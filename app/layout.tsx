@@ -2,7 +2,7 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import Sidebar from '@/components/sidebar';
-import { Plus_Jakarta_Sans, Merriweather } from 'next/font/google';
+import { Merriweather } from 'next/font/google';
 
 export const metadata: Metadata = {
   title: 'Application Tracker',
@@ -17,7 +17,7 @@ const merriweather = Merriweather({
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`h-full } ${merriweather.variable}`}>
+    <html lang="en" className={`h-full ${merriweather.variable}`}>
       <body className="h-full bg-neutral-100 text-neutral-900 antialiased font-display">
         <Sidebar />
         <div className="min-h-screen pl-64">
