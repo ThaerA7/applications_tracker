@@ -2,6 +2,7 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import Sidebar from '@/components/sidebar';
+import TopBar from '@/components/topbar'; // ⬅️ add this
 import { Merriweather } from 'next/font/google';
 
 export const metadata: Metadata = {
@@ -21,8 +22,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="h-full bg-neutral-100 text-neutral-900 antialiased font-display">
         <Sidebar />
         <div className="min-h-screen pl-64">
+          <TopBar />
           <main className="min-h-screen bg-white">
-            <div className="mx-auto w-full max-w-5xl px-6 py-8">
+            {/* ⬇️ wider + 10 gap left/right */}
+            <div className="w-full px-5 py-5">
               {children}
             </div>
           </main>

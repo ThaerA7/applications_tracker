@@ -44,8 +44,8 @@ export default function Sidebar() {
           <Image
             src="/application_tracker.png"
             alt=""
-            width={200}
-            height={200}
+            width={202}
+            height={202}
             priority
             className="block"
           />
