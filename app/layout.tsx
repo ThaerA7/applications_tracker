@@ -18,13 +18,12 @@ const merriweather = Merriweather({
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`h-full ${merriweather.variable}`}>
+    <html lang="en" className={`h-full text-[115%] ${merriweather.variable}`}>
       <body className="h-full bg-neutral-100 text-neutral-900 antialiased font-display">
         <Sidebar />
         <div className="min-h-screen pl-64">
           <TopBar />
           <main className="min-h-screen bg-white">
-            {/* ⬇️ wider + 10 gap left/right */}
             <div className="w-full px-5 py-5">
               {children}
             </div>
