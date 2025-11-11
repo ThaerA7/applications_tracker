@@ -28,7 +28,7 @@ export default function Sidebar() {
   return (
     <aside className="fixed inset-y-0 left-0 z-50 w-64 border-r border-neutral-800 bg-black shadow-2xl shadow-black/40">
       {/* Brand */}
-      <div className="flex h-28 items-center justify-center border-b border-neutral-800 overflow-visible px-4">
+      <div className="flex items-center justify-center border-b border-neutral-800 overflow-visible px-4 py-2">
         <Link href="/" aria-label="Application Tracker" className="group inline-flex items-center gap-2">
           <Image
             src="/icons/site_logo.png"
@@ -39,7 +39,7 @@ export default function Sidebar() {
             className="block shrink-0 rounded-md transition-transform group-hover:scale-105"
           />
           {/* Stacked words to the right of the logo */}
-          <span className="leading-tight text-white font-medium">
+          <span className="leading-tight text-white font-bold">
             <span className="block uppercase tracking-widest">Application</span>
             <span className="block uppercase tracking-widest">Tracker</span>
           </span>
