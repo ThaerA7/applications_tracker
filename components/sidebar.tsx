@@ -28,16 +28,21 @@ export default function Sidebar() {
   return (
     <aside className="fixed inset-y-0 left-0 z-50 w-64 border-r border-neutral-800 bg-black shadow-2xl shadow-black/40">
       {/* Brand */}
-      <div className="flex h-28 items-center justify-center border-b border-neutral-800 overflow-visible">
-        <Link href="/" aria-label="Application Tracker" className="inline-flex">
+      <div className="flex h-28 items-center justify-center border-b border-neutral-800 overflow-visible px-4">
+        <Link href="/" aria-label="Application Tracker" className="group inline-flex items-center gap-2">
           <Image
-            src="/application_tracker.png"
-            alt=""
-            width={202}
-            height={202}
+            src="/icons/site_logo.png"
+            alt="Application Tracker logo"
+            width={75}
+            height={75}
             priority
-            className="block"
+            className="block shrink-0 rounded-md transition-transform group-hover:scale-105"
           />
+          {/* Stacked words to the right of the logo */}
+          <span className="leading-tight text-white font-medium">
+            <span className="block uppercase tracking-widest">Application</span>
+            <span className="block uppercase tracking-widest">Tracker</span>
+          </span>
         </Link>
       </div>
 
@@ -72,7 +77,6 @@ export default function Sidebar() {
 
       <div className="absolute bottom-0 w-full border-t border-neutral-800 p-3 text-[0.9375rem] text-zinc-500">
         v0.1
-        {/* (Optional) Free Icons8 assets usually require attribution. */}
         {/* <span className="ml-2">Icons by <a href="https://icons8.com" className="underline">Icons8</a></span> */}
       </div>
     </aside>
