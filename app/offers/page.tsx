@@ -131,24 +131,24 @@ function labelFromApiOfferType(v?: string | number): string | null {
   return map[key] ?? key.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-/** Try to read a total from any common shape */
 function extractTotal(json: any): number | null {
   const candidates = [
-    json?.total,
-    json?.page?.totalElements,
+    json?.total,                               // returned by our API
+    json?.baPage?.stellenangeboteGesamt,       // BA real total (when present)
     json?.baPage?.totalElements,
-    json?.totalCount,
-    json?.count,
+    json?.page?.totalElements,
     json?.totalElements,
+    json?.count,
     json?.paging?.total,
     json?.hits?.total?.value ?? json?.hits?.total,
-  ];
-  for (const c of candidates) {
-    const n = Number(c);
-    if (Number.isFinite(n) && n >= 0) return n;
-  }
-  return null;
+  ]
+    .map((v) => Number(v))
+    .filter((n) => Number.isFinite(n) && n >= 0);
+
+  if (candidates.length === 0) return null;
+  return Math.max(...candidates);
 }
+
 
 // ---------- FloatingMenu ----------
 function FloatingMenu({
@@ -426,7 +426,11 @@ export default function OffersPage() {
 
     const res = await fetch(`/api/jobs?${params.toString()}`, { cache: 'no-store' });
     const json = await res.json();
-    if (!res.ok) throw new Error(json?.error || `HTTP ${res.status}`);
+    if (!res.ok) {
+   throw new Error(
+     `${json?.error || `HTTP ${res.status}`}\n${json?.forwardedUrl || ''}`
+   );
+ }
 
     const batch: JobRow[] = Array.isArray(json?.results) ? json.results : [];
     const parsedTotal = extractTotal(json);

@@ -14,32 +14,30 @@ const BASE_URL = 'https://rest.arbeitsagentur.de/jobboerse/jobsuche-service/pc/v
 const JOBSUCHE_KEY = process.env.JOBSUCHE_API_KEY ?? 'jobboerse-jobsuche';
 
 function extractTotalBA(data: any): number | null {
-  const cands = [
+  const candidates = [
+    data?.stellenangeboteGesamt,
     data?.page?.totalElements,
     data?.totalElements,
     data?.gesamt,
     data?.gesamtAnzahl,
-    data?.stellenangeboteGesamt,
-  ];
-  for (const c of cands) {
-    const n = Number(c);
-    if (Number.isFinite(n) && n >= 0) return n;
-  }
-  return null;
+  ].map(Number).filter((n) => Number.isFinite(n) && n >= 0);
+  return candidates.length ? Math.max(...candidates) : null;
 }
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
 
-  // alias support: q → was
   const was = searchParams.get('was') ?? searchParams.get('q') ?? '';
   const wo = searchParams.get('wo') ?? '';
   const umkreis = searchParams.get('umkreis') ?? '';
-  const page = searchParams.get('page') ?? '1';   // 1-based
-  const size = searchParams.get('size') ?? '20';  // 20 per page
-  const angebotsart = searchParams.get('angebotsart') ?? '1'; // default like BA page: Arbeit
-  const arbeitszeit = searchParams.get('arbeitszeit') ?? '';  // vz|tz|mj|ho|snw (optional)
-  const sortierung = searchParams.get('sortierung') ?? '';    // optional
+const uiPage = Math.max(1, Number(searchParams.get('page') ?? '1'));
+  const size = searchParams.get('size') ?? '20';
+  const angebotsart = searchParams.get('angebotsart') ?? '1';
+  const arbeitszeit = searchParams.get('arbeitszeit') ?? '';
+  const sortierung = searchParams.get('sortierung') ?? '';
+
+  // BA is 0-based -> translate here
+  const upstreamPage = String(uiPage);
 
   const qs = new URLSearchParams();
   if (was) qs.set('was', was);
@@ -48,7 +46,7 @@ export async function GET(req: NextRequest) {
   if (angebotsart) qs.set('angebotsart', angebotsart);
   if (arbeitszeit) qs.set('arbeitszeit', arbeitszeit);
   if (sortierung) qs.set('sortierung', sortierung);
-  qs.set('page', page);
+  qs.set('page', upstreamPage);
   qs.set('size', size);
 
   const url = `${BASE_URL}?${qs.toString()}`;
@@ -58,12 +56,10 @@ export async function GET(req: NextRequest) {
       headers: { 'X-API-Key': JOBSUCHE_KEY, Accept: 'application/json' },
       cache: 'no-store',
     });
-
     const text = await upstream.text();
 
     if (!upstream.ok) {
-      let body: any;
-      try { body = JSON.parse(text); } catch { body = text; }
+      let body: any; try { body = JSON.parse(text); } catch { body = text; }
       return NextResponse.json(
         { error: `Upstream error ${upstream.status}`, upstream: body, forwardedUrl: url },
         { status: upstream.status }
@@ -83,7 +79,9 @@ export async function GET(req: NextRequest) {
       const location =
         typeof locObj === 'string' ? locObj : [locObj?.ort, locObj?.region, locObj?.land].filter(Boolean).join(', ');
       const hashId = j?.hashId ?? j?.hashID ?? j?.refnr;
-      const detailUrl = hashId ? `https://www.arbeitsagentur.de/jobsuche/jobdetail/${encodeURIComponent(hashId)}` : undefined;
+      const detailUrl = hashId
+        ? `https://www.arbeitsagentur.de/jobsuche/jobdetail/${encodeURIComponent(hashId)}`
+        : undefined;
 
       const offerType = j?.angebotsart ?? j?.arbeitszeit ?? undefined;
       const logoUrl = j?.arbeitgeberLogo ?? j?.logoUrl ?? undefined;
@@ -94,8 +92,8 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       results,
-      total,                  // exact BA total
-      page: Number(page),     // 1-based
+      total,               // now reliable
+      page: uiPage,        // keep UI 1-based
       size: Number(size),
       baPage: data?.page ?? null,
     });
@@ -103,3 +101,4 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: err?.message ?? 'Unexpected error' }, { status: 500 });
   }
 }
+
