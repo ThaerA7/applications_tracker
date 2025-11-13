@@ -15,12 +15,16 @@ const JOBSUCHE_KEY = process.env.JOBSUCHE_API_KEY ?? 'jobboerse-jobsuche';
 
 function extractTotalBA(data: any): number | null {
   const candidates = [
+    data?.maxErgebnisse,          // <-- REAL BA total
     data?.stellenangeboteGesamt,
     data?.page?.totalElements,
     data?.totalElements,
     data?.gesamt,
     data?.gesamtAnzahl,
-  ].map(Number).filter((n) => Number.isFinite(n) && n >= 0);
+  ]
+    .map((v) => Number(v))
+    .filter((n) => Number.isFinite(n) && n >= 0);
+
   return candidates.length ? Math.max(...candidates) : null;
 }
 

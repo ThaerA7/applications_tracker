@@ -133,8 +133,10 @@ function labelFromApiOfferType(v?: string | number): string | null {
 
 function extractTotal(json: any): number | null {
   const candidates = [
-    json?.total,                               // returned by our API
-    json?.baPage?.stellenangeboteGesamt,       // BA real total (when present)
+    json?.total,                          // from our own API
+    json?.maxErgebnisse,                  // if we ever forward it
+    json?.baPage?.maxErgebnisse,
+    json?.baPage?.stellenangeboteGesamt,
     json?.baPage?.totalElements,
     json?.page?.totalElements,
     json?.totalElements,
