@@ -75,24 +75,68 @@ const uiPage = Math.max(1, Number(searchParams.get('page') ?? '1'));
     const total = extractTotalBA(data);
 
     const results = rows.map((j: any) => {
-      const title = j?.titel ?? j?.beruf ?? j?.stellenbezeichnung ?? j?.berufsbezeichnung ?? 'Ohne Titel';
-      const employer =
-        (typeof j?.arbeitgeber === 'string' && j?.arbeitgeber) ||
-        j?.arbeitgeber?.name || j?.unternehmen || j?.firma || '';
-      const locObj = j?.arbeitsort ?? j?.arbeitsorte?.[0] ?? {};
-      const location =
-        typeof locObj === 'string' ? locObj : [locObj?.ort, locObj?.region, locObj?.land].filter(Boolean).join(', ');
-      const hashId = j?.hashId ?? j?.hashID ?? j?.refnr;
-      const detailUrl = hashId
-        ? `https://www.arbeitsagentur.de/jobsuche/jobdetail/${encodeURIComponent(hashId)}`
-        : undefined;
+  const title =
+    j?.titel ??
+    j?.beruf ??
+    j?.stellenbezeichnung ??
+    j?.berufsbezeichnung ??
+    'Ohne Titel';
 
-      const offerType = j?.angebotsart ?? j?.arbeitszeit ?? undefined;
-      const logoUrl = j?.arbeitgeberLogo ?? j?.logoUrl ?? undefined;
-      const distanceKm = j?.entfernung ?? undefined;
+  const employer =
+    (typeof j?.arbeitgeber === 'string' && j?.arbeitgeber) ||
+    j?.arbeitgeber?.name ||
+    j?.unternehmen ||
+    j?.firma ||
+    '';
 
-      return { title, employer, location, hashId, detailUrl, offerType, logoUrl, distanceKm };
-    });
+  const locObj = j?.arbeitsort ?? j?.arbeitsorte?.[0] ?? {};
+  const location =
+    typeof locObj === 'string'
+      ? locObj
+      : [locObj?.ort, locObj?.region, locObj?.land]
+          .filter(Boolean)
+          .join(', ');
+
+  const hashId = j?.hashId ?? j?.hashID ?? j?.refnr;
+
+  // 🔗 1) try to use the company / external URL from BA
+  const externalUrlRaw =
+    j?.externeUrl ??
+    j?.externeURL ??
+    j?.externeurl ??
+    undefined;
+
+  const externalUrl =
+    typeof externalUrlRaw === 'string' && externalUrlRaw.trim().length > 0
+      ? externalUrlRaw.trim()
+      : undefined;
+
+  // 🔗 2) fallback: BA job detail page
+  const baDetailUrl = hashId
+    ? `https://www.arbeitsagentur.de/jobsuche/jobdetail/${encodeURIComponent(
+        hashId,
+      )}`
+    : undefined;
+
+  // 🔗 3) final URL sent to the frontend
+  const detailUrl = externalUrl ?? baDetailUrl;
+
+  const offerType = j?.angebotsart ?? j?.arbeitszeit ?? undefined;
+  const logoUrl = j?.arbeitgeberLogo ?? j?.logoUrl ?? undefined;
+  const distanceKm = j?.entfernung ?? undefined;
+
+  return {
+    title,
+    employer,
+    location,
+    hashId,
+    detailUrl,     // now: company URL first, BA fallback
+    offerType,
+    logoUrl,
+    distanceKm,
+  };
+});
+
 
     return NextResponse.json({
       results,
