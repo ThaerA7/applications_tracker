@@ -1,6 +1,13 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, ReactNode } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  ReactNode,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import {
@@ -34,13 +41,16 @@ type JobRow = {
   detailUrl?: string;
   logoUrl?: string;
   distanceKm?: number;
-  offerType?: string | number; // label or BA angebotsart / arbeitszeit
-  startDate?: string | null;   // job start date (eintrittsdatum)
+  offerType?: string; // <-- human-readable label from API
+  startDate?: string | null;
 };
 
 // ---------- utils ----------
 function normalize(s: string) {
-  return s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+  return s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '');
 }
 function rankedSuggestions(source: string[], q: string, max = 8) {
   const nq = normalize(q.trim());
@@ -59,24 +69,70 @@ function rankedSuggestions(source: string[], q: string, max = 8) {
   return scored.slice(0, max).map((x) => x.s);
 }
 
-// choose icon
 function pickJobIcon(title: string) {
   const t = title.toLowerCase();
-  if (/(dev|software|frontend|backend|full[- ]?stack|react|angular|vue|typescript|engineer|programm)/.test(t)) return Code2;
-  if (/(data|ml|ai|cloud|devops|kubernetes|docker|sysadmin|sre|platform|server)/.test(t)) return Server;
-  if (/(nurse|pfleg|arzt|ärzt|medizin|therap|apothe|health|care)/.test(t)) return Stethoscope;
-  if (/(mechanic|mechatron|installat|wartung|techniker|elektrik|elektron|service)/.test(t)) return Wrench;
-  if (/(bau|construction|maurer|zimmerer|tiefbau|hochbau|handwerk)/.test(t)) return Hammer;
-  if (/(driver|fahrer|logistik|liefer|kurier|transport|truck|flotte)/.test(t)) return Truck;
-  if (/(koch|küche|chef|gastronomie|restaurant|küchenhilfe|kitchen|cook)/.test(t)) return ChefHat;
-  if (/(design|ux|ui|grafik|creative|art|produktdesign)/.test(t)) return Palette;
-  if (/(teacher|ausbilder|trainer|schule|bildung|dozent|professor|ausbildung)/.test(t)) return GraduationCap;
-  if (/(factory|produktion|fertigung|betrieb|warehouse|lager|industrie)/.test(t)) return Building2;
-  if (/(sales|vertrieb|account|customer|kunden|business|consult)/.test(t)) return Briefcase;
+  if (
+    /(dev|software|frontend|backend|full[- ]?stack|react|angular|vue|typescript|engineer|programm)/.test(
+      t,
+    )
+  )
+    return Code2;
+  if (
+    /(data|ml|ai|cloud|devops|kubernetes|docker|sysadmin|sre|platform|server)/.test(
+      t,
+    )
+  )
+    return Server;
+  if (
+    /(nurse|pfleg|arzt|ärzt|medizin|therap|apothe|health|care)/.test(t)
+  )
+    return Stethoscope;
+  if (
+    /(mechanic|mechatron|installat|wartung|techniker|elektrik|elektron|service)/.test(
+      t,
+    )
+  )
+    return Wrench;
+  if (
+    /(bau|construction|maurer|zimmerer|tiefbau|hochbau|handwerk)/.test(
+      t,
+    )
+  )
+    return Hammer;
+  if (
+    /(driver|fahrer|logistik|liefer|kurier|transport|truck|flotte)/.test(t)
+  )
+    return Truck;
+  if (
+    /(koch|küche|chef|gastronomie|restaurant|küchenhilfe|kitchen|cook)/.test(
+      t,
+    )
+  )
+    return ChefHat;
+  if (
+    /(design|ux|ui|grafik|creative|art|produktdesign)/.test(t)
+  )
+    return Palette;
+  if (
+    /(teacher|ausbilder|trainer|schule|bildung|dozent|professor|ausbildung)/.test(
+      t,
+    )
+  )
+    return GraduationCap;
+  if (
+    /(factory|produktion|fertigung|betrieb|warehouse|lager|industrie)/.test(
+      t,
+    )
+  )
+    return Building2;
+  if (
+    /(sales|vertrieb|account|customer|kunden|business|consult)/.test(t)
+  )
+    return Briefcase;
   return Briefcase;
 }
 
-// --------- BA mappings (fixed to official) ----------
+// --------- BA mappings for FILTER (UI → API) ----------
 /** UI → BA `angebotsart` */
 function angebotToParam(v: string): string | null {
   switch (v) {
@@ -98,7 +154,9 @@ function angebotToParam(v: string): string | null {
   }
 }
 /** UI → BA `arbeitszeit` (lowercase codes) */
-function arbeitszeitParam(v: string): 'vz' | 'tz' | 'mj' | null {
+function arbeitszeitParam(
+  v: string,
+): 'vz' | 'tz' | 'mj' | null {
   if (v === 'vollzeit') return 'vz';
   if (v === 'teilzeit') return 'tz';
   if (v === 'minijob') return 'mj';
@@ -122,72 +180,34 @@ const OFFER_LABEL = (v?: string) => {
   if (!v) return '';
   const found = OFFER_OPTIONS.find((o) => o.value === v);
   if (found) return found.label;
-  return v.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  return v
+    .replace(/-/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 };
 
-/** Label shown from REAL BA `offerType` (id or string) */
-function labelFromApiOfferType(v?: string | number): string | null {
-  if (v === undefined || v === null) return null;
-  const key = String(v).trim().toLowerCase();
-  const map: Record<string, string> = {
-    '1': 'Arbeit',
-    '2': 'Selbstständigkeit',
-    '4': 'Ausbildung/Duales Studium',
-    '34': 'Praktikum/Trainee',
-
-    job: 'Arbeit',
-    arbeit: 'Arbeit',
-    ausbildung: 'Ausbildung',
-    'duales-studium': 'Duales Studium',
-    praktikum: 'Praktikum',
-    trainee: 'Trainee',
-    werkstudent: 'Werkstudent',
-
-    minijob: 'Minijob',
-    teilzeit: 'Teilzeit Job',
-    vollzeit: 'Vollzeit Job',
-    freelance: 'Selbstständigkeit',
-    freiberuflich: 'Selbstständigkeit',
-
-    // BA arbeitszeit codes
-    vz: 'Vollzeit Job',
-    tz: 'Teilzeit Job',
-    mj: 'Minijob',
-    ho: 'Homeoffice Job',
-    snw: 'Schicht / Nacht / Wochenende',
-  };
-  return map[key] ?? key.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-// Format start date (eintrittsdatum) nicely for UI
 function formatStartDate(raw?: string | null): string | null {
   if (!raw) return null;
   const trimmed = raw.trim();
   if (!trimmed) return null;
 
-  // If BA already sends something like "ab sofort" / free text → show as is
   if (/ab\s*sofort/i.test(trimmed)) {
     return 'ab sofort';
   }
 
   const d = new Date(trimmed);
   if (Number.isNaN(d.getTime())) {
-    // Not a parsable date (e.g. "nach Vereinbarung") → show the original text
     return trimmed;
   }
 
-  // Normalize both dates to midnight
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const start = new Date(d);
   start.setHours(0, 0, 0, 0);
 
-  // Heuristic: if the start date is today or in the past, treat it as "ab sofort"
   if (start <= today) {
     return 'ab sofort';
   }
 
-  // Otherwise show a normal German date
   return start.toLocaleDateString('de-DE', {
     year: 'numeric',
     month: '2-digit',
@@ -195,11 +215,10 @@ function formatStartDate(raw?: string | null): string | null {
   });
 }
 
-
 function extractTotal(json: any): number | null {
   const candidates = [
     json?.total, // from our own API
-    json?.maxErgebnisse, // if we ever forward it
+    json?.maxErgebnisse,
     json?.baPage?.maxErgebnisse,
     json?.baPage?.stellenangeboteGesamt,
     json?.baPage?.totalElements,
@@ -233,7 +252,11 @@ function FloatingMenu({
   align?: 'left' | 'right';
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<{ left: number; top: number; visibility: 'hidden' | 'visible' }>({
+  const [pos, setPos] = useState<{
+    left: number;
+    top: number;
+    visibility: 'hidden' | 'visible';
+  }>({
     left: -9999,
     top: -9999,
     visibility: 'hidden',
@@ -245,14 +268,18 @@ function FloatingMenu({
     if (!anchor || !menu) return;
     const a = anchor.getBoundingClientRect();
     let left = align === 'right' ? a.right - width : a.left;
-    left = Math.max(8, Math.min(left, window.innerWidth - width - 8));
+    left = Math.max(
+      8,
+      Math.min(left, window.innerWidth - width - 8),
+    );
     let top = a.bottom + 6;
     menu.style.position = 'fixed';
     menu.style.left = `${left}px`;
     menu.style.top = `${top}px`;
     menu.style.width = `${width}px`;
     const m = menu.getBoundingClientRect();
-    if (m.bottom > window.innerHeight - 8) top = Math.max(8, a.top - m.height - 6);
+    if (m.bottom > window.innerHeight - 8)
+      top = Math.max(8, a.top - m.height - 6);
     setPos({ left, top, visibility: 'visible' });
   };
 
@@ -261,8 +288,11 @@ function FloatingMenu({
     calc();
     const onScroll = () => calc();
     const onResize = () => calc();
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    window.addEventListener('scroll', onScroll, { passive: true });
+    const onKey = (e: KeyboardEvent) =>
+      e.key === 'Escape' && onClose();
+    window.addEventListener('scroll', onScroll, {
+      passive: true,
+    });
     window.addEventListener('resize', onResize);
     window.addEventListener('keydown', onKey);
     return () => {
@@ -270,8 +300,7 @@ function FloatingMenu({
       window.removeEventListener('resize', onResize);
       window.removeEventListener('keydown', onKey);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, onClose]);
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
@@ -282,7 +311,8 @@ function FloatingMenu({
       onClose();
     }
     document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
+    return () =>
+      document.removeEventListener('mousedown', onDoc);
   }, [open, onClose]);
 
   if (!open) return null;
@@ -291,7 +321,14 @@ function FloatingMenu({
     <div
       ref={menuRef}
       role="menu"
-      style={{ position: 'fixed', left: pos.left, top: pos.top, width, zIndex: 9999, visibility: pos.visibility }}
+      style={{
+        position: 'fixed',
+        left: pos.left,
+        top: pos.top,
+        width,
+        zIndex: 9999,
+        visibility: pos.visibility,
+      }}
       className="overflow-auto max-h-[80vh] rounded-lg border border-neutral-200 bg-white/95 backdrop-blur shadow-lg"
     >
       {children}
@@ -331,7 +368,10 @@ function AutoCompleteInput({
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLUListElement>(null);
-  const items = useMemo(() => rankedSuggestions(suggestionsSource, value, 8), [suggestionsSource, value]);
+  const items = useMemo(
+    () => rankedSuggestions(suggestionsSource, value, 8),
+    [suggestionsSource, value],
+  );
 
   useEffect(() => setMounted(true), []);
   useEffect(() => {
@@ -342,13 +382,20 @@ function AutoCompleteInput({
   useEffect(() => {
     function onDoc(e: MouseEvent) {
       if (!rootRef.current) return;
-      if (!rootRef.current.contains(e.target as Node)) setOpen(false);
+      if (!rootRef.current.contains(e.target as Node))
+        setOpen(false);
     }
     document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
+    return () =>
+      document.removeEventListener('mousedown', onDoc);
   }, []);
 
-  const [pos, setPos] = useState<{ left: number; top: number; width: number } | null>(null);
+  const [pos, setPos] = useState<{
+    left: number;
+    top: number;
+    width: number;
+  } | null>(null);
+
   useLayoutEffect(() => {
     if (!open || !inputRef.current) return;
     const update = () => {
@@ -359,15 +406,28 @@ function AutoCompleteInput({
       const approxHeight = Math.min(8 * 36 + 12, 320);
       const spaceBelow = window.innerHeight - rect.bottom;
       const spaceAbove = rect.top;
-      if (spaceBelow < approxHeight && spaceAbove > spaceBelow) top = rect.top + window.scrollY - Math.min(approxHeight, spaceAbove) - 8;
+      if (spaceBelow < approxHeight && spaceAbove > spaceBelow)
+        top =
+          rect.top +
+          window.scrollY -
+          Math.min(approxHeight, spaceAbove) -
+          8;
       setPos({ left, top, width: rect.width });
     };
     update();
     const events = ['scroll', 'resize'];
-    events.forEach((ev) => window.addEventListener(ev, update, { passive: true } as any));
+    events.forEach((ev) =>
+      window.addEventListener(
+        ev,
+        update,
+        { passive: true } as any,
+      ),
+    );
     const raf = requestAnimationFrame(update);
     return () => {
-      events.forEach((ev) => window.removeEventListener(ev, update));
+      events.forEach((ev) =>
+        window.removeEventListener(ev, update),
+      );
       cancelAnimationFrame(raf);
     };
   }, [open, value]);
@@ -379,7 +439,12 @@ function AutoCompleteInput({
       ref={dropdownRef}
       role="listbox"
       className="z-[9999] max-h-80 overflow-auto rounded-lg border border-neutral-200 bg-white/95 backdrop-blur shadow-lg"
-      style={{ position: 'absolute', left: pos?.left ?? -9999, top: pos?.top ?? -9999, width: pos?.width ?? undefined }}
+      style={{
+        position: 'absolute',
+        left: pos?.left ?? -9999,
+        top: pos?.top ?? -9999,
+        width: pos?.width ?? undefined,
+      }}
     >
       {items.map((s, idx) => (
         <li
@@ -390,9 +455,15 @@ function AutoCompleteInput({
             e.preventDefault();
             onChange(s);
             setOpen(false);
-            if (submitOnPick) inputRef.current?.form?.requestSubmit();
+            if (submitOnPick)
+              inputRef.current?.form?.requestSubmit();
           }}
-          className={['cursor-pointer px-3 py-2 text-sm', idx === active ? 'bg-neutral-100' : 'hover:bg-neutral-50'].join(' ')}
+          className={[
+            'cursor-pointer px-3 py-2 text-sm',
+            idx === active
+              ? 'bg-neutral-100'
+              : 'hover:bg-neutral-50',
+          ].join(' ')}
         >
           {s}
         </li>
@@ -405,7 +476,9 @@ function AutoCompleteInput({
       <div
         className={[
           'pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 z-10',
-          icon === 'search' ? 'text-amber-600' : 'text-orange-600',
+          icon === 'search'
+            ? 'text-amber-600'
+            : 'text-orange-600',
         ].join(' ')}
         aria-hidden="true"
       >
@@ -421,12 +494,16 @@ function AutoCompleteInput({
         aria-autocomplete="list"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        onFocus={() => items.length > 0 && setOpen(true)}
+        onFocus={() =>
+          items.length > 0 && setOpen(true)
+        }
         onKeyDown={(e) => {
           if (open) {
             if (e.key === 'ArrowDown') {
               e.preventDefault();
-              setActive((i) => Math.min(i + 1, items.length - 1));
+              setActive((i) =>
+                Math.min(i + 1, items.length - 1),
+              );
               return;
             }
             if (e.key === 'ArrowUp') {
@@ -438,7 +515,10 @@ function AutoCompleteInput({
               e.preventDefault();
               onChange(items[active]);
               setOpen(false);
-              (inputRef.current?.form as HTMLFormElement | undefined)?.requestSubmit();
+              (
+                inputRef.current
+                  ?.form as HTMLFormElement | undefined
+              )?.requestSubmit();
               return;
             }
             if (e.key === 'Escape') {
@@ -446,7 +526,11 @@ function AutoCompleteInput({
               return;
             }
           }
-          if (e.key === 'Enter') (inputRef.current?.form as HTMLFormElement | undefined)?.requestSubmit();
+          if (e.key === 'Enter')
+            (
+              inputRef.current
+                ?.form as HTMLFormElement | undefined
+            )?.requestSubmit();
         }}
         className={[
           'h-11 w-full rounded-lg text-sm text-neutral-900 placeholder:text-neutral-500',
@@ -460,10 +544,16 @@ function AutoCompleteInput({
       />
       {rightAddon && (
         <div className="absolute right-1 top-1/2 z-20 -translate-y-1/2">
-          <div className="flex items-center gap-1">{rightAddon}</div>
+          <div className="flex items-center gap-1">
+            {rightAddon}
+          </div>
         </div>
       )}
-      {open && items.length > 0 && mounted && pos && createPortal(dropdownEl, document.body)}
+      {open &&
+        items.length > 0 &&
+        mounted &&
+        pos &&
+        createPortal(dropdownEl, document.body)}
     </div>
   );
 }
@@ -478,14 +568,26 @@ function useDebounced<T>(value: T, delay = 200) {
   return debounced;
 }
 
-const DISTANCES = ['5', '10', '15', '20', '25', '30', '35', '40', '45', '50'] as const;
+const DISTANCES = [
+  '5',
+  '10',
+  '15',
+  '20',
+  '25',
+  '30',
+  '35',
+  '40',
+  '45',
+  '50',
+] as const;
 const PAGE_SIZE = 20;
 
-// identity + dedupe
 function jobIdentity(j: JobRow): string {
   const base = j.hashId?.trim() || j.detailUrl?.trim();
   if (base) return base;
-  return `${j.employer ?? ''}|${j.title ?? ''}|${j.location ?? ''}`.toLowerCase();
+  return `${j.employer ?? ''}|${j.title ?? ''}|${
+    j.location ?? ''
+  }`.toLowerCase();
 }
 function dedupeJobs(list: JobRow[]): JobRow[] {
   const seen = new Set<string>();
@@ -499,35 +601,38 @@ function dedupeJobs(list: JobRow[]): JobRow[] {
   return out;
 }
 
-// For sorting "ab sofort" and real dates
 function sortStartValue(raw?: string | null): number {
   if (!raw) return Number.POSITIVE_INFINITY;
   const trimmed = raw.trim();
   if (!trimmed) return Number.POSITIVE_INFINITY;
 
-  // treat "ab sofort" as earliest
   if (/ab\s*sofort/i.test(trimmed)) return 0;
 
   const d = new Date(trimmed);
-  if (Number.isNaN(d.getTime())) return Number.POSITIVE_INFINITY;
+  if (Number.isNaN(d.getTime()))
+    return Number.POSITIVE_INFINITY;
 
-  // earlier dates first
   return d.getTime();
 }
 
-// Sort jobs: 1) by distance (ascending), 2) by start date (earliest first)
-function sortJobsByDistanceThenStart(list: JobRow[]): JobRow[] {
+function sortJobsByDistanceThenStart(
+  list: JobRow[],
+): JobRow[] {
   return [...list].sort((a, b) => {
-    const ad = Number.isFinite(a.distanceKm as number) ? (a.distanceKm as number) : Number.POSITIVE_INFINITY;
-    const bd = Number.isFinite(b.distanceKm as number) ? (b.distanceKm as number) : Number.POSITIVE_INFINITY;
+    const ad = Number.isFinite(a.distanceKm as number)
+      ? (a.distanceKm as number)
+      : Number.POSITIVE_INFINITY;
+    const bd = Number.isFinite(b.distanceKm as number)
+      ? (b.distanceKm as number)
+      : Number.POSITIVE_INFINITY;
 
-    if (ad !== bd) return ad - bd; // closer first
+    if (ad !== bd) return ad - bd;
 
     const asv = sortStartValue(a.startDate);
     const bsv = sortStartValue(b.startDate);
-    if (asv !== bsv) return asv - bsv; // earlier start first
+    if (asv !== bsv) return asv - bsv;
 
-    return 0; // keep relative order otherwise
+    return 0;
   });
 }
 
@@ -536,19 +641,20 @@ export default function OffersPage() {
   const [q, setQ] = useState('');
   const [wo, setWo] = useState('');
   const [distance, setDistance] = useState<string>(''); // km
-  const [offerType, setOfferType] = useState<string>(''); // UI-only filter
+  const [offerType, setOfferType] = useState<string>(''); // UI filter only
   const [offerOpen, setOfferOpen] = useState(false);
   const [distanceOpen, setDistanceOpen] = useState(false);
   const offerBtnRef = useRef<HTMLButtonElement | null>(null);
-  const distanceBtnRef = useRef<HTMLButtonElement | null>(null);
+  const distanceBtnRef =
+    useRef<HTMLButtonElement | null>(null);
 
   const [loadingFirst, setLoadingFirst] = useState(false);
   const [pageLoading, setPageLoading] = useState(false);
   const [allResults, setAllResults] = useState<JobRow[]>([]);
   const [page, setPage] = useState(1);
-  const [totalAvailable, setTotalAvailable] = useState<number | null>(null);
+  const [totalAvailable, setTotalAvailable] =
+    useState<number | null>(null);
 
-  // live suggestions
   const [kwSugs, setKwSugs] = useState<string[]>([]);
   const [locSugs, setLocSugs] = useState<string[]>([]);
   const dq = useDebounced(q, 220);
@@ -562,9 +668,18 @@ export default function OffersPage() {
     const ac = new AbortController();
     (async () => {
       try {
-        const r = await fetch(`/api/suggest/keywords?q=${encodeURIComponent(dq)}`, { signal: ac.signal, cache: 'no-store' });
-        const j = await r.json().catch(() => ({ suggestions: [] }));
-        setKwSugs(Array.isArray(j?.suggestions) ? j.suggestions : []);
+        const r = await fetch(
+          `/api/suggest/keywords?q=${encodeURIComponent(dq)}`,
+          { signal: ac.signal, cache: 'no-store' },
+        );
+        const j = await r
+          .json()
+          .catch(() => ({ suggestions: [] }));
+        setKwSugs(
+          Array.isArray(j?.suggestions)
+            ? j.suggestions
+            : [],
+        );
       } catch {
         if (!ac.signal.aborted) setKwSugs([]);
       }
@@ -580,9 +695,20 @@ export default function OffersPage() {
     const ac = new AbortController();
     (async () => {
       try {
-        const r = await fetch(`/api/suggest/locations?q=${encodeURIComponent(dwo)}`, { signal: ac.signal, cache: 'no-store' });
-        const j = await r.json().catch(() => ({ suggestions: [] }));
-        setLocSugs(Array.isArray(j?.suggestions) ? j.suggestions : []);
+        const r = await fetch(
+          `/api/suggest/locations?q=${encodeURIComponent(
+            dwo,
+          )}`,
+          { signal: ac.signal, cache: 'no-store' },
+        );
+        const j = await r
+          .json()
+          .catch(() => ({ suggestions: [] }));
+        setLocSugs(
+          Array.isArray(j?.suggestions)
+            ? j.suggestions
+            : [],
+        );
       } catch {
         if (!ac.signal.aborted) setLocSugs([]);
       }
@@ -590,15 +716,17 @@ export default function OffersPage() {
     return () => ac.abort();
   }, [dwo]);
 
-  // keep URL in sync
   function pushUrl(nextUiPage = 1) {
     const params = new URLSearchParams();
     if (q.trim()) params.set('q', q.trim());
     if (wo.trim()) params.set('wo', wo.trim());
-    if (distance && wo.trim()) params.set('umkreis', distance);
+    if (distance && wo.trim())
+      params.set('umkreis', distance);
     if (offerType) params.set('typ', offerType);
     params.set('page', String(nextUiPage));
-    router.replace(`?${params.toString()}`, { scroll: false });
+    router.replace(`?${params.toString()}`, {
+      scroll: false,
+    });
   }
 
   async function fetchPage(pageNum: number) {
@@ -608,24 +736,35 @@ export default function OffersPage() {
       params.set('wo', wo.trim());
       if (distance) params.set('umkreis', distance);
     }
-    // BA default is Arbeit; send angebotsart even when none picked so totals match BA
-    const angebot = angebotToParam(offerType) ?? '1';
-    params.set('angebotsart', angebot);
+
+    // Only send angebotsart when a specific type is chosen.
+    // "Any offer" => no angebotsart, BA returns all types.
+    const angebot = angebotToParam(offerType);
+    if (angebot) params.set('angebotsart', angebot);
 
     const az = arbeitszeitParam(offerType);
-    if (az) params.set('arbeitszeit', az); // vz|tz|mj
+    if (az) params.set('arbeitszeit', az);
 
     const oneBased = Math.max(1, pageNum);
     params.set('size', String(PAGE_SIZE));
     params.set('page', String(oneBased));
 
-    const res = await fetch(`/api/jobs?${params.toString()}`, { cache: 'no-store' });
+    const res = await fetch(
+      `/api/jobs?${params.toString()}`,
+      { cache: 'no-store' },
+    );
     const json = await res.json();
     if (!res.ok) {
-      throw new Error(`${json?.error || `HTTP ${res.status}`}\n${json?.forwardedUrl || ''}`);
+      throw new Error(
+        `${json?.error || `HTTP ${res.status}`}\n${
+          json?.forwardedUrl || ''
+        }`,
+      );
     }
 
-    const batch: JobRow[] = Array.isArray(json?.results) ? json.results : [];
+    const batch: JobRow[] = Array.isArray(json?.results)
+      ? json.results
+      : [];
     const parsedTotal = extractTotal(json);
     return { batch, total: parsedTotal };
   }
@@ -638,28 +777,51 @@ export default function OffersPage() {
     setPage(1);
     pushUrl(1);
     try {
-      const { batch: firstBatch, total } = await fetchPage(1);
+      const { batch: firstBatch, total } =
+        await fetchPage(1);
       setAllResults(dedupeJobs(firstBatch));
-      setTotalAvailable((typeof total === 'number' ? total : null) ?? (firstBatch.length < PAGE_SIZE ? firstBatch.length : null));
+      setTotalAvailable(
+        (typeof total === 'number' ? total : null) ??
+          (firstBatch.length < PAGE_SIZE
+            ? firstBatch.length
+            : null),
+      );
     } finally {
       setLoadingFirst(false);
     }
   }
 
-  // pagination math
-  const totalKnown = Number.isFinite(totalAvailable as number);
-  const knownTotal = totalKnown ? (totalAvailable as number) : null;
+  const totalKnown = Number.isFinite(
+    totalAvailable as number,
+  );
+  const knownTotal = totalKnown
+    ? (totalAvailable as number)
+    : null;
   const effectiveTotal = knownTotal ?? allResults.length;
   const totalPages =
-    (knownTotal != null ? Math.max(1, Math.ceil(knownTotal / PAGE_SIZE)) : Math.max(1, Math.ceil(Math.max(1, effectiveTotal) / PAGE_SIZE))) || 1;
+    (knownTotal != null
+      ? Math.max(
+          1,
+          Math.ceil(knownTotal / PAGE_SIZE),
+        )
+      : Math.max(
+          1,
+          Math.ceil(Math.max(1, effectiveTotal) / PAGE_SIZE),
+        )) || 1;
 
   const canPrev = page > 1;
   const canNext = totalKnown ? page < totalPages : true;
 
-   const sortedResults = useMemo(() => sortJobsByDistanceThenStart(allResults), [allResults]);
+  const sortedResults = useMemo(
+    () => sortJobsByDistanceThenStart(allResults),
+    [allResults],
+  );
 
   const startIndex = (page - 1) * PAGE_SIZE;
-  const displayed = sortedResults.slice(startIndex, startIndex + PAGE_SIZE);
+  const displayed = sortedResults.slice(
+    startIndex,
+    startIndex + PAGE_SIZE,
+  );
 
   const handlePrev = () => {
     if (!canPrev) return;
@@ -682,9 +844,14 @@ export default function OffersPage() {
 
       const prevLen = allResults.length;
       const { batch, total } = await fetchPage(next);
-      if (Number.isFinite(Number(total)) && total !== null) setTotalAvailable(total as number);
+      if (Number.isFinite(Number(total)) && total !== null)
+        setTotalAvailable(total as number);
       if (!batch || batch.length === 0) {
-        setTotalAvailable((prev) => (Number.isFinite(prev as number) ? (prev as number) : prevLen));
+        setTotalAvailable((prev) =>
+          Number.isFinite(prev as number)
+            ? (prev as number)
+            : prevLen,
+        );
         return;
       }
 
@@ -696,7 +863,8 @@ export default function OffersPage() {
         return;
       }
       if (batch.length < PAGE_SIZE && !totalKnown) {
-        const computed = (next - 1) * PAGE_SIZE + batch.length;
+        const computed =
+          (next - 1) * PAGE_SIZE + batch.length;
         setTotalAvailable(computed);
       }
 
@@ -707,7 +875,7 @@ export default function OffersPage() {
     }
   };
 
-  // auto-refresh on filter change
+  // auto-refresh on filter change (offerType, distance)
   useEffect(() => {
     const ready = q.trim() && wo.trim();
     if (!ready) return;
@@ -734,8 +902,12 @@ export default function OffersPage() {
       <div className="pointer-events-none absolute -top-20 -right-24 h-72 w-72 rounded-full bg-amber-400/20 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-24 -left-28 h-80 w-80 rounded-full bg-orange-400/20 blur-3xl" />
 
-      <h1 className="text-2xl font-semibold text-neutral-900">Offers</h1>
-      <p className="mt-1 text-neutral-700">Search offers from Bundesagentur für Arbeit.</p>
+      <h1 className="text-2xl font-semibold text-neutral-900">
+        Offers
+      </h1>
+      <p className="mt-1 text-neutral-700">
+        Search offers from Bundesagentur für Arbeit.
+      </p>
 
       <form
         className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-[1fr,1fr,auto]"
@@ -759,7 +931,9 @@ export default function OffersPage() {
                 <button
                   ref={offerBtnRef}
                   type="button"
-                  onClick={() => setOfferOpen((v) => !v)}
+                  onClick={() =>
+                    setOfferOpen((v) => !v)
+                  }
                   aria-haspopup="menu"
                   aria-expanded={offerOpen}
                   className={btnInside}
@@ -767,11 +941,15 @@ export default function OffersPage() {
                 >
                   <span className="inline-flex items-center gap-1">
                     <Tag className="h-3.5 w-3.5" />
-                    {offerType ? OFFER_LABEL(offerType) : 'Offer'}
+                    {offerType
+                      ? OFFER_LABEL(offerType)
+                      : 'Offer'}
                   </span>
                 </button>
                 <FloatingMenu
-                  anchorRef={offerBtnRef as unknown as React.RefObject<HTMLElement>}
+                  anchorRef={
+                    offerBtnRef as unknown as React.RefObject<HTMLElement>
+                  }
                   open={offerOpen}
                   onClose={() => setOfferOpen(false)}
                   width={224}
@@ -787,7 +965,9 @@ export default function OffersPage() {
                       }}
                       className={[
                         'block w-full px-3 py-2 text-left text-sm hover:bg-neutral-50',
-                        o.value === offerType ? 'bg-amber-50 text-amber-800' : 'text-neutral-800',
+                        o.value === offerType
+                          ? 'bg-amber-50 text-amber-800'
+                          : 'text-neutral-800',
                       ].join(' ')}
                       role="menuitem"
                     >
@@ -815,7 +995,9 @@ export default function OffersPage() {
                 <button
                   ref={distanceBtnRef}
                   type="button"
-                  onClick={() => setDistanceOpen((v) => !v)}
+                  onClick={() =>
+                    setDistanceOpen((v) => !v)
+                  }
                   aria-haspopup="menu"
                   aria-expanded={distanceOpen}
                   className={btnInside}
@@ -827,7 +1009,9 @@ export default function OffersPage() {
                   </span>
                 </button>
                 <FloatingMenu
-                  anchorRef={distanceBtnRef as unknown as React.RefObject<HTMLElement>}
+                  anchorRef={
+                    distanceBtnRef as unknown as React.RefObject<HTMLElement>
+                  }
                   open={distanceOpen}
                   onClose={() => setDistanceOpen(false)}
                   width={176}
@@ -837,7 +1021,9 @@ export default function OffersPage() {
                     type="button"
                     className={[
                       'block w-full px-3 py-2 text-left text-sm hover:bg-neutral-50',
-                      distance === '' ? 'bg-amber-50 text-amber-800' : 'text-neutral-800',
+                      distance === ''
+                        ? 'bg-amber-50 text-amber-800'
+                        : 'text-neutral-800',
                     ].join(' ')}
                     onClick={() => {
                       setDistance('');
@@ -857,7 +1043,9 @@ export default function OffersPage() {
                       }}
                       className={[
                         'block w-full px-3 py-2 text-left text-sm hover:bg-neutral-50',
-                        distance === d ? 'bg-amber-50 text-amber-800' : 'text-neutral-800',
+                        distance === d
+                          ? 'bg-amber-50 text-amber-800'
+                          : 'text-neutral-800',
                       ].join(' ')}
                       role="menuitem"
                     >
@@ -883,7 +1071,11 @@ export default function OffersPage() {
               'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-300',
             ].join(' ')}
             aria-label="Search"
-            title={submitDisabled ? 'Fill title and location' : 'Search'}
+            title={
+              submitDisabled
+                ? 'Fill title and location'
+                : 'Search'
+            }
           >
             <Search className="h-4 w-4" /> Search
           </button>
@@ -892,18 +1084,39 @@ export default function OffersPage() {
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-3 text-sm text-neutral-700">
         <div>
-          {Number.isFinite(totalAvailable as number)
-            ? `${(totalAvailable as number).toLocaleString()} offers found${
-                q || wo ? ` for ${q || ''}${q && wo ? ' in ' : ''}${wo || ''}` : ''
-              }`
-            : allResults.length > 0
-            ? `${allResults.length.toLocaleString()} offers loaded`
-            : ''}
+          {Number.isFinite(
+            totalAvailable as number,
+          ) ? (
+            <>
+              {(totalAvailable as number).toLocaleString()}{' '}
+              offers found
+              {q || wo ? (
+                <>
+                  {' '}
+                  for {q || ''}
+                  {q && wo ? ' in ' : ''}
+                  {wo || ''}
+                </>
+              ) : null}
+            </>
+          ) : allResults.length > 0 ? (
+            `${allResults.length.toLocaleString()} offers loaded`
+          ) : (
+            ''
+          )}
         </div>
         <div className="flex items-center gap-2">
           <span>
-            Page <span className="font-semibold">{page}</span> / <span className="font-semibold">{totalPages}</span>
-            {!Number.isFinite(totalAvailable as number) && allResults.length > 0 ? ' +' : ''}
+            Page <span className="font-semibold">{page}</span>{' '}
+            /{' '}
+            <span className="font-semibold">
+              {totalPages}
+            </span>
+            {!Number.isFinite(
+              totalAvailable as number,
+            ) && allResults.length > 0
+              ? ' +'
+              : ''}
           </span>
         </div>
       </div>
@@ -912,14 +1125,18 @@ export default function OffersPage() {
         {loadingFirst && (
           <div className="flex items-center gap-2 rounded-xl border border-neutral-200 bg-white/80 p-4">
             <Loader2 className="h-4 w-4 animate-spin" />
-            <span className="text-sm text-neutral-700">Loading…</span>
+            <span className="text-sm text-neutral-700">
+              Loading…
+            </span>
           </div>
         )}
 
         {!loadingFirst && pageLoading && (
           <div className="flex items-center gap-2 rounded-xl border border-neutral-200 bg-white/80 p-4">
             <Loader2 className="h-4 w-4 animate-spin" />
-            <span className="text-sm text-neutral-700">Loading this page…</span>
+            <span className="text-sm text-neutral-700">
+              Loading this page…
+            </span>
           </div>
         )}
 
@@ -928,10 +1145,20 @@ export default function OffersPage() {
           displayed.map((job, i) => {
             const Icon = pickJobIcon(job.title);
             const idx = startIndex + i + 1;
-            const key = jobIdentity(job) || `idx-${idx}`;
-            const apiOfferLabel = labelFromApiOfferType(job.offerType)?? '';
-            const startLabel = formatStartDate(job.startDate ?? null);
+            const key =
+              jobIdentity(job) || `idx-${idx}`;
 
+            // 🔥 This is the important part:
+            // ALWAYS show whatever label the API sent.
+            const apiOfferLabel =
+              job.offerType &&
+              job.offerType.trim().length > 0
+                ? job.offerType.trim()
+                : 'Job';
+
+            const startLabel = formatStartDate(
+              job.startDate ?? null,
+            );
 
             return (
               <article
@@ -951,15 +1178,22 @@ export default function OffersPage() {
                     {idx}
                   </div>
                   <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50">
-                    <Icon className="h-7 w-7 text-amber-700" aria-hidden="true" />
+                    <Icon
+                      className="h-7 w-7 text-amber-700"
+                      aria-hidden="true"
+                    />
                   </div>
                   {job.logoUrl && (
                     <img
                       src={job.logoUrl}
-                      alt={`${job.employer || 'Company'} logo`}
+                      alt={`${
+                        job.employer || 'Company'
+                      } logo`}
                       className="absolute inset-0 h-full w-full object-contain p-1.5"
                       onError={(e) => {
-                        (e.currentTarget as HTMLImageElement).style.display = 'none';
+                        (
+                          e.currentTarget as HTMLImageElement
+                        ).style.display = 'none';
                       }}
                       loading="lazy"
                     />
@@ -969,40 +1203,58 @@ export default function OffersPage() {
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <h2 className="text-base font-semibold text-neutral-900">
-                      {job.employer || 'Unbekannter Arbeitgeber'}
+                      {job.employer ||
+                        'Unbekannter Arbeitgeber'}
                     </h2>
-                    <span className="text-sm text-neutral-600">• {job.title}</span>
+                    <span className="text-sm text-neutral-600">
+                      • {job.title}
+                    </span>
                   </div>
                   <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-neutral-700">
-  {!!job.location && (
-    <span className="inline-flex items-center gap-1.5">
-      <MapPin className="h-4 w-4 text-neutral-400" aria-hidden="true" />
-      {job.location}
-    </span>
-  )}
+                    {!!job.location && (
+                      <span className="inline-flex items-center gap-1.5">
+                        <MapPin
+                          className="h-4 w-4 text-neutral-400"
+                          aria-hidden="true"
+                        />
+                        {job.location}
+                      </span>
+                    )}
 
-  {Number.isFinite(job.distanceKm) && (
-    <span className="inline-flex items-center gap-1.5">
-      <MapPin className="h-4 w-4 text-neutral-400" aria-hidden="true" />
-      {Math.round(job.distanceKm as number)} km
-    </span>
-  )}
+                    {Number.isFinite(
+                      job.distanceKm as number,
+                    ) && (
+                      <span className="inline-flex items-center gap-1.5">
+                        <MapPin
+                          className="h-4 w-4 text-neutral-400"
+                          aria-hidden="true"
+                        />
+                        {Math.round(
+                          job.distanceKm as number,
+                        )}{' '}
+                        km
+                      </span>
+                    )}
 
-  {startLabel && (
-    <span className="inline-flex items-center gap-1.5">
-      <CalendarDays className="h-4 w-4 text-neutral-400" aria-hidden="true" />
-      {startLabel}
-    </span>
-  )}
+                    {startLabel && (
+                      <span className="inline-flex items-center gap-1.5">
+                        <CalendarDays
+                          className="h-4 w-4 text-neutral-400"
+                          aria-hidden="true"
+                        />
+                        {startLabel}
+                      </span>
+                    )}
 
-  {/* always show type of employment, last in the row */}
-  <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-800">
-    <Tag className="h-3.5 w-3.5" aria-hidden="true" />
-    {apiOfferLabel}
-  </span>
-</div>
-
-                 
+                    {/* ALWAYS show type of employment */}
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-800">
+                      <Tag
+                        className="h-3.5 w-3.5"
+                        aria-hidden="true"
+                      />
+                      {apiOfferLabel}
+                    </span>
+                  </div>
                 </div>
 
                 {job.detailUrl && (
@@ -1012,7 +1264,10 @@ export default function OffersPage() {
                     rel="noreferrer"
                     className="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white/70 px-2.5 py-1.5 text-sm text-neutral-800 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-300"
                   >
-                    <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                    <ExternalLink
+                      className="h-4 w-4"
+                      aria-hidden="true"
+                    />
                     View
                   </a>
                 )}
@@ -1020,55 +1275,73 @@ export default function OffersPage() {
             );
           })}
 
-        {!loadingFirst && !pageLoading && allResults.length === 0 && (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
-            <div className="mb-2 text-5xl">🔎</div>
-            <p className="text-sm text-neutral-700">
-              Enter a title and a location, then hit <span className="font-semibold">Search</span>.
-            </p>
-          </div>
-        )}
-
-        {!loadingFirst && (allResults.length > 0 || page > 1) && (
-          <div className="mt-3 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={handlePrev}
-              disabled={!canPrev}
-              aria-label="Previous page"
-              className={[
-                'inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium shadow-sm',
-                canPrev
-                  ? 'border-neutral-200 bg-white/80 text-neutral-800 hover:bg-white'
-                  : 'cursor-not-allowed border-neutral-200 bg-neutral-100 text-neutral-400',
-                'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-300',
-              ].join(' ')}
-            >
-              <ChevronLeft className="h-4 w-4" /> Previous
-            </button>
-
-            <div className="text-sm text-neutral-700">
-              Page <span className="font-semibold">{page}</span> / <span className="font-semibold">{totalPages}</span>
-              {!Number.isFinite(totalAvailable as number) && allResults.length > 0 ? ' +' : ''}
+        {!loadingFirst &&
+          !pageLoading &&
+          allResults.length === 0 && (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
+              <div className="mb-2 text-5xl">🔎</div>
+              <p className="text-sm text-neutral-700">
+                Enter a title and a location, then hit{' '}
+                <span className="font-semibold">
+                  Search
+                </span>
+                .
+              </p>
             </div>
+          )}
 
-            <button
-              type="button"
-              onClick={handleNext}
-              disabled={!canNext}
-              aria-label="Next page"
-              className={[
-                'inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium shadow-sm',
-                canNext
-                  ? 'border-neutral-200 bg-white/80 text-neutral-800 hover:bg-white'
-                  : 'cursor-not-allowed border-neutral-200 bg-neutral-100 text-neutral-400',
-                'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-300',
-              ].join(' ')}
-            >
-              Next <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-        )}
+        {!loadingFirst &&
+          (allResults.length > 0 || page > 1) && (
+            <div className="mt-3 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={handlePrev}
+                disabled={!canPrev}
+                aria-label="Previous page"
+                className={[
+                  'inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium shadow-sm',
+                  canPrev
+                    ? 'border-neutral-200 bg-white/80 text-neutral-800 hover:bg-white'
+                    : 'cursor-not-allowed border-neutral-200 bg-neutral-100 text-neutral-400',
+                  'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-300',
+                ].join(' ')}
+              >
+                <ChevronLeft className="h-4 w-4" /> Previous
+              </button>
+
+              <div className="text-sm text-neutral-700">
+                Page{' '}
+                <span className="font-semibold">
+                  {page}
+                </span>{' '}
+                /{' '}
+                <span className="font-semibold">
+                  {totalPages}
+                </span>
+                {!Number.isFinite(
+                  totalAvailable as number,
+                ) && allResults.length > 0
+                  ? ' +'
+                  : ''}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleNext}
+                disabled={!canNext}
+                aria-label="Next page"
+                className={[
+                  'inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium shadow-sm',
+                  canNext
+                    ? 'border-neutral-200 bg-white/80 text-neutral-800 hover:bg-white'
+                    : 'cursor-not-allowed border-neutral-200 bg-neutral-100 text-neutral-400',
+                  'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-300',
+                ].join(' ')}
+              >
+                Next <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
       </div>
     </section>
   );

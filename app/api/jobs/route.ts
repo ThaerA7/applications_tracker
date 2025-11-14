@@ -10,7 +10,8 @@ export const revalidate = 0;
  *  - uses 1-based `page`
  *  - returns exact `total` (page.totalElements) so UI shows BA's count
  */
-const BASE_URL = 'https://rest.arbeitsagentur.de/jobboerse/jobsuche-service/pc/v4/jobs';
+const BASE_URL =
+  'https://rest.arbeitsagentur.de/jobboerse/jobsuche-service/pc/v4/jobs';
 const JOBSUCHE_KEY = process.env.JOBSUCHE_API_KEY ?? 'jobboerse-jobsuche';
 
 function extractTotalBA(data: any): number | null {
@@ -28,12 +29,21 @@ function extractTotalBA(data: any): number | null {
   return candidates.length ? Math.max(...candidates) : null;
 }
 
-// Build a nice label for the type of employment from BA fields
-function deriveOfferTypeLabel(j: any): string | undefined {
+/**
+ * Build a human-readable label for the type of employment
+ * using BA's angebotsart + arbeitszeit + title as fallback.
+ * This ALWAYS returns a non-empty string.
+ */
+function deriveOfferTypeLabel(j: any): string {
   const angebotCode =
-    j?.angebotsart !== undefined && j?.angebotsart !== null ? String(j.angebotsart).trim() : '';
+    j?.angebotsart !== undefined && j?.angebotsart !== null
+      ? String(j.angebotsart).trim()
+      : '';
 
-  const arbeitszeitRaw = typeof j?.arbeitszeit === 'string' ? j.arbeitszeit.trim().toLowerCase() : '';
+  const arbeitszeitRaw =
+    typeof j?.arbeitszeit === 'string'
+      ? j.arbeitszeit.trim().toLowerCase()
+      : '';
   const arbeitszeitParts = arbeitszeitRaw
     ? arbeitszeitRaw
         .split(/[;,]+/)
@@ -41,27 +51,30 @@ function deriveOfferTypeLabel(j: any): string | undefined {
         .filter(Boolean)
     : [];
 
-  // Angebotstyp priorisiert
+  // 1) Angebotstyp priorisiert für Ausbildung / Praktikum / Selbstständigkeit
   if (angebotCode === '4') return 'Ausbildung / Duales Studium';
   if (angebotCode === '34') return 'Praktikum / Trainee';
   if (angebotCode === '2') return 'Selbstständigkeit';
 
-  // Arbeitszeit-Codes
+  // 2) Arbeitszeit-Codes (Vollzeit / Teilzeit / Minijob / Homeoffice / Schicht)
   if (arbeitszeitParts.includes('mj')) return 'Minijob';
   if (arbeitszeitParts.includes('tz')) return 'Teilzeit Job';
   if (arbeitszeitParts.includes('vz')) return 'Vollzeit Job';
   if (arbeitszeitParts.includes('ho')) return 'Homeoffice Job';
-  if (arbeitszeitParts.includes('snw')) return 'Schicht / Nacht / Wochenende';
+  if (arbeitszeitParts.includes('snw'))
+    return 'Schicht / Nacht / Wochenende';
 
+  // 3) Normale Arbeit
   if (angebotCode === '1') return 'Arbeit';
 
-  // Fallback: Titel scannen
+  // 4) Fallback: Titel scannen
   const t = typeof j?.titel === 'string' ? j.titel.toLowerCase() : '';
   if (t.includes('werkstudent')) return 'Werkstudent';
   if (t.includes('praktikum') || t.includes('praktikant')) return 'Praktikum';
   if (t.includes('ausbildung')) return 'Ausbildung';
 
-  return undefined;
+  // 5) Letzter Notfall: generisch
+  return 'Job';
 }
 
 export async function GET(req: NextRequest) {
@@ -72,7 +85,10 @@ export async function GET(req: NextRequest) {
   const umkreis = searchParams.get('umkreis') ?? '';
   const uiPage = Math.max(1, Number(searchParams.get('page') ?? '1'));
   const size = searchParams.get('size') ?? '20';
-  const angebotsart = searchParams.get('angebotsart') ?? '1';
+
+  // if caller sets angebotsart, we forward it; otherwise: ANY offer, no default "1"
+  const angebotsart = searchParams.get('angebotsart') ?? '';
+
   const arbeitszeit = searchParams.get('arbeitszeit') ?? '';
   const sortierung = searchParams.get('sortierung') ?? '';
 
@@ -106,13 +122,19 @@ export async function GET(req: NextRequest) {
         body = text;
       }
       return NextResponse.json(
-        { error: `Upstream error ${upstream.status}`, upstream: body, forwardedUrl: url },
+        {
+          error: `Upstream error ${upstream.status}`,
+          upstream: body,
+          forwardedUrl: url,
+        },
         { status: upstream.status },
       );
     }
 
     const data = JSON.parse(text);
-    const rows = Array.isArray(data?.stellenangebote) ? data.stellenangebote : [];
+    const rows = Array.isArray(data?.stellenangebote)
+      ? data.stellenangebote
+      : [];
     const total = extractTotalBA(data);
 
     const results = rows.map((j: any) => {
@@ -134,31 +156,35 @@ export async function GET(req: NextRequest) {
       const location =
         typeof locObj === 'string'
           ? locObj
-          : [locObj?.ort, locObj?.region, locObj?.land].filter(Boolean).join(', ');
+          : [locObj?.ort, locObj?.region, locObj?.land]
+              .filter(Boolean)
+              .join(', ');
 
       const hashId = j?.hashId ?? j?.hashID ?? j?.refnr;
 
-      // 🔗 1) try to use the company / external URL from BA
-      const externalUrlRaw = j?.externeUrl ?? j?.externeURL ?? j?.externeurl ?? undefined;
+      // 1) external URL from company, if present
+      const externalUrlRaw =
+        j?.externeUrl ?? j?.externeURL ?? j?.externeurl ?? undefined;
 
       const externalUrl =
         typeof externalUrlRaw === 'string' && externalUrlRaw.trim().length > 0
           ? externalUrlRaw.trim()
           : undefined;
 
-      // 🔗 2) fallback: BA job detail page
+      // 2) BA job detail URL as fallback
       const baDetailUrl = hashId
-        ? `https://www.arbeitsagentur.de/jobsuche/jobdetail/${encodeURIComponent(hashId)}`
+        ? `https://www.arbeitsagentur.de/jobsuche/jobdetail/${encodeURIComponent(
+            hashId,
+          )}`
         : undefined;
 
-      // 🔗 3) final URL sent to the frontend
       const detailUrl = externalUrl ?? baDetailUrl;
 
+      // 👇 ALWAYS a human-readable label
       const offerType = deriveOfferTypeLabel(j);
 
       const logoUrl = j?.arbeitgeberLogo ?? j?.logoUrl ?? undefined;
 
-      // Entfernung kommt aus arbeitsort.entfernung (ggf. als String)
       const distanceRaw =
         typeof locObj?.entfernung === 'number'
           ? locObj.entfernung
@@ -172,7 +198,6 @@ export async function GET(req: NextRequest) {
 
       const distanceKm = Number.isFinite(distanceRaw) ? distanceRaw : undefined;
 
-      // Beginn-Datum (eintrittsdatum)
       const startDate =
         typeof j?.eintrittsdatum === 'string'
           ? j.eintrittsdatum
@@ -185,8 +210,8 @@ export async function GET(req: NextRequest) {
         employer,
         location,
         hashId,
-        detailUrl, // company URL first, BA fallback
-        offerType,
+        detailUrl,
+        offerType, // ALWAYS something like "Vollzeit Job", "Ausbildung / Duales Studium", etc.
         logoUrl,
         distanceKm,
         startDate,
@@ -195,12 +220,15 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       results,
-      total, // now reliable
-      page: uiPage, // keep UI 1-based
+      total,
+      page: uiPage,
       size: Number(size),
       baPage: data?.page ?? null,
     });
   } catch (err: any) {
-    return NextResponse.json({ error: err?.message ?? 'Unexpected error' }, { status: 500 });
+    return NextResponse.json(
+      { error: err?.message ?? 'Unexpected error' },
+      { status: 500 },
+    );
   }
 }
