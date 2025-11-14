@@ -499,6 +499,38 @@ function dedupeJobs(list: JobRow[]): JobRow[] {
   return out;
 }
 
+// For sorting "ab sofort" and real dates
+function sortStartValue(raw?: string | null): number {
+  if (!raw) return Number.POSITIVE_INFINITY;
+  const trimmed = raw.trim();
+  if (!trimmed) return Number.POSITIVE_INFINITY;
+
+  // treat "ab sofort" as earliest
+  if (/ab\s*sofort/i.test(trimmed)) return 0;
+
+  const d = new Date(trimmed);
+  if (Number.isNaN(d.getTime())) return Number.POSITIVE_INFINITY;
+
+  // earlier dates first
+  return d.getTime();
+}
+
+// Sort jobs: 1) by distance (ascending), 2) by start date (earliest first)
+function sortJobsByDistanceThenStart(list: JobRow[]): JobRow[] {
+  return [...list].sort((a, b) => {
+    const ad = Number.isFinite(a.distanceKm as number) ? (a.distanceKm as number) : Number.POSITIVE_INFINITY;
+    const bd = Number.isFinite(b.distanceKm as number) ? (b.distanceKm as number) : Number.POSITIVE_INFINITY;
+
+    if (ad !== bd) return ad - bd; // closer first
+
+    const asv = sortStartValue(a.startDate);
+    const bsv = sortStartValue(b.startDate);
+    if (asv !== bsv) return asv - bsv; // earlier start first
+
+    return 0; // keep relative order otherwise
+  });
+}
+
 export default function OffersPage() {
   const router = useRouter();
   const [q, setQ] = useState('');
@@ -624,8 +656,10 @@ export default function OffersPage() {
   const canPrev = page > 1;
   const canNext = totalKnown ? page < totalPages : true;
 
+   const sortedResults = useMemo(() => sortJobsByDistanceThenStart(allResults), [allResults]);
+
   const startIndex = (page - 1) * PAGE_SIZE;
-  const displayed = allResults.slice(startIndex, startIndex + PAGE_SIZE);
+  const displayed = sortedResults.slice(startIndex, startIndex + PAGE_SIZE);
 
   const handlePrev = () => {
     if (!canPrev) return;
