@@ -929,7 +929,7 @@ export default function OffersPage() {
             const Icon = pickJobIcon(job.title);
             const idx = startIndex + i + 1;
             const key = jobIdentity(job) || `idx-${idx}`;
-            const apiOfferLabel = labelFromApiOfferType(job.offerType);
+            const apiOfferLabel = labelFromApiOfferType(job.offerType)?? '';
             const startLabel = formatStartDate(job.startDate ?? null);
 
 
@@ -974,31 +974,35 @@ export default function OffersPage() {
                     <span className="text-sm text-neutral-600">• {job.title}</span>
                   </div>
                   <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-neutral-700">
-                    {!!job.location && (
-                      <span className="inline-flex items-center gap-1.5">
-                        <MapPin className="h-4 w-4 text-neutral-400" aria-hidden="true" />
-                        {job.location}
-                      </span>
-                    )}
-                    {Number.isFinite(job.distanceKm) && (
-                      <span className="inline-flex items-center gap-1.5">
-                        <MapPin className="h-4 w-4 text-neutral-400" aria-hidden="true" />
-                        {Math.round(job.distanceKm as number)} km
-                      </span>
-                    )}
-                    {apiOfferLabel && (
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-800">
-                        <Tag className="h-3.5 w-3.5" aria-hidden="true" />
-                        {apiOfferLabel}
-                      </span>
-                    )}
-                    {startLabel && (
-  <span className="inline-flex items-center gap-1.5">
-    <CalendarDays className="h-4 w-4 text-neutral-400" aria-hidden="true" />
-    {startLabel}
+  {!!job.location && (
+    <span className="inline-flex items-center gap-1.5">
+      <MapPin className="h-4 w-4 text-neutral-400" aria-hidden="true" />
+      {job.location}
+    </span>
+  )}
+
+  {Number.isFinite(job.distanceKm) && (
+    <span className="inline-flex items-center gap-1.5">
+      <MapPin className="h-4 w-4 text-neutral-400" aria-hidden="true" />
+      {Math.round(job.distanceKm as number)} km
+    </span>
+  )}
+
+  {startLabel && (
+    <span className="inline-flex items-center gap-1.5">
+      <CalendarDays className="h-4 w-4 text-neutral-400" aria-hidden="true" />
+      {startLabel}
+    </span>
+  )}
+
+  {/* always show type of employment, last in the row */}
+  <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-800">
+    <Tag className="h-3.5 w-3.5" aria-hidden="true" />
+    {apiOfferLabel}
   </span>
-)}
-                  </div>
+</div>
+
+                 
                 </div>
 
                 {job.detailUrl && (
