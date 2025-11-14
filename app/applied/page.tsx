@@ -13,6 +13,9 @@ import {
   Briefcase,
   ExternalLink,
 } from 'lucide-react';
+import AddApplicationDialog, {
+  NewApplicationForm,
+} from './AddApplicationDialog';
 
 type Application = {
   id: string;
@@ -90,6 +93,7 @@ function statusClasses(status: string) {
 export default function AppliedPage() {
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [addOpen, setAddOpen] = useState(false);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
@@ -146,6 +150,7 @@ export default function AppliedPage() {
         {/* Add (bold gradient) */}
         <button
           type="button"
+          onClick={() => setAddOpen(true)}
           className={[
             'inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800',
             'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
@@ -153,9 +158,9 @@ export default function AppliedPage() {
             'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-300',
           ].join(' ')}
         >
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          Add
-        </button>
+        <Plus className="h-4 w-4" aria-hidden="true" />
+        Add
+      </button>
 
         {/* Filter (glass) */}
         <button
@@ -286,6 +291,15 @@ export default function AppliedPage() {
           </div>
         )}
       </div>
+    <AddApplicationDialog
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onSave={(data: NewApplicationForm) => {
+          // TODO: merge into your state; for now just inspect it:
+          console.log('New application', data);
+          // you can create an `Application` object here and push it into state
+        }}
+      />
     </section>
   );
 }
