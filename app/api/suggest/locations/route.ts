@@ -17,17 +17,24 @@ export async function GET(req: NextRequest) {
 
     const data = await res.json();
     const features: any[] = data?.features ?? [];
-    const germanOnly = features.filter((f: any) =>
-      (f?.properties?.countrycode ?? f?.properties?.country_code ?? '').toLowerCase() === 'de'
-      || ['Deutschland', 'Germany'].includes(f?.properties?.country)
+    const germanOnly = features.filter(
+      (f: any) =>
+        (f?.properties?.countrycode ?? f?.properties?.country_code ?? '').toLowerCase() === 'de' ||
+        ['Deutschland', 'Germany'].includes(f?.properties?.country),
     );
 
-    const labels = germanOnly.map((f: any) => {
-      const p = f?.properties ?? {};
-      const name = p.name || p.city || p.town || p.village || p.state || p.county;
-      const region = p.state || p.county || p.district;
-      return [name, region].filter(Boolean).join(', ');
-    }).filter(Boolean);
+    const labels = germanOnly
+      .map((f: any) => {
+        const p = f?.properties ?? {};
+        const name = p.name || p.city || p.town || p.village || p.state || p.county;
+        const postcode = p.postcode;
+        const region = p.state || p.county || p.district;
+
+        // Use "PLZ Stadt" as main label when possible ⇒ nice city center PLZ
+        const main = postcode && name ? `${postcode} ${name}` : name;
+        return [main, region].filter(Boolean).join(', ');
+      })
+      .filter(Boolean);
 
     const suggestions = Array.from(new Set(labels)).slice(0, 8);
     return Response.json({ suggestions });
