@@ -1,3 +1,4 @@
+// AddApplicationDialog.tsx
 'use client';
 
 import {
@@ -17,6 +18,7 @@ import {
   Mail,
   User,
   FileText,
+  Image as ImageIcon,
 } from 'lucide-react';
 
 export type NewApplicationForm = {
@@ -34,6 +36,8 @@ export type NewApplicationForm = {
   source: string;       // where you found the job (LinkedIn, company site…)
   status: string;       // Applied, Interview, Offer, Rejected…
   notes: string;
+  logoUrl?: string;     // optional company logo URL / object URL from upload
+  website?: string;     // company website
 };
 
 function makeInitialForm(): NewApplicationForm {
@@ -53,6 +57,8 @@ function makeInitialForm(): NewApplicationForm {
     source: '',
     status: 'Applied',
     notes: '',
+    logoUrl: '',
+    website: '',
   };
 }
 
@@ -60,28 +66,33 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onSave: (data: NewApplicationForm) => void;
+  initialData?: NewApplicationForm | null;
 };
 
 export default function AddApplicationDialog({
   open,
   onClose,
   onSave,
+  initialData,
 }: Props) {
-  const [form, setForm] = useState<NewApplicationForm>(() =>
-    makeInitialForm(),
-  );
+  const [form, setForm] = useState<NewApplicationForm>(() => makeInitialForm());
   const firstFieldRef = useRef<HTMLInputElement | null>(null);
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
+  const [logoError, setLogoError] = useState<string | null>(null);
 
-  // Reset form + focus when opened
+  // Reset form + focus when opened (supports edit + create)
   useEffect(() => {
     if (!open) return;
-    setForm(makeInitialForm());
+    setForm(initialData ?? makeInitialForm());
+    setLogoError(null);
+    if (logoInputRef.current) {
+      logoInputRef.current.value = '';
+    }
     const t = firstFieldRef.current;
     if (t) {
-      // Small timeout to ensure element is mounted
       setTimeout(() => t.focus(), 10);
     }
-  }, [open]);
+  }, [open, initialData]);
 
   // Close on Escape
   useEffect(() => {
@@ -98,14 +109,39 @@ export default function AddApplicationDialog({
 
   const handleChange =
     (field: keyof NewApplicationForm) =>
-    (
-      e: React.ChangeEvent<
-        HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-      >,
-    ) => {
-      const { value } = e.target;
-      setForm((f) => ({ ...f, [field]: value }));
-    };
+      (
+        e: React.ChangeEvent<
+          HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+        >,
+      ) => {
+        const { value } = e.target;
+        setForm((f) => ({ ...f, [field]: value }));
+      };
+
+  const handleLogoChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+
+    if (!file) {
+      setLogoError(null);
+      setForm((f) => ({ ...f, logoUrl: '' }));
+      return;
+    }
+
+    const maxSizeBytes = 3 * 1024 * 1024; // 3 MB
+    if (file.size > maxSizeBytes) {
+      setLogoError('Logo must be smaller than 3 MB.');
+      if (logoInputRef.current) {
+        logoInputRef.current.value = '';
+      }
+      return;
+    }
+
+    setLogoError(null);
+    const objectUrl = URL.createObjectURL(file);
+    setForm((f) => ({ ...f, logoUrl: objectUrl }));
+  };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -124,11 +160,11 @@ export default function AddApplicationDialog({
     form.company.trim().length > 0 &&
     form.role.trim().length > 0;
 
+  const isEdit = !!initialData;
+
   const dialog = (
-    <div
-      className="fixed inset-y-0 right-0 left-64 z-[10000] flex items-center justify-center px-4 py-8"
-    >
-      {/* Backdrop (no blur, main content only – sidebar is not covered) */}
+    <div className="fixed inset-y-0 right-0 left-64 z-[10000] flex items-center justify-center px-4 py-8">
+      {/* Backdrop */}
       <div
         className="absolute inset-0 bg-neutral-900/40"
         onClick={onClose}
@@ -141,7 +177,7 @@ export default function AddApplicationDialog({
         aria-modal="true"
         aria-labelledby="add-application-title"
         className={[
-          'relative z-10 max-h-full w-full max-w-2xl overflow-hidden rounded-2xl border border-neutral-200/80',
+          'relative z-10 max-h-full w-full max-w-3xl overflow-hidden rounded-2xl border border-neutral-200/80',
           'bg-gradient-to-br from-sky-50 via-white to-amber-50 shadow-xl',
         ].join(' ')}
         onClick={(e) => e.stopPropagation()}
@@ -153,10 +189,12 @@ export default function AddApplicationDialog({
               id="add-application-title"
               className="text-base font-semibold text-neutral-900"
             >
-              Add application
+              {isEdit ? 'Edit application' : 'Add application'}
             </h2>
             <p className="mt-0.5 text-xs text-neutral-600">
-              Track where you applied and the details of the offer.
+              {isEdit
+                ? 'Update the details of this application.'
+                : 'Track where you applied and the details of the offer.'}
             </p>
           </div>
           <button
@@ -172,7 +210,7 @@ export default function AddApplicationDialog({
         {/* Form */}
         <form
           onSubmit={handleSubmit}
-          className="max-h-[70vh] overflow-y-auto px-5 py-4 space-y-4"
+          className="max-h-[75vh] overflow-y-auto px-5 py-4 space-y-4"
         >
           {/* Main info */}
           <div className="grid gap-4 md:grid-cols-2">
@@ -189,6 +227,47 @@ export default function AddApplicationDialog({
                 className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 px-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-sky-300"
                 required
               />
+            </label>
+
+            {/* Company logo upload + preview */}
+            <label className="space-y-1 text-sm md:col-span-2">
+              <span className="font-medium text-neutral-800">
+                Company logo (optional)
+              </span>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div>
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-neutral-200 bg-white/80 px-3 py-2 text-xs font-medium text-neutral-800 shadow-sm hover:bg-white">
+                    <ImageIcon
+                      className="h-4 w-4 text-neutral-400"
+                      aria-hidden="true"
+                    />
+                    <span>Upload logo (PNG, JPG, SVG. Max size 3 MB)</span>
+                    <input
+                      ref={logoInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoChange}
+                      className="sr-only"
+                    />
+                  </label>
+                  
+                  {logoError && (
+                    <p className="mt-1 text-[11px] text-rose-600">
+                      {logoError}
+                    </p>
+                  )}
+                </div>
+
+                {form.logoUrl?.trim() && (
+                  <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-md border border-neutral-200 bg-white/70 flex items-center justify-center">
+                    <img
+                      src={form.logoUrl}
+                      alt={`${form.company || 'Company'} logo`}
+                      className="h-full w-full object-contain"
+                    />
+                  </div>
+                )}
+              </div>
             </label>
 
             <label className="space-y-1 text-sm">
@@ -334,6 +413,26 @@ export default function AddApplicationDialog({
               </div>
             </label>
 
+            {/* Company website */}
+            <label className="space-y-1 text-sm md:col-span-2">
+              <span className="font-medium text-neutral-800">
+                Company website
+              </span>
+              <div className="relative">
+                <ExternalLink
+                  className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
+                  aria-hidden="true"
+                />
+                <input
+                  type="url"
+                  value={form.website ?? ''}
+                  onChange={handleChange('website')}
+                  placeholder="https://company.example.com"
+                  className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-sky-300"
+                />
+              </div>
+            </label>
+
             <label className="space-y-1 text-sm">
               <span className="font-medium text-neutral-800">
                 Salary / range
@@ -443,7 +542,7 @@ export default function AddApplicationDialog({
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex items-center justify-center rounded-lg border border-neutral-200 bg-white/80 px-4 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg:white focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-300"
+              className="inline-flex items-center justify-center rounded-lg border border-neutral-200 bg-white/80 px-4 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-300"
             >
               Cancel
             </button>
@@ -458,7 +557,7 @@ export default function AddApplicationDialog({
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
               ].join(' ')}
             >
-              Save application
+              {isEdit ? 'Save changes' : 'Save application'}
             </button>
           </div>
         </form>
