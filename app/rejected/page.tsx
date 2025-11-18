@@ -127,57 +127,66 @@ export default function RejectedPage() {
       <p className="mt-1 text-neutral-700">Applications that didn’t work out.</p>
 
       {/* Toolbar */}
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-        {/* Search */}
-        <div className="relative flex-1">
-          <Search
-            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
-            aria-hidden="true"
-          />
-          <input
-            type="search"
-            placeholder="Search rejected…"
-            aria-label="Search rejected applications"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className={[
-              'h-11 w-full rounded-lg pl-9 pr-3 text-sm text-neutral-900 placeholder:text-neutral-500',
-              'bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70',
-              'border border-neutral-200 ring-1 ring-transparent',
-              'focus:outline-none focus:ring-2 focus:ring-rose-400 focus:border-rose-300',
-              'transition-shadow',
-            ].join(' ')}
-          />
-        </div>
+<div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+  {/* Search */}
+  <div className="relative flex-1">
+    <Search
+      className="pointer-events-none absolute left-3 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-neutral-400"
+      aria-hidden="true"
+    />
+    <input
+      type="search"
+      placeholder="Search interviews…"
+      aria-label="Search interviews"
+      value={query}
+      onChange={(e) => setQuery(e.target.value)}
+      className={[
+        // base
+        'h-11 w-full rounded-lg pl-10 pr-3 text-sm text-neutral-900 placeholder:text-neutral-500',
 
-        {/* Add (glass, matches Filter) */}
-        <button
-          type="button"
-          className={[
-            'inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800',
-            'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
-            'border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50',
-            'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-rose-300',
-          ].join(' ')}
-        >
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          Add
-        </button>
+        // match Add / Filter glass look
+        'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
+        'border border-neutral-200 shadow-sm',
 
-        {/* Filter (glass) */}
-        <button
-          type="button"
-          className={[
-            'inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800',
-            'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
-            'border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50',
-            'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-rose-300',
-          ].join(' ')}
-        >
-          <Filter className="h-4 w-4" aria-hidden="true" />
-          Filter
-        </button>
-      </div>
+        // interactions
+        'hover:bg-white focus:bg-white',
+        'ring-1 ring-transparent',
+        'focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-300',
+
+        'transition-shadow',
+      ].join(' ')}
+    />
+  </div>
+
+  {/* Add (glass, matches Filter) */}
+  <button
+    type="button"
+    className={[
+      'inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800',
+      'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
+      'border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50',
+      'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-300',
+    ].join(' ')}
+  >
+    <Plus className="h-4 w-4" aria-hidden="true" />
+    Add
+  </button>
+
+  {/* Filter (glass sibling) */}
+  <button
+    type="button"
+    className={[
+      'inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800',
+      'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
+      'border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50',
+      'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-300',
+    ].join(' ')}
+  >
+    <Filter className="h-4 w-4" aria-hidden="true" />
+    Filter
+  </button>
+</div>
+
 
       {/* Grid */}
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

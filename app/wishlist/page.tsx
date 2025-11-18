@@ -109,7 +109,7 @@ export default function WishlistPage() {
         {/* Search */}
         <div className="relative flex-1">
           <Search
-            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
+            className="pointer-events-none absolute left-3 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-neutral-400"
             aria-hidden="true"
           />
           <input
@@ -119,10 +119,18 @@ export default function WishlistPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className={[
-              'h-11 w-full rounded-lg pl-9 pr-3 text-sm text-neutral-900 placeholder:text-neutral-500',
-              'bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70',
-              'border border-neutral-200 ring-1 ring-transparent',
+              // base
+              'h-11 w-full rounded-lg pl-10 pr-3 text-sm text-neutral-900 placeholder:text-neutral-500',
+
+              // match Add / Filter glass look
+              'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
+              'border border-neutral-200 shadow-sm',
+
+              // interactions
+              'hover:bg-white focus:bg-white',
+              'ring-1 ring-transparent',
               'focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-violet-300',
+
               'transition-shadow',
             ].join(' ')}
           />
@@ -156,6 +164,7 @@ export default function WishlistPage() {
           Filter
         </button>
       </div>
+
 
       {/* Results grid */}
       <div className="mt-5 grid grid-cols-1 gap-3">
