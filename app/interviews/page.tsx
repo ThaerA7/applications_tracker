@@ -7,7 +7,6 @@ import {
   Search,
   Plus,
   Filter,
-  Building2,
   Briefcase,
   MapPin,
   Calendar,
@@ -16,6 +15,7 @@ import {
   Video,
   User2,
   Link as LinkIcon,
+  Building2,
 } from 'lucide-react';
 
 type InterviewType = 'phone' | 'video' | 'in-person';
@@ -193,7 +193,6 @@ export default function InterviewsPage() {
         </button>
       </div>
 
-
       {/* Grid */}
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {filtered.map((item) => {
@@ -226,14 +225,17 @@ export default function InterviewsPage() {
                     />
                   </div>
                 ) : (
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-neutral-50 text-sm font-semibold text-neutral-700">
-                    {item.company.slice(0, 1).toUpperCase()}
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-neutral-50 text-neutral-500">
+                    <Building2 className="h-6 w-6" aria-hidden="true" />
+                    <span className="sr-only">{item.company}</span>
                   </div>
                 )}
 
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <h2 className="truncate text-base font-semibold text-neutral-900">{item.company}</h2>
+                    <h2 className="truncate text-base font-semibold text-neutral-900">
+                      {item.company}
+                    </h2>
                     {/* type chip */}
                     <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
                       <TypeIcon className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
@@ -248,7 +250,11 @@ export default function InterviewsPage() {
               </div>
 
               {/* Divider */}
-              <div className="mt-3 h-px w-full bg-neutral-200/80" role="separator" aria-hidden="true" />
+              <div
+                className="mt-3 h-px w-full bg-neutral-200/80"
+                role="separator"
+                aria-hidden="true"
+              />
 
               {/* Details */}
               <dl className="mt-4 grid grid-cols-1 gap-3 text-sm">
@@ -309,27 +315,27 @@ export default function InterviewsPage() {
                     </div>
                   </div>
                 )}
-              </dl>
-
-              {/* Footer actions */}
-              <div className="mt-4 flex items-center justify-between">
-                <div className="inline-flex items-center gap-2 rounded-md border border-emerald-200/70 bg-emerald-50/70 px-2.5 py-1 text-xs text-emerald-800">
-                  <Building2 className="h-3.5 w-3.5" aria-hidden="true" />
-                  Company
-                </div>
 
                 {item.url && (
-                  <a
-                    href={item.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-sm font-medium text-neutral-900 hover:underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-700"
-                  >
-                    <LinkIcon className="h-4 w-4" aria-hidden="true" />
-                    Job posting
-                  </a>
+                  <div className="flex items-center gap-2">
+                    <LinkIcon className="h-4 w-4 text-neutral-500" aria-hidden="true" />
+                    <div className="flex flex-col">
+                      <dt className="text-neutral-500">Job posting</dt>
+                      <dd className="font-medium text-neutral-900">
+                        <a
+                          href={item.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 hover:underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-600"
+                        >
+                          <span>View the offer details</span>
+                          <span aria-hidden="true">↗</span>
+                        </a>
+                      </dd>
+                    </div>
+                  </div>
                 )}
-              </div>
+              </dl>
             </article>
           );
         })}

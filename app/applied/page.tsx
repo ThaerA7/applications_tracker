@@ -20,8 +20,8 @@ import {
   Building2,
   Tag,
   Banknote,
-  Trash2,          // ⬅️ already added
-  MoveRight,       // ⬅️ new
+  Trash2,
+  MoveRight,
 } from 'lucide-react';
 
 import type { LucideIcon } from 'lucide-react';
@@ -29,6 +29,7 @@ import type { LucideIcon } from 'lucide-react';
 import AddApplicationDialog, {
   NewApplicationForm,
 } from './AddApplicationDialog';
+import MoveApplicationDialog from './MoveApplicationDialog';
 
 type Application = {
   id: string;
@@ -55,6 +56,8 @@ function statusClasses(status: string) {
     return 'bg-rose-100 text-rose-800 ring-1 ring-inset ring-rose-300';
   if (s.includes('submitted'))
     return 'bg-sky-100 text-sky-800 ring-1 ring-inset ring-sky-300';
+  if (s.includes('withdrawn') || s.includes('stopped'))
+    return 'bg-amber-100 text-amber-800 ring-1 ring-inset ring-amber-300';
   return 'bg-cyan-100 text-cyan-800 ring-1 ring-inset ring-cyan-300';
 }
 
@@ -89,6 +92,10 @@ export default function AppliedPage() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingApp, setEditingApp] = useState<Application | null>(null);
+
+  // Move dialog state
+  const [moveDialogOpen, setMoveDialogOpen] = useState(false);
+  const [appBeingMoved, setAppBeingMoved] = useState<Application | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
@@ -153,6 +160,50 @@ export default function AppliedPage() {
     }
   };
 
+  // --- Move dialog helpers ---
+
+  const openMoveDialog = (app: Application) => {
+    setAppBeingMoved(app);
+    setMoveDialogOpen(true);
+  };
+
+  const closeMoveDialog = () => {
+    setMoveDialogOpen(false);
+    setAppBeingMoved(null);
+  };
+
+  const moveToInterviews = () => {
+    if (!appBeingMoved) return;
+    setApplications((prev) =>
+      prev.map((app) =>
+        app.id === appBeingMoved.id
+          ? { ...app, status: 'Interview – Phone screen' }
+          : app,
+      ),
+    );
+    closeMoveDialog();
+  };
+
+  const moveToRejected = () => {
+    if (!appBeingMoved) return;
+    setApplications((prev) =>
+      prev.map((app) =>
+        app.id === appBeingMoved.id ? { ...app, status: 'Rejected' } : app,
+      ),
+    );
+    closeMoveDialog();
+  };
+
+  const moveToWithdrawn = () => {
+    if (!appBeingMoved) return;
+    setApplications((prev) =>
+      prev.map((app) =>
+        app.id === appBeingMoved.id ? { ...app, status: 'Withdrawn' } : app,
+      ),
+    );
+    closeMoveDialog();
+  };
+
   return (
     <section
       className={[
@@ -185,24 +236,16 @@ export default function AppliedPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className={[
-              // base
               'h-11 w-full rounded-lg pl-9 pr-3 text-sm text-neutral-900 placeholder:text-neutral-500',
-
-              // match Add / Filter glassmorphism
               'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
               'border border-neutral-200 shadow-sm',
-
-              // interaction
               'hover:bg-white focus:bg-white',
               'ring-1 ring-transparent',
               'focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-sky-300',
-
               'transition-shadow',
             ].join(' ')}
           />
-
         </div>
-
 
         {/* Add */}
         <button
@@ -353,7 +396,7 @@ export default function AppliedPage() {
                 </div>
               </div>
 
-                            {/* Edit + move + delete + expand buttons */}
+              {/* Edit + move + delete + expand buttons */}
               <div className="flex items-center justify-end gap-2">
                 <button
                   type="button"
@@ -376,10 +419,7 @@ export default function AppliedPage() {
 
                 <button
                   type="button"
-                  onClick={() => {
-                    // TODO: plug real move logic here (e.g. move to another column/list)
-                    console.log('Move application', app.id);
-                  }}
+                  onClick={() => openMoveDialog(app)}
                   className={[
                     'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium',
                     'text-sky-800',
@@ -409,15 +449,11 @@ export default function AppliedPage() {
                   Delete
                 </button>
 
-
-
                 <button
                   type="button"
                   onClick={() => toggle(app.id)}
                   aria-expanded={isOpen}
-                  aria-label={
-                    isOpen ? 'Collapse details' : 'Expand details'
-                  }
+                  aria-label={isOpen ? 'Collapse details' : 'Expand details'}
                   className={[
                     'inline-flex items-center rounded-md px-2.5 py-1.5 text-sm',
                     'text-neutral-800',
@@ -428,15 +464,9 @@ export default function AppliedPage() {
                   ].join(' ')}
                 >
                   {isOpen ? (
-                    <ChevronUp
-                      className="h-4 w-4"
-                      aria-hidden="true"
-                    />
+                    <ChevronUp className="h-4 w-4" aria-hidden="true" />
                   ) : (
-                    <ChevronDown
-                      className="h-4 w-4"
-                      aria-hidden="true"
-                    />
+                    <ChevronDown className="h-4 w-4" aria-hidden="true" />
                   )}
                 </button>
               </div>
@@ -450,9 +480,7 @@ export default function AppliedPage() {
                         className="h-3.5 w-3.5 text-neutral-400"
                         aria-hidden="true"
                       />
-                      <span className="text-neutral-500">
-                        Applied
-                      </span>
+                      <span className="text-neutral-500">Applied</span>
                       <span className="text-neutral-900">
                         {fmtDate(app.appliedOn)}
                       </span>
@@ -464,9 +492,7 @@ export default function AppliedPage() {
                           className="h-3.5 w-3.5 text-neutral-400"
                           aria-hidden="true"
                         />
-                        <span className="text-neutral-500">
-                          Start
-                        </span>
+                        <span className="text-neutral-500">Start</span>
                         <span className="text-neutral-900">
                           {fmtDate(app.startDate)}
                         </span>
@@ -513,11 +539,8 @@ export default function AppliedPage() {
                     {/* LEFT PANEL: Application + Offer */}
                     <div className="space-y-3 rounded-lg border border-neutral-200/70 bg-white/80 p-4">
                       {/* Header */}
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <SectionLabel
-                          icon={FileText}
-                          label="Application"
-                        />
+                      <div className="flex flex-wrap items.center justify-between gap-2">
+                        <SectionLabel icon={FileText} label="Application" />
 
                         {app.source && (
                           <div className="inline-flex items-center gap-1.5 rounded-full bg-neutral-50 px-2.5 py-1 text-[11px] font-medium text-neutral-700 ring-1 ring-inset ring-neutral-200">
@@ -646,7 +669,6 @@ export default function AppliedPage() {
                           label="Offer details"
                         />
 
-                        {/* Same 2-column layout / gap as above */}
                         <div className="mt-1 grid gap-x-8 gap-y-1.5 text-xs text-neutral-800 sm:grid-cols-2">
                           {/* Row 1: Salary (left) + Job posting (right) */}
                           {app.salary && (
@@ -762,60 +784,58 @@ export default function AppliedPage() {
                       </ul>
 
                       {/* Quick actions */}
-                      {(app.offerUrl ||
-                        app.website ||
-                        app.contactEmail) && (
-                          <>
-                            <div className="mt-3 border-t border-dashed border-neutral-200" />
-                            <div className="space-y-1.5">
-                              <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
-                                Quick actions
-                              </div>
-                              <div className="flex flex-wrap gap-2">
-                                {app.offerUrl && (
-                                  <a
-                                    href={app.offerUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-800 hover:bg-sky-100"
-                                  >
-                                    <ExternalLink
-                                      className="h-3.5 w-3.5"
-                                      aria-hidden="true"
-                                    />
-                                    Job posting
-                                  </a>
-                                )}
-                                {app.website && (
-                                  <a
-                                    href={app.website}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-xs font-medium text-neutral-800 hover:bg-neutral-100"
-                                  >
-                                    <ExternalLink
-                                      className="h-3.5 w-3.5"
-                                      aria-hidden="true"
-                                    />
-                                    Company site
-                                  </a>
-                                )}
-                                {app.contactEmail && (
-                                  <a
-                                    href={`mailto:${app.contactEmail}`}
-                                    className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800 hover:bg-emerald-100"
-                                  >
-                                    <Mail
-                                      className="h-3.5 w-3.5"
-                                      aria-hidden="true"
-                                    />
-                                    Email contact
-                                  </a>
-                                )}
-                              </div>
+                      {(app.offerUrl || app.website || app.contactEmail) && (
+                        <>
+                          <div className="mt-3 border-t border-dashed border-neutral-200" />
+                          <div className="space-y-1.5">
+                            <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+                              Quick actions
                             </div>
-                          </>
-                        )}
+                            <div className="flex flex-wrap gap-2">
+                              {app.offerUrl && (
+                                <a
+                                  href={app.offerUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-800 hover:bg-sky-100"
+                                >
+                                  <ExternalLink
+                                    className="h-3.5 w-3.5"
+                                    aria-hidden="true"
+                                  />
+                                  Job posting
+                                </a>
+                              )}
+                              {app.website && (
+                                <a
+                                  href={app.website}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-xs font-medium text-neutral-800 hover:bg-neutral-100"
+                                >
+                                  <ExternalLink
+                                    className="h-3.5 w-3.5"
+                                    aria-hidden="true"
+                                  />
+                                  Company site
+                                </a>
+                              )}
+                              {app.contactEmail && (
+                                <a
+                                  href={`mailto:${app.contactEmail}`}
+                                  className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800 hover:bg-emerald-100"
+                                >
+                                  <Mail
+                                    className="h-3.5 w-3.5"
+                                    aria-hidden="true"
+                                  />
+                                  Email contact
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -829,9 +849,8 @@ export default function AppliedPage() {
                       </p>
                     ) : (
                       <p className="mt-1 text-xs text-neutral-500">
-                        No additional notes yet. Use this space to
-                        track interview prep, follow-up dates, or
-                        anything important.
+                        No additional notes yet. Use this space to track
+                        interview prep, follow-up dates, or anything important.
                       </p>
                     )}
                   </div>
@@ -853,6 +872,19 @@ export default function AppliedPage() {
         )}
       </div>
 
+      {/* Move dialog */}
+      <MoveApplicationDialog
+        open={moveDialogOpen}
+        application={appBeingMoved}
+        onClose={closeMoveDialog}
+        onMoveToInterviews={moveToInterviews}
+        onMoveToRejected={moveToRejected}
+        onMoveToWithdrawn={moveToWithdrawn}
+        fmtDate={fmtDate}
+        statusClasses={statusClasses}
+      />
+
+      {/* Add / edit dialog */}
       <AddApplicationDialog
         open={dialogOpen}
         onClose={() => {
