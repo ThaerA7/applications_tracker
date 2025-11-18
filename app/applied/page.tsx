@@ -20,7 +20,8 @@ import {
   Building2,
   Tag,
   Banknote,
-  Trash2,          // ⬅️ add this
+  Trash2,          // ⬅️ already added
+  MoveRight,       // ⬅️ new
 } from 'lucide-react';
 
 import type { LucideIcon } from 'lucide-react';
@@ -352,7 +353,7 @@ export default function AppliedPage() {
                 </div>
               </div>
 
-              {/* Edit + delete + expand buttons */}
+                            {/* Edit + move + delete + expand buttons */}
               <div className="flex items-center justify-end gap-2">
                 <button
                   type="button"
@@ -369,11 +370,27 @@ export default function AppliedPage() {
                     'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-300',
                   ].join(' ')}
                 >
-                  <Pencil
-                    className="h-3 w-3"
-                    aria-hidden="true"
-                  />
+                  <Pencil className="h-3 w-3" aria-hidden="true" />
                   Edit
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    // TODO: plug real move logic here (e.g. move to another column/list)
+                    console.log('Move application', app.id);
+                  }}
+                  className={[
+                    'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium',
+                    'text-sky-800',
+                    'bg-sky-50/80 backdrop-blur supports-[backdrop-filter]:bg-sky-50/70',
+                    'border border-sky-200 shadow-sm',
+                    'hover:bg-sky-50 active:bg-sky-100',
+                    'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-300',
+                  ].join(' ')}
+                >
+                  <MoveRight className="h-3 w-3" aria-hidden="true" />
+                  Move
                 </button>
 
                 <button
@@ -391,6 +408,7 @@ export default function AppliedPage() {
                   <Trash2 className="h-3 w-3" aria-hidden="true" />
                   Delete
                 </button>
+
 
 
                 <button
