@@ -12,14 +12,15 @@ type Item = {
 };
 
 const items: Item[] = [
-  { href: '/',           label: 'Overview',   icon: '/icons/home.png' },
-  { href: '/applied',    label: 'Applied',    icon: '/icons/checklist.png' },
-  { href: '/interviews', label: 'Interviews', icon: '/icons/interview.png' },
-  { href: '/offers',     label: 'Offers',     icon: '/icons/briefcase.png' },
-  { href: '/rejected',   label: 'Rejected',   icon: '/icons/cancel.png' },
-  { href: '/wishlist',   label: 'Wishlist',   icon: '/icons/star.png' },
-  { href: '/notes',      label: 'Notes',      icon: '/icons/note.png' },
-  { href: '/settings',   label: 'Settings',   icon: '/icons/settings.png' },
+  { href: '/',           label: 'Overview',  icon: '/icons/home.png' },
+  { href: '/offers',     label: 'Offers',    icon: '/icons/briefcase.png' },
+  { href: '/applied',    label: 'Applied',   icon: '/icons/checklist.png' },
+  { href: '/interviews', label: 'Interviews',icon: '/icons/interview.png' },
+  { href: '/rejected',   label: 'Rejected',  icon: '/icons/cancel.png' },
+  { href: '/wishlist',   label: 'Wishlist',  icon: '/icons/star.png' },
+  { href: '/calendar',   label: 'Calendar',  icon: '/icons/calendar.png' },
+  { href: '/notes',      label: 'Notes',     icon: '/icons/note.png' },
+  { href: '/settings',   label: 'Settings',  icon: '/icons/settings.png' },
 ];
 
 export default function Sidebar() {
@@ -38,7 +39,6 @@ export default function Sidebar() {
             priority
             className="block shrink-0 rounded-md transition-transform group-hover:scale-105"
           />
-          {/* Stacked words to the right of the logo */}
           <span className="leading-tight text-white font-bold">
             <span className="block uppercase tracking-widest">Application</span>
             <span className="block uppercase tracking-widest">Tracker</span>
@@ -77,7 +77,6 @@ export default function Sidebar() {
 
       <div className="absolute bottom-0 w-full border-t border-neutral-800 p-3 text-[0.9375rem] text-zinc-500">
         v0.1
-        {/* <span className="ml-2">Icons by <a href="https://icons8.com" className="underline">Icons8</a></span> */}
       </div>
     </aside>
   );

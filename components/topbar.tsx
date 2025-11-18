@@ -17,11 +17,12 @@ const ROUTES: Record<string, RouteMeta> = {
   '/offers':     { title: 'Offers',     icon: '/icons/briefcase.png' },
   '/rejected':   { title: 'Rejected',   icon: '/icons/cancel.png' },
   '/wishlist':   { title: 'Wishlist',   icon: '/icons/star.png' },
+  '/calendar':   { title: 'Calendar',   icon: '/icons/calendar.png' }, // ⬅️ new
   '/notes':      { title: 'Notes',      icon: '/icons/note.png' },
   '/settings':   { title: 'Settings',   icon: '/icons/settings.png' },
 };
 
-// Per-route accent (kept simple; only washFrom is used below)
+// Per-route accent
 type Accent = {
   washFrom: string;
   barFrom: string;
@@ -36,6 +37,7 @@ const ACCENTS: Record<string, Accent> = {
   '/offers':     { washFrom: 'from-amber-50',   barFrom: 'after:from-amber-500',   barTo: 'after:to-orange-500',  focus: 'focus-visible:ring-amber-300' },
   '/rejected':   { washFrom: 'from-rose-50',    barFrom: 'after:from-rose-500',    barTo: 'after:to-pink-500',    focus: 'focus-visible:ring-rose-300' },
   '/wishlist':   { washFrom: 'from-violet-50',  barFrom: 'after:from-violet-500',  barTo: 'after:to-fuchsia-500', focus: 'focus-visible:ring-violet-300' },
+  '/calendar':   { washFrom: 'from-indigo-50',  barFrom: 'after:from-indigo-500',  barTo: 'after:to-sky-500',     focus: 'focus-visible:ring-indigo-300' }, // ⬅️ new
   '/notes':      { washFrom: 'from-fuchsia-50', barFrom: 'after:from-fuchsia-500', barTo: 'after:to-violet-500',  focus: 'focus-visible:ring-fuchsia-300' },
   '/settings':   { washFrom: 'from-slate-50',   barFrom: 'after:from-slate-500',   barTo: 'after:to-neutral-500', focus: 'focus-visible:ring-slate-300' },
 };
@@ -43,7 +45,6 @@ const ACCENTS: Record<string, Accent> = {
 export default function TopBar() {
   const pathname = usePathname();
 
-  // Longest-prefix match so nested routes still get the right accent
   const activeKey =
     Object.keys(ROUTES)
       .sort((a, b) => b.length - a.length)
@@ -75,7 +76,7 @@ export default function TopBar() {
           <h1 className="text-lg font-semibold text-neutral-900">{title}</h1>
         </div>
 
-        {/* Right: avatar + glassy logout with colorful icon */}
+        {/* Right: avatar + logout */}
         <div className="flex items-center gap-3">
           <div
             className="grid h-8 w-8 place-items-center rounded-full bg-neutral-200/80 text-sm font-semibold text-neutral-700 ring-1 ring-neutral-300"

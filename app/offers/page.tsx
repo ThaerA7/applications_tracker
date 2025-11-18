@@ -1121,7 +1121,7 @@ export default function OffersPage() {
         </div>
       </div>
 
-      <div className="mt-5 grid grid-cols-1 gap-3" aria-live="polite">
+      <div className="mt-2 grid grid-cols-1 gap-3" aria-live="polite">
         {loadingFirst && (
           <div className="flex items-center gap-2 rounded-xl border border-neutral-200 bg-white/80 p-4">
             <Loader2 className="h-4 w-4 animate-spin" />
