@@ -17,16 +17,15 @@ type MoveApplicationDialogProps = {
         location?: string;
         status: string;
         appliedOn: string;
-        // NEW optional fields so we can prefill the schedule dialog
+        // optional fields so we can prefill the schedule dialog
         contactPerson?: string;
         contactEmail?: string;
+        contactPhone?: string;
         offerUrl?: string;
         logoUrl?: string;
       }
     | null;
   onClose: () => void;
-  // Now receives the created Interview so parent can remove the card from "Applied"
-  // and (optionally) update any global/app state.
   onMoveToInterviews: (interview: Interview) => void;
   onMoveToRejected: () => void;
   onMoveToWithdrawn: () => void;
@@ -269,11 +268,12 @@ const MoveApplicationDialog: FC<MoveApplicationDialogProps> = ({
           location: application.location,
           contactPerson: application.contactPerson,
           contactEmail: application.contactEmail,
+          contactPhone: application.contactPhone,
           offerUrl: application.offerUrl,
           logoUrl: application.logoUrl,
+          appliedOn: application.appliedOn,
         }}
         onInterviewCreated={(interview) => {
-          // Let parent delete the card from "Applied" (and do anything else)
           onMoveToInterviews(interview);
           setScheduleOpen(false);
           onClose();

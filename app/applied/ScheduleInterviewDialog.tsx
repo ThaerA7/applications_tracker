@@ -30,11 +30,12 @@ export type Interview = {
   company: string;
   role: string;
   location?: string;
-  contact?: { name?: string; email?: string };
+  contact?: { name?: string; email?: string; phone?: string };
   date: string; // ISO-ish string, e.g. 2025-11-12T14:00
   type: InterviewType;
   url?: string;
   logoUrl?: string;
+  appliedOn?: string; // YYYY-MM-DD from original application
 };
 
 type ScheduleInterviewDialogProps = {
@@ -48,15 +49,23 @@ type ScheduleInterviewDialogProps = {
         location?: string;
         contactPerson?: string;
         contactEmail?: string;
+        contactPhone?: string;
         offerUrl?: string;
         logoUrl?: string;
+        appliedOn?: string;
       }
     | null;
   /**
    * Called after the interview has been persisted.
-   * Parent should remove the application card from "Applied" here.
    */
   onInterviewCreated?: (interview: Interview) => void;
+  /**
+   * Controls text & behavior:
+   * - "schedule": coming from Applications page (default)
+   * - "add": add new interview on /interviews
+   * - "edit": edit existing interview on /interviews
+   */
+  mode?: 'schedule' | 'add' | 'edit';
 };
 
 type FormState = {
@@ -68,10 +77,14 @@ type FormState = {
   location: string;
   contactName: string;
   contactEmail: string;
+  contactPhone: string;
   url: string;
+  appliedDate: string; // YYYY-MM-DD
 };
 
-function makeInitialForm(app: ScheduleInterviewDialogProps['application']): FormState {
+function makeInitialForm(
+  app: ScheduleInterviewDialogProps['application'],
+): FormState {
   const now = new Date();
   const yyyy = now.getFullYear();
   const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -79,16 +92,20 @@ function makeInitialForm(app: ScheduleInterviewDialogProps['application']): Form
   const hh = String(now.getHours()).padStart(2, '0');
   const min = String(now.getMinutes()).padStart(2, '0');
 
+  const today = `${yyyy}-${mm}-${dd}`;
+
   return {
     company: app?.company ?? '',
     role: app?.role ?? '',
-    date: `${yyyy}-${mm}-${dd}`,
+    date: today,
     time: `${hh}:${min}`,
     type: 'phone',
     location: app?.location ?? '',
     contactName: app?.contactPerson ?? '',
     contactEmail: app?.contactEmail ?? '',
+    contactPhone: app?.contactPhone ?? '',
     url: app?.offerUrl ?? '',
+    appliedDate: app?.appliedOn ?? today,
   };
 }
 
@@ -97,8 +114,32 @@ export default function ScheduleInterviewDialog({
   onClose,
   application,
   onInterviewCreated,
+  mode = 'schedule',
 }: ScheduleInterviewDialogProps) {
   const [form, setForm] = useState<FormState>(() => makeInitialForm(null));
+
+  const effectiveMode = mode ?? 'schedule';
+
+  const title =
+    effectiveMode === 'edit'
+      ? 'Edit interview'
+      : effectiveMode === 'add'
+      ? 'Add interview'
+      : 'Schedule interview';
+
+  const description =
+    effectiveMode === 'edit'
+      ? 'Update the interview details and save your changes.'
+      : effectiveMode === 'add'
+      ? 'Fill in the details to add a new interview.'
+      : 'Confirm the details before moving this application to the interviews section.';
+
+  const submitLabel =
+    effectiveMode === 'edit'
+      ? 'Save changes'
+      : effectiveMode === 'add'
+      ? 'Add interview'
+      : 'Save & move to interviews';
 
   // Reset form whenever dialog opens or application changes
   useEffect(() => {
@@ -122,29 +163,38 @@ export default function ScheduleInterviewDialog({
 
     if (!company || !role || !date || !time) return;
 
-    // Store as local "ISO-ish" string without forcing UTC conversion,
-    // so Europe/Berlin display stays as user entered.
     const iso = `${date}T${time}`;
 
+    const contactName = form.contactName.trim();
+    const contactEmail = form.contactEmail.trim();
+    const contactPhone = form.contactPhone.trim();
+    const appliedDate = form.appliedDate.trim() || undefined;
+
+    const id =
+      effectiveMode === 'edit' && application?.id
+        ? application.id
+        : typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}`;
+
     const interview: Interview = {
-      id:
-        typeof crypto !== 'undefined' && 'randomUUID' in crypto
-          ? crypto.randomUUID()
-          : `${Date.now()}`,
+      id,
       company,
       role,
       location: form.location.trim() || undefined,
       contact:
-        form.contactName.trim() || form.contactEmail.trim()
+        contactName || contactEmail || contactPhone
           ? {
-              name: form.contactName.trim() || undefined,
-              email: form.contactEmail.trim() || undefined,
+              name: contactName || undefined,
+              email: contactEmail || undefined,
+              phone: contactPhone || undefined,
             }
           : undefined,
       date: iso,
       type: form.type,
       url: form.url.trim() || undefined,
       logoUrl: application?.logoUrl,
+      appliedOn: appliedDate,
     };
 
     // Persist to localStorage so /interviews page can read it
@@ -159,7 +209,10 @@ export default function ScheduleInterviewDialog({
           }
         }
         const next = [...existing, interview];
-        window.localStorage.setItem(INTERVIEWS_STORAGE_KEY, JSON.stringify(next));
+        window.localStorage.setItem(
+          INTERVIEWS_STORAGE_KEY,
+          JSON.stringify(next),
+        );
       }
     } catch (err) {
       console.error('Failed to persist interview to localStorage', err);
@@ -179,7 +232,7 @@ export default function ScheduleInterviewDialog({
     form.time.trim().length > 0;
 
   const dialog = (
-    <div className="fixed inset-0 z-[12000] flex items-center justify-center px-4 py-8">
+    <div className="fixed inset-y-0 right-0 left-64 z-[12000] flex items-center justify-center px-4 py-8">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-neutral-900/40"
@@ -201,19 +254,21 @@ export default function ScheduleInterviewDialog({
         {/* Header */}
         <div className="flex items-start justify-between border-b border-neutral-200/70 px-5 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-200 bg-white/80">
-              <CalendarDays className="h-5 w-5 text-emerald-600" aria-hidden="true" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-200 bg-white/80 overflow-hidden">
+              <img
+                src="/icons/calendar.png"
+                alt="Schedule interview"
+                className="h-8 w-8 object-contain"
+              />
             </div>
             <div>
               <h2
                 id="schedule-interview-title"
                 className="text-sm font-semibold text-neutral-900"
               >
-                Schedule interview
+                {title}
               </h2>
-              <p className="mt-0.5 text-xs text-neutral-600">
-                Confirm the details before moving this application to the interviews section.
-              </p>
+              <p className="mt-0.5 text-xs text-neutral-600">{description}</p>
             </div>
           </div>
 
@@ -244,6 +299,29 @@ export default function ScheduleInterviewDialog({
                   </div>
                 </div>
               </div>
+
+              {(application.appliedOn || application.contactPhone) && (
+                <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-neutral-600">
+                  {application.appliedOn && (
+                    <span className="inline-flex items-center gap-1.5">
+                      <CalendarDays
+                        className="h-3.5 w-3.5 text-neutral-400"
+                        aria-hidden="true"
+                      />
+                      <span>Applied on {application.appliedOn}</span>
+                    </span>
+                  )}
+                  {application.contactPhone && (
+                    <span className="inline-flex items-center gap-1.5">
+                      <Phone
+                        className="h-3.5 w-3.5 text-neutral-400"
+                        aria-hidden="true"
+                      />
+                      <span>{application.contactPhone}</span>
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -326,6 +404,23 @@ export default function ScheduleInterviewDialog({
               </div>
             </label>
 
+            {/* Applied on (optional, but prefilled) */}
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-neutral-800">Applied on</span>
+              <div className="relative">
+                <CalendarDays
+                  className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
+                  aria-hidden="true"
+                />
+                <input
+                  type="date"
+                  value={form.appliedDate}
+                  onChange={handleChange('appliedDate')}
+                  className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
+                />
+              </div>
+            </label>
+
             <label className="space-y-1 text-sm">
               <span className="font-medium text-neutral-800">
                 Type<span className="text-rose-500">*</span>
@@ -337,7 +432,7 @@ export default function ScheduleInterviewDialog({
                   className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 px-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
                   required
                 >
-                  <option value="phone">Phone</option>
+                  <option value="phone">Phone screening</option>
                   <option value="video">Video call</option>
                   <option value="in-person">In person</option>
                 </select>
@@ -395,6 +490,23 @@ export default function ScheduleInterviewDialog({
               </div>
             </label>
 
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-neutral-800">Contact phone</span>
+              <div className="relative">
+                <Phone
+                  className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
+                  aria-hidden="true"
+                />
+                <input
+                  type="tel"
+                  value={form.contactPhone}
+                  onChange={handleChange('contactPhone')}
+                  placeholder="+49 30 123456"
+                  className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
+                />
+              </div>
+            </label>
+
             <label className="space-y-1 text-sm md:col-span-2">
               <span className="font-medium text-neutral-800">Job posting URL</span>
               <div className="relative">
@@ -433,7 +545,7 @@ export default function ScheduleInterviewDialog({
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
               ].join(' ')}
             >
-              Save &amp; move to interviews
+              {submitLabel}
             </button>
           </div>
         </form>

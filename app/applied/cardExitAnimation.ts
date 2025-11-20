@@ -1,3 +1,4 @@
+// app/applied/cardExitAnimation.ts
 'use client';
 
 type CardExitMode = 'move' | 'delete';

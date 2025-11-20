@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 
 import type { LucideIcon } from 'lucide-react';
+import { animateCardExit } from './cardExitAnimation';
 
 import AddApplicationDialog, {
   NewApplicationForm,
@@ -146,18 +147,23 @@ export default function AppliedPage() {
   };
 
   const handleDelete = (id: string) => {
-    setApplications((prev) => prev.filter((app) => app.id !== id));
+    const elementId = `application-card-${id}`;
 
-    setExpanded((prev) => {
-      const copy = { ...prev };
-      delete copy[id];
-      return copy;
+    animateCardExit(elementId, 'delete', () => {
+      // actually remove from state AFTER animation
+      setApplications((prev) => prev.filter((app) => app.id !== id));
+
+      setExpanded((prev) => {
+        const copy = { ...prev };
+        delete copy[id];
+        return copy;
+      });
+
+      if (editingApp?.id === id) {
+        setEditingApp(null);
+        setDialogOpen(false);
+      }
     });
-
-    if (editingApp?.id === id) {
-      setEditingApp(null);
-      setDialogOpen(false);
-    }
   };
 
   // --- Move dialog helpers ---
@@ -172,36 +178,41 @@ export default function AppliedPage() {
     setAppBeingMoved(null);
   };
 
-  const moveToInterviews = () => {
+  // When moving an application OUT of "Applied",
+  // we play the move animation, then remove it from this list.
+  const moveOutOfApplied = () => {
     if (!appBeingMoved) return;
-    setApplications((prev) =>
-      prev.map((app) =>
-        app.id === appBeingMoved.id
-          ? { ...app, status: 'Interview – Phone screen' }
-          : app,
-      ),
-    );
-    closeMoveDialog();
+
+    const id = appBeingMoved.id;
+    const elementId = `application-card-${id}`;
+
+    animateCardExit(elementId, 'move', () => {
+      setApplications((prev) => prev.filter((app) => app.id !== id));
+
+      setExpanded((prev) => {
+        const copy = { ...prev };
+        delete copy[id];
+        return copy;
+      });
+
+      // After this, if it was the last application,
+      // applications.length === 0 and filtered.length === 0,
+      // so the "No applications yet..." empty-state shows.
+      closeMoveDialog();
+    });
+  };
+
+  const moveToInterviews = () => {
+    // you can also trigger any global/state updates here if needed
+    moveOutOfApplied();
   };
 
   const moveToRejected = () => {
-    if (!appBeingMoved) return;
-    setApplications((prev) =>
-      prev.map((app) =>
-        app.id === appBeingMoved.id ? { ...app, status: 'Rejected' } : app,
-      ),
-    );
-    closeMoveDialog();
+    moveOutOfApplied();
   };
 
   const moveToWithdrawn = () => {
-    if (!appBeingMoved) return;
-    setApplications((prev) =>
-      prev.map((app) =>
-        app.id === appBeingMoved.id ? { ...app, status: 'Withdrawn' } : app,
-      ),
-    );
-    closeMoveDialog();
+    moveOutOfApplied();
   };
 
   return (
@@ -286,6 +297,7 @@ export default function AppliedPage() {
           const isOpen = !!expanded[app.id];
           return (
             <article
+              id={`application-card-${app.id}`}
               key={app.id}
               className={[
                 'relative group grid grid-cols-[64px,1fr,auto] items-center gap-4',
