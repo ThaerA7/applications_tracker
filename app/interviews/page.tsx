@@ -481,7 +481,7 @@ export default function InterviewsPage() {
             ].join(' ')}
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
-            Add interview
+            Add
           </button>
 
           {/* Filter (placeholder) */}
@@ -495,6 +495,7 @@ export default function InterviewsPage() {
             ].join(' ')}
           >
             <Filter className="h-4 w-4" aria-hidden="true" />
+            Filter
           </button>
         </div>
 
