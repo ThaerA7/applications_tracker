@@ -25,7 +25,7 @@ import {
 import ScheduleInterviewDialog, {
   type Interview,
   type InterviewType,
-} from '../applied/ScheduleInterviewDialog';
+} from '../../components/ScheduleInterviewDialog';
 
 const INTERVIEWS_STORAGE_KEY = 'job-tracker:interviews';
 

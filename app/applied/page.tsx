@@ -25,12 +25,12 @@ import {
 } from 'lucide-react';
 
 import type { LucideIcon } from 'lucide-react';
-import { animateCardExit } from './cardExitAnimation';
+import { animateCardExit } from '../../components/cardExitAnimation';
 
 import AddApplicationDialog, {
   NewApplicationForm,
-} from './AddApplicationDialog';
-import MoveApplicationDialog from './MoveApplicationDialog';
+} from '../../components/AddApplicationDialog';
+import MoveApplicationDialog from '../../components/MoveApplicationDialog';
 
 type Application = {
   id: string;
