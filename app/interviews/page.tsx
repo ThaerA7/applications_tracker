@@ -780,30 +780,23 @@ export default function InterviewsPage() {
                     </div>
                   )}
 
-                  {/* Job posting URL (optional) */}
-                  {item.url && (
-                    <div className="flex items-center gap-2">
-                      <LinkIcon
-                        className="h-4 w-4 text-neutral-500"
-                        aria-hidden="true"
-                      />
-                      <div className="flex flex-col">
-                        <dt className="text-neutral-500">Job posting</dt>
-                        <dd className="font-medium text-neutral-900">
-                          <a
-                            href={item.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1 hover:underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-600"
-                          >
-                            <span>View the offer details</span>
-                            <span aria-hidden="true">↗</span>
-                          </a>
-                        </dd>
-                      </div>
-                    </div>
-                  )}
+
+
                 </dl>
+                {/* Footer – Job posting link (same style as Rejected card) */}
+                {item.url && (
+                  <div className="mt-4 flex justify-end">
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-sm font-medium text-neutral-900 hover:underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-700"
+                    >
+                      <LinkIcon className="h-4 w-4" aria-hidden="true" />
+                      Job posting
+                    </a>
+                  </div>
+                )}
               </article>
             );
           })}
