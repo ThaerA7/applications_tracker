@@ -40,6 +40,18 @@ export type NewApplicationForm = {
   website?: string;     // company website
 };
 
+// Same-style options as in ScheduleInterviewDialog
+const EMPLOYMENT_OPTIONS: string[] = [
+  'Full-time',
+  'Part-time',
+  'Internship',
+  'Working student',
+  'Contract',
+  'Temporary',
+  'Mini-job',
+  'Freelance',
+];
+
 function makeInitialForm(): NewApplicationForm {
   const today = new Date().toISOString().slice(0, 10);
   return {
@@ -109,14 +121,14 @@ export default function AddApplicationDialog({
 
   const handleChange =
     (field: keyof NewApplicationForm) =>
-      (
-        e: React.ChangeEvent<
-          HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-        >,
-      ) => {
-        const { value } = e.target;
-        setForm((f) => ({ ...f, [field]: value }));
-      };
+    (
+      e: React.ChangeEvent<
+        HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+      >,
+    ) => {
+      const { value } = e.target;
+      setForm((f) => ({ ...f, [field]: value }));
+    };
 
   const handleLogoChange = (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -182,38 +194,38 @@ export default function AddApplicationDialog({
         ].join(' ')}
         onClick={(e) => e.stopPropagation()}
       >
-       {/* Header */}
-<div className="flex items-center justify-between border-b border-neutral-200/70 px-5 py-3">
-  <div className="flex items-center gap-2">
-    <img
-      src={isEdit ? '/icons/edit.png' : '/icons/add.png'}
-      alt={isEdit ? 'Edit application' : 'Add application'}
-      className="h-9 w-9 md:h-12 md:w-12 object-contain"
-    />
-    <div>
-      <h2
-        id="add-application-title"
-        className="text-base font-semibold text-neutral-900"
-      >
-        {isEdit ? 'Edit application' : 'Add application'}
-      </h2>
-      <p className="mt-0.1 text-xs text-neutral-600">
-        {isEdit
-          ? 'Update the details of this application.'
-          : 'Track where you applied and the details of the offer.'}
-      </p>
-    </div>
-  </div>
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-neutral-200/70 px-5 py-3">
+          <div className="flex items-center gap-2">
+            <img
+              src={isEdit ? '/icons/edit.png' : '/icons/add.png'}
+              alt={isEdit ? 'Edit application' : 'Add application'}
+              className="h-9 w-9 md:h-12 md:w-12 object-contain"
+            />
+            <div>
+              <h2
+                id="add-application-title"
+                className="text-base font-semibold text-neutral-900"
+              >
+                {isEdit ? 'Edit application' : 'Add application'}
+              </h2>
+              <p className="mt-0.1 text-xs text-neutral-600">
+                {isEdit
+                  ? 'Update the details of this application.'
+                  : 'Track where you applied and the details of the offer.'}
+              </p>
+            </div>
+          </div>
 
-  <button
-    type="button"
-    onClick={onClose}
-    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 bg-white/80 text-neutral-500 shadow-sm hover:bg-white"
-    aria-label="Close dialog"
-  >
-    <X className="h-4 w-4" aria-hidden="true" />
-  </button>
-</div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 bg-white/80 text-neutral-500 shadow-sm hover:bg-white"
+            aria-label="Close dialog"
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
 
         {/* Form */}
         <form
@@ -244,7 +256,7 @@ export default function AddApplicationDialog({
               </span>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <div>
-                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-neutral-200 bg-white/80 px-3 py-2 text-xs font-medium text-neutral-800 shadow-sm hover:bg-white">
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-neutral-200 bg-white/80 px-3 py-2 text-xs font-medium text-neutral-800 shadow-sm hover:bg:white">
                     <ImageIcon
                       className="h-4 w-4 text-neutral-400"
                       aria-hidden="true"
@@ -258,7 +270,7 @@ export default function AddApplicationDialog({
                       className="sr-only"
                     />
                   </label>
-                  
+
                   {logoError && (
                     <p className="mt-1 text-[11px] text-rose-600">
                       {logoError}
@@ -306,7 +318,7 @@ export default function AddApplicationDialog({
                   value={form.location}
                   onChange={handleChange('location')}
                   placeholder="Berlin, DE / Remote"
-                  className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-sky-300"
+                  className="h-9 w-full rounded-lg border border-neutral-200 bg:white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-sky-300"
                 />
               </div>
             </label>
@@ -324,7 +336,7 @@ export default function AddApplicationDialog({
                   type="date"
                   value={form.appliedOn}
                   onChange={handleChange('appliedOn')}
-                  className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-sky-300"
+                  className="h-9 w-full rounded-lg border border-neutral-200 bg:white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-sky-300"
                 />
               </div>
             </label>
@@ -342,14 +354,15 @@ export default function AddApplicationDialog({
                   type="date"
                   value={form.startDate}
                   onChange={handleChange('startDate')}
-                  className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-sky-300"
+                  className="h-9 w-full rounded-lg border border-neutral-200 bg:white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-sky-300"
                 />
               </div>
             </label>
 
+            {/* UPDATED: employment type to match ScheduleInterviewDialog style */}
             <label className="space-y-1 text-sm">
               <span className="font-medium text-neutral-800">
-                Type of employment
+                Employment type
               </span>
               <div className="relative">
                 <Briefcase
@@ -359,19 +372,14 @@ export default function AddApplicationDialog({
                 <select
                   value={form.employmentType}
                   onChange={handleChange('employmentType')}
-                  className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-sky-300"
+                  className="h-9 w-full rounded-lg border border-neutral-200 bg:white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-sky-300"
                 >
-                  <option value="">Select…</option>
-                  <option value="Vollzeit">Vollzeit</option>
-                  <option value="Teilzeit">Teilzeit</option>
-                  <option value="Werkstudent">Werkstudent</option>
-                  <option value="Minijob">Minijob</option>
-                  <option value="Praktikum">Praktikum</option>
-                  <option value="Ausbildung">Ausbildung</option>
-                  <option value="Trainee">Trainee</option>
-                  <option value="Freelance">Freelance</option>
-                  <option value="Befristet">Befristet</option>
-                  <option value="Sonstiges">Sonstiges</option>
+                  <option value="">Select type…</option>
+                  {EMPLOYMENT_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
                 </select>
               </div>
             </label>
@@ -383,7 +391,7 @@ export default function AddApplicationDialog({
               <select
                 value={form.status}
                 onChange={handleChange('status')}
-                className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 px-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-sky-300"
+                className="h-9 w-full rounded-lg border border-neutral-200 bg:white/80 px-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-sky-300"
               >
                 <option value="Applied">Applied</option>
                 <option value="Submitted">Submitted</option>
@@ -416,7 +424,7 @@ export default function AddApplicationDialog({
                   value={form.offerUrl}
                   onChange={handleChange('offerUrl')}
                   placeholder="https://jobs.example.com/frontend-engineer"
-                  className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-sky-300"
+                  className="h-9 w-full rounded-lg border border-neutral-200 bg:white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-sky-300"
                 />
               </div>
             </label>
@@ -436,7 +444,7 @@ export default function AddApplicationDialog({
                   value={form.website ?? ''}
                   onChange={handleChange('website')}
                   placeholder="https://company.example.com"
-                  className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-sky-300"
+                  className="h-9 w-full rounded-lg border border-neutral-200 bg:white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-sky-300"
                 />
               </div>
             </label>
@@ -450,7 +458,7 @@ export default function AddApplicationDialog({
                 value={form.salary}
                 onChange={handleChange('salary')}
                 placeholder="€60k–€75k / €x per hour"
-                className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 px-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-sky-300"
+                className="h-9 w-full rounded-lg border border-neutral-200 bg:white/80 px-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-sky-300"
               />
             </label>
 
@@ -463,7 +471,7 @@ export default function AddApplicationDialog({
                 value={form.source}
                 onChange={handleChange('source')}
                 placeholder="LinkedIn, Arbeitagentur, company site…"
-                className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 px-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-sky-300"
+                className="h-9 w-full rounded-lg border border-neutral-200 bg:white/80 px-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-sky-300"
               />
             </label>
 
@@ -481,7 +489,7 @@ export default function AddApplicationDialog({
                   value={form.contactPerson}
                   onChange={handleChange('contactPerson')}
                   placeholder="Jane Doe"
-                  className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-sky-300"
+                  className="h-9 w-full rounded-lg border border-neutral-200 bg:white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-sky-300"
                 />
               </div>
             </label>
@@ -500,7 +508,7 @@ export default function AddApplicationDialog({
                   value={form.contactEmail}
                   onChange={handleChange('contactEmail')}
                   placeholder="recruiting@example.com"
-                  className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-sky-300"
+                  className="h-9 w-full rounded-lg border border-neutral-200 bg:white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-sky-300"
                 />
               </div>
             </label>
@@ -519,7 +527,7 @@ export default function AddApplicationDialog({
                   value={form.contactPhone}
                   onChange={handleChange('contactPhone')}
                   placeholder="+49 30 123456"
-                  className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-sky-300"
+                  className="h-9 w-full rounded-lg border border-neutral-200 bg:white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-sky-300"
                 />
               </div>
             </label>
@@ -540,7 +548,7 @@ export default function AddApplicationDialog({
                 onChange={handleChange('notes')}
                 rows={3}
                 placeholder="Interview prep, who you talked to, follow-up dates…"
-                className="w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 pt-2.5 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-sky-300"
+                className="w-full rounded-lg border border-neutral-200 bg:white/80 pl-8 pr-3 pt-2.5 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-sky-300"
               />
             </div>
           </label>
@@ -550,7 +558,7 @@ export default function AddApplicationDialog({
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex items-center justify-center rounded-lg border border-neutral-200 bg-white/80 px-4 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-300"
+              className="inline-flex items-center justify-center rounded-lg border border-neutral-200 bg:white/80 px-4 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg:white focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-300"
             >
               Cancel
             </button>

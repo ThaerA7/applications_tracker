@@ -15,6 +15,7 @@ import {
   Phone,
   Video,
   User2,
+  Mail,
   Link as LinkIcon,
   X,
   Briefcase,
@@ -36,6 +37,7 @@ export type Interview = {
   url?: string;
   logoUrl?: string;
   appliedOn?: string; // YYYY-MM-DD from original application
+  employmentType?: string;
 };
 
 type ScheduleInterviewDialogProps = {
@@ -53,6 +55,7 @@ type ScheduleInterviewDialogProps = {
         offerUrl?: string;
         logoUrl?: string;
         appliedOn?: string;
+        employmentType?: string;
       }
     | null;
   /**
@@ -80,7 +83,19 @@ type FormState = {
   contactPhone: string;
   url: string;
   appliedDate: string; // YYYY-MM-DD
+  employmentType: string;
 };
+
+const EMPLOYMENT_OPTIONS: string[] = [
+  'Full-time',
+  'Part-time',
+  'Internship',
+  'Working student',
+  'Contract',
+  'Temporary',
+  'Mini-job',
+  'Freelance',
+];
 
 function makeInitialForm(
   app: ScheduleInterviewDialogProps['application'],
@@ -106,6 +121,7 @@ function makeInitialForm(
     contactPhone: app?.contactPhone ?? '',
     url: app?.offerUrl ?? '',
     appliedDate: app?.appliedOn ?? today,
+    employmentType: app?.employmentType ?? '',
   };
 }
 
@@ -169,6 +185,7 @@ export default function ScheduleInterviewDialog({
     const contactEmail = form.contactEmail.trim();
     const contactPhone = form.contactPhone.trim();
     const appliedDate = form.appliedDate.trim() || undefined;
+    const employmentType = form.employmentType.trim();
 
     const id =
       effectiveMode === 'edit' && application?.id
@@ -195,6 +212,7 @@ export default function ScheduleInterviewDialog({
       url: form.url.trim() || undefined,
       logoUrl: application?.logoUrl,
       appliedOn: appliedDate,
+      employmentType: employmentType || undefined,
     };
 
     // Persist to localStorage so /interviews page can read it
@@ -208,7 +226,15 @@ export default function ScheduleInterviewDialog({
             existing = parsed;
           }
         }
-        const next = [...existing, interview];
+        // For edit, replace existing; for add, append
+        const existingIndex = existing.findIndex((i) => i.id === interview.id);
+        let next: Interview[];
+        if (existingIndex >= 0) {
+          next = [...existing];
+          next[existingIndex] = interview;
+        } else {
+          next = [...existing, interview];
+        }
         window.localStorage.setItem(
           INTERVIEWS_STORAGE_KEY,
           JSON.stringify(next),
@@ -295,7 +321,9 @@ export default function ScheduleInterviewDialog({
                     <div className="font-medium text-neutral-900">
                       {application.role || 'Role not set'}
                     </div>
-                    <div className="text-neutral-600">{application.company}</div>
+                    <div className="text-neutral-600">
+                      {application.company}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -439,6 +467,31 @@ export default function ScheduleInterviewDialog({
               </div>
             </label>
 
+            {/* Employment type */}
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-neutral-800">
+                Employment type
+              </span>
+              <div className="relative">
+                <Briefcase
+                  className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
+                  aria-hidden="true"
+                />
+                <select
+                  value={form.employmentType}
+                  onChange={handleChange('employmentType')}
+                  className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
+                >
+                  <option value="">Select type…</option>
+                  {EMPLOYMENT_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </label>
+
             <label className="space-y-1 text-sm">
               <span className="font-medium text-neutral-800">Location</span>
               <div className="relative">
@@ -476,7 +529,7 @@ export default function ScheduleInterviewDialog({
             <label className="space-y-1 text-sm">
               <span className="font-medium text-neutral-800">Contact email</span>
               <div className="relative">
-                <User2
+                <Mail
                   className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
                   aria-hidden="true"
                 />
@@ -508,7 +561,9 @@ export default function ScheduleInterviewDialog({
             </label>
 
             <label className="space-y-1 text-sm md:col-span-2">
-              <span className="font-medium text-neutral-800">Job posting URL</span>
+              <span className="font-medium text-neutral-800">
+                Job posting URL
+              </span>
               <div className="relative">
                 <LinkIcon
                   className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"

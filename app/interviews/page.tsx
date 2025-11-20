@@ -14,6 +14,7 @@ import {
   Phone,
   Video,
   User2,
+  Mail,
   Link as LinkIcon,
   Building2,
   Trash2,
@@ -52,6 +53,7 @@ const DEMO_INTERVIEWS: Interview[] = [
     type: 'video',
     url: 'https://jobs.example/acme/frontend',
     logoUrl: '/logos/acme.svg',
+    employmentType: 'Full-time',
   },
   {
     id: '2',
@@ -62,6 +64,7 @@ const DEMO_INTERVIEWS: Interview[] = [
     date: '2025-11-15T10:30',
     type: 'phone',
     logoUrl: '/logos/globex.png',
+    employmentType: 'Full-time',
   },
   {
     id: '3',
@@ -73,6 +76,7 @@ const DEMO_INTERVIEWS: Interview[] = [
     type: 'in-person',
     url: 'https://initech.example/careers/123',
     logoUrl: '/logos/initech.svg',
+    employmentType: 'Full-time',
   },
 ];
 
@@ -270,6 +274,7 @@ export default function InterviewsPage() {
       offerUrl: item.url,
       logoUrl: item.logoUrl,
       appliedOn: item.appliedOn,
+      employmentType: item.employmentType,
     };
 
     setEditingInterview(item);
@@ -363,6 +368,7 @@ export default function InterviewsPage() {
         i.contact?.email,
         i.contact?.phone,
         i.appliedOn,
+        i.employmentType,
       ]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q)),
@@ -401,7 +407,8 @@ export default function InterviewsPage() {
             </h2>
             <p className="mt-2 text-sm text-neutral-700">
               This will permanently remove the interview with{' '}
-              <span className="font-medium">{deleteTarget.company}</span> for the role{' '}
+              <span className="font-medium">{deleteTarget.company}</span> for
+              the role{' '}
               <span className="font-medium">{deleteTarget.role}</span>.
             </p>
             <p className="mt-1 text-xs text-neutral-500">
@@ -428,7 +435,6 @@ export default function InterviewsPage() {
         </div>
       )}
 
-
       <section
         className={[
           'relative rounded-2xl border border-neutral-200/70',
@@ -440,7 +446,9 @@ export default function InterviewsPage() {
         <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-emerald-400/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-teal-400/20 blur-3xl" />
 
-        <h1 className="text-2xl font-semibold text-neutral-900">Interviews</h1>
+        <h1 className="text-2xl font-semibold text-neutral-900">
+          Interviews
+        </h1>
         <p className="mt-1 text-neutral-700">
           Track upcoming and past interviews, outcomes, and notes.
         </p>
@@ -550,7 +558,10 @@ export default function InterviewsPage() {
                       className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600 shadow-sm hover:bg-emerald-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
                       aria-label="Move interview"
                     >
-                      <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                      <ArrowRight
+                        className="h-3.5 w-3.5"
+                        aria-hidden="true"
+                      />
                     </button>
                   </div>
 
@@ -564,7 +575,6 @@ export default function InterviewsPage() {
                     <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                   </button>
                 </div>
-
 
                 {/* Header with square logo + company/role */}
                 <div className="flex items-start gap-3 pr-20 sm:pr-24">
@@ -602,7 +612,6 @@ export default function InterviewsPage() {
                     </p>
                   </div>
                 </div>
-
 
                 {/* Divider */}
                 <div
@@ -660,6 +669,22 @@ export default function InterviewsPage() {
                     </div>
                   </div>
 
+                  {/* Employment type (optional) */}
+                  {item.employmentType && (
+                    <div className="flex items-center gap-2">
+                      <Briefcase
+                        className="h-4 w-4 text-neutral-500"
+                        aria-hidden="true"
+                      />
+                      <div className="flex flex-col">
+                        <dt className="text-neutral-500">Employment</dt>
+                        <dd className="font-medium text-neutral-900">
+                          {item.employmentType}
+                        </dd>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Applied date + countup (only if we have appliedOn) */}
                   {item.appliedOn && (
                     <div className="flex items-center gap-2">
@@ -716,7 +741,7 @@ export default function InterviewsPage() {
                   {/* Contact email (optional) */}
                   {item.contact?.email && (
                     <div className="flex items-center gap-2">
-                      <User2
+                      <Mail
                         className="h-4 w-4 text-neutral-500"
                         aria-hidden="true"
                       />
