@@ -182,30 +182,38 @@ export default function AddApplicationDialog({
         ].join(' ')}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-neutral-200/70 px-5 py-3">
-          <div>
-            <h2
-              id="add-application-title"
-              className="text-base font-semibold text-neutral-900"
-            >
-              {isEdit ? 'Edit application' : 'Add application'}
-            </h2>
-            <p className="mt-0.5 text-xs text-neutral-600">
-              {isEdit
-                ? 'Update the details of this application.'
-                : 'Track where you applied and the details of the offer.'}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 bg-white/80 text-neutral-500 shadow-sm hover:bg-white"
-            aria-label="Close dialog"
-          >
-            <X className="h-4 w-4" aria-hidden="true" />
-          </button>
-        </div>
+       {/* Header */}
+<div className="flex items-center justify-between border-b border-neutral-200/70 px-5 py-3">
+  <div className="flex items-center gap-2">
+    <img
+      src={isEdit ? '/icons/edit.png' : '/icons/add.png'}
+      alt={isEdit ? 'Edit application' : 'Add application'}
+      className="h-9 w-9 md:h-12 md:w-12 object-contain"
+    />
+    <div>
+      <h2
+        id="add-application-title"
+        className="text-base font-semibold text-neutral-900"
+      >
+        {isEdit ? 'Edit application' : 'Add application'}
+      </h2>
+      <p className="mt-0.1 text-xs text-neutral-600">
+        {isEdit
+          ? 'Update the details of this application.'
+          : 'Track where you applied and the details of the offer.'}
+      </p>
+    </div>
+  </div>
+
+  <button
+    type="button"
+    onClick={onClose}
+    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 bg-white/80 text-neutral-500 shadow-sm hover:bg-white"
+    aria-label="Close dialog"
+  >
+    <X className="h-4 w-4" aria-hidden="true" />
+  </button>
+</div>
 
         {/* Form */}
         <form

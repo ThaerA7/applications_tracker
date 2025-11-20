@@ -2,7 +2,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Search,
   Plus,
@@ -18,6 +18,8 @@ import {
   Building2,
 } from 'lucide-react';
 
+const INTERVIEWS_STORAGE_KEY = 'job-tracker:interviews';
+
 type InterviewType = 'phone' | 'video' | 'in-person';
 
 type Interview = {
@@ -26,7 +28,7 @@ type Interview = {
   role: string;
   location?: string;
   contact?: { name?: string; email?: string };
-  date: string; // ISO string
+  date: string; // ISO-ish string
   type: InterviewType;
   url?: string;
   logoUrl?: string;
@@ -41,15 +43,15 @@ const INTERVIEW_TYPE_META: Record<
   'in-person': { label: 'In person', Icon: MapPin },
 };
 
-// demo data
-const interviews: Interview[] = [
+// Initial demo data (used only if localStorage is empty)
+const DEMO_INTERVIEWS: Interview[] = [
   {
     id: '1',
     company: 'Acme Corp',
     role: 'Frontend Engineer',
     location: 'Berlin',
     contact: { name: 'Julia Meyer', email: 'j.meyer@acme.example' },
-    date: '2025-11-12T14:00:00+01:00',
+    date: '2025-11-12T14:00',
     type: 'video',
     url: 'https://jobs.example/acme/frontend',
     logoUrl: '/logos/acme.svg',
@@ -60,7 +62,7 @@ const interviews: Interview[] = [
     role: 'Mobile Developer (Flutter)',
     location: 'Remote',
     contact: { name: 'HR Team' },
-    date: '2025-11-15T10:30:00+01:00',
+    date: '2025-11-15T10:30',
     type: 'phone',
     logoUrl: '/logos/globex.png',
   },
@@ -70,7 +72,7 @@ const interviews: Interview[] = [
     role: 'Full-Stack Developer',
     location: 'Munich HQ',
     contact: { name: 'Samir', email: 'samir@initech.example' },
-    date: '2025-11-20T09:15:00+01:00',
+    date: '2025-11-20T09:15',
     type: 'in-person',
     url: 'https://initech.example/careers/123',
     logoUrl: '/logos/initech.svg',
@@ -97,11 +99,38 @@ function formatDateTime(iso: string) {
 
 export default function InterviewsPage() {
   const [query, setQuery] = useState('');
+  const [items, setItems] = useState<Interview[]>(DEMO_INTERVIEWS);
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const raw = window.localStorage.getItem(INTERVIEWS_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          setItems(parsed);
+          return;
+        }
+      }
+
+      // If nothing in storage, seed with demo data
+      window.localStorage.setItem(
+        INTERVIEWS_STORAGE_KEY,
+        JSON.stringify(DEMO_INTERVIEWS),
+      );
+      setItems(DEMO_INTERVIEWS);
+    } catch (err) {
+      console.error('Failed to load interviews from localStorage', err);
+      setItems(DEMO_INTERVIEWS);
+    }
+  }, []);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
-    if (!q) return interviews;
-    return interviews.filter((i) =>
+    if (!q) return items;
+    return items.filter((i) =>
       [
         i.company,
         i.role,
@@ -113,7 +142,7 @@ export default function InterviewsPage() {
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q)),
     );
-  }, [query]);
+  }, [query, items]);
 
   return (
     <section
@@ -147,24 +176,18 @@ export default function InterviewsPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className={[
-              // base
               'h-11 w-full rounded-lg pl-10 pr-3 text-sm text-neutral-900 placeholder:text-neutral-500',
-
-              // match Add / Filter glass look
               'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
               'border border-neutral-200 shadow-sm',
-
-              // interactions
               'hover:bg-white focus:bg-white',
               'ring-1 ring-transparent',
               'focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-300',
-
               'transition-shadow',
             ].join(' ')}
           />
         </div>
 
-        {/* Add (glass, matches Filter) */}
+        {/* Add (no behavior yet, same as before) */}
         <button
           type="button"
           className={[
@@ -178,7 +201,7 @@ export default function InterviewsPage() {
           Add
         </button>
 
-        {/* Filter (glass sibling) */}
+        {/* Filter (placeholder) */}
         <button
           type="button"
           className={[
@@ -206,7 +229,6 @@ export default function InterviewsPage() {
                 'relative group rounded-xl border border-neutral-200/80 p-5 shadow-sm transition-all',
                 'bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70',
                 'hover:-translate-y-0.5 hover:shadow-md',
-                // emerald/teal accent strip
                 'before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl',
                 'before:bg-gradient-to-b before:from-emerald-500 before:via-teal-500 before:to-cyan-500',
                 'before:opacity-90',
@@ -236,14 +258,16 @@ export default function InterviewsPage() {
                     <h2 className="truncate text-base font-semibold text-neutral-900">
                       {item.company}
                     </h2>
-                    {/* type chip */}
                     <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
                       <TypeIcon className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
                       {typeLabel}
                     </span>
                   </div>
                   <p className="truncate text-sm text-neutral-600 flex items-center gap-1">
-                    <Briefcase className="h-3.5 w-3.5 text-neutral-400" aria-hidden="true" />
+                    <Briefcase
+                      className="h-3.5 w-3.5 text-neutral-400"
+                      aria-hidden="true"
+                    />
                     {item.role}
                   </p>
                 </div>

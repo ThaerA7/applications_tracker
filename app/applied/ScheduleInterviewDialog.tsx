@@ -1,0 +1,445 @@
+// components/ScheduleInterviewDialog.tsx
+'use client';
+
+import {
+  useEffect,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from 'react';
+import { createPortal } from 'react-dom';
+import {
+  CalendarDays,
+  Clock,
+  MapPin,
+  Phone,
+  Video,
+  User2,
+  Link as LinkIcon,
+  X,
+  Briefcase,
+  Building2,
+} from 'lucide-react';
+
+const INTERVIEWS_STORAGE_KEY = 'job-tracker:interviews';
+
+export type InterviewType = 'phone' | 'video' | 'in-person';
+
+export type Interview = {
+  id: string;
+  company: string;
+  role: string;
+  location?: string;
+  contact?: { name?: string; email?: string };
+  date: string; // ISO-ish string, e.g. 2025-11-12T14:00
+  type: InterviewType;
+  url?: string;
+  logoUrl?: string;
+};
+
+type ScheduleInterviewDialogProps = {
+  open: boolean;
+  onClose: () => void;
+  application:
+    | {
+        id: string;
+        company: string;
+        role?: string;
+        location?: string;
+        contactPerson?: string;
+        contactEmail?: string;
+        offerUrl?: string;
+        logoUrl?: string;
+      }
+    | null;
+  /**
+   * Called after the interview has been persisted.
+   * Parent should remove the application card from "Applied" here.
+   */
+  onInterviewCreated?: (interview: Interview) => void;
+};
+
+type FormState = {
+  company: string;
+  role: string;
+  date: string; // YYYY-MM-DD
+  time: string; // HH:mm
+  type: InterviewType;
+  location: string;
+  contactName: string;
+  contactEmail: string;
+  url: string;
+};
+
+function makeInitialForm(app: ScheduleInterviewDialogProps['application']): FormState {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const hh = String(now.getHours()).padStart(2, '0');
+  const min = String(now.getMinutes()).padStart(2, '0');
+
+  return {
+    company: app?.company ?? '',
+    role: app?.role ?? '',
+    date: `${yyyy}-${mm}-${dd}`,
+    time: `${hh}:${min}`,
+    type: 'phone',
+    location: app?.location ?? '',
+    contactName: app?.contactPerson ?? '',
+    contactEmail: app?.contactEmail ?? '',
+    url: app?.offerUrl ?? '',
+  };
+}
+
+export default function ScheduleInterviewDialog({
+  open,
+  onClose,
+  application,
+  onInterviewCreated,
+}: ScheduleInterviewDialogProps) {
+  const [form, setForm] = useState<FormState>(() => makeInitialForm(null));
+
+  // Reset form whenever dialog opens or application changes
+  useEffect(() => {
+    if (!open) return;
+    setForm(makeInitialForm(application));
+  }, [open, application]);
+
+  const handleChange =
+    (field: keyof FormState) =>
+    (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+      const { value } = e.target;
+      setForm((prev) => ({ ...prev, [field]: value }));
+    };
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    const company = form.company.trim();
+    const role = form.role.trim();
+    const date = form.date.trim();
+    const time = form.time.trim();
+
+    if (!company || !role || !date || !time) return;
+
+    // Store as local "ISO-ish" string without forcing UTC conversion,
+    // so Europe/Berlin display stays as user entered.
+    const iso = `${date}T${time}`;
+
+    const interview: Interview = {
+      id:
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}`,
+      company,
+      role,
+      location: form.location.trim() || undefined,
+      contact:
+        form.contactName.trim() || form.contactEmail.trim()
+          ? {
+              name: form.contactName.trim() || undefined,
+              email: form.contactEmail.trim() || undefined,
+            }
+          : undefined,
+      date: iso,
+      type: form.type,
+      url: form.url.trim() || undefined,
+      logoUrl: application?.logoUrl,
+    };
+
+    // Persist to localStorage so /interviews page can read it
+    try {
+      if (typeof window !== 'undefined') {
+        const raw = window.localStorage.getItem(INTERVIEWS_STORAGE_KEY);
+        let existing: Interview[] = [];
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            existing = parsed;
+          }
+        }
+        const next = [...existing, interview];
+        window.localStorage.setItem(INTERVIEWS_STORAGE_KEY, JSON.stringify(next));
+      }
+    } catch (err) {
+      console.error('Failed to persist interview to localStorage', err);
+    }
+
+    onInterviewCreated?.(interview);
+    onClose();
+  };
+
+  if (!open) return null;
+  if (typeof document === 'undefined') return null;
+
+  const canSubmit =
+    form.company.trim().length > 0 &&
+    form.role.trim().length > 0 &&
+    form.date.trim().length > 0 &&
+    form.time.trim().length > 0;
+
+  const dialog = (
+    <div className="fixed inset-0 z-[12000] flex items-center justify-center px-4 py-8">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-neutral-900/40"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+
+      {/* Panel */}
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="schedule-interview-title"
+        className={[
+          'relative z-10 w-full max-w-xl overflow-hidden rounded-2xl border border-neutral-200/80',
+          'bg-gradient-to-br from-emerald-50 via-white to-teal-50 shadow-2xl',
+        ].join(' ')}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between border-b border-neutral-200/70 px-5 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-200 bg-white/80">
+              <CalendarDays className="h-5 w-5 text-emerald-600" aria-hidden="true" />
+            </div>
+            <div>
+              <h2
+                id="schedule-interview-title"
+                className="text-sm font-semibold text-neutral-900"
+              >
+                Schedule interview
+              </h2>
+              <p className="mt-0.5 text-xs text-neutral-600">
+                Confirm the details before moving this application to the interviews section.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 bg-white/80 text-neutral-500 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+            aria-label="Close schedule interview dialog"
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+
+        {/* Application summary (optional) */}
+        {application && (
+          <div className="px-5 pt-4">
+            <div className="rounded-xl border border-neutral-200/80 bg-white/90 p-3 text-xs text-neutral-800 shadow-sm">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-start gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500">
+                    <Building2 className="h-4 w-4" aria-hidden="true" />
+                  </div>
+                  <div>
+                    <div className="font-medium text-neutral-900">
+                      {application.role || 'Role not set'}
+                    </div>
+                    <div className="text-neutral-600">{application.company}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Form */}
+        <form
+          onSubmit={handleSubmit}
+          className="max-h-[70vh] space-y-4 overflow-y-auto px-5 py-4"
+        >
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="space-y-1 text-sm md:col-span-2">
+              <span className="font-medium text-neutral-800">
+                Company name<span className="text-rose-500">*</span>
+              </span>
+              <div className="relative">
+                <Briefcase
+                  className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
+                  aria-hidden="true"
+                />
+                <input
+                  type="text"
+                  value={form.company}
+                  onChange={handleChange('company')}
+                  placeholder="Acme GmbH"
+                  className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
+                  required
+                />
+              </div>
+            </label>
+
+            <label className="space-y-1 text-sm md:col-span-2">
+              <span className="font-medium text-neutral-800">
+                Role / position<span className="text-rose-500">*</span>
+              </span>
+              <input
+                type="text"
+                value={form.role}
+                onChange={handleChange('role')}
+                placeholder="Frontend Engineer"
+                className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 px-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
+                required
+              />
+            </label>
+
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-neutral-800">
+                Date<span className="text-rose-500">*</span>
+              </span>
+              <div className="relative">
+                <CalendarDays
+                  className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
+                  aria-hidden="true"
+                />
+                <input
+                  type="date"
+                  value={form.date}
+                  onChange={handleChange('date')}
+                  className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
+                  required
+                />
+              </div>
+            </label>
+
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-neutral-800">
+                Time<span className="text-rose-500">*</span>
+              </span>
+              <div className="relative">
+                <Clock
+                  className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
+                  aria-hidden="true"
+                />
+                <input
+                  type="time"
+                  value={form.time}
+                  onChange={handleChange('time')}
+                  className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
+                  required
+                />
+              </div>
+            </label>
+
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-neutral-800">
+                Type<span className="text-rose-500">*</span>
+              </span>
+              <div className="relative">
+                <select
+                  value={form.type}
+                  onChange={handleChange('type')}
+                  className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 px-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
+                  required
+                >
+                  <option value="phone">Phone</option>
+                  <option value="video">Video call</option>
+                  <option value="in-person">In person</option>
+                </select>
+              </div>
+            </label>
+
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-neutral-800">Location</span>
+              <div className="relative">
+                <MapPin
+                  className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
+                  aria-hidden="true"
+                />
+                <input
+                  type="text"
+                  value={form.location}
+                  onChange={handleChange('location')}
+                  placeholder="Berlin HQ / Remote"
+                  className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
+                />
+              </div>
+            </label>
+
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-neutral-800">Contact name</span>
+              <div className="relative">
+                <User2
+                  className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
+                  aria-hidden="true"
+                />
+                <input
+                  type="text"
+                  value={form.contactName}
+                  onChange={handleChange('contactName')}
+                  placeholder="Julia Meyer"
+                  className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
+                />
+              </div>
+            </label>
+
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-neutral-800">Contact email</span>
+              <div className="relative">
+                <User2
+                  className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
+                  aria-hidden="true"
+                />
+                <input
+                  type="email"
+                  value={form.contactEmail}
+                  onChange={handleChange('contactEmail')}
+                  placeholder="recruiting@example.com"
+                  className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
+                />
+              </div>
+            </label>
+
+            <label className="space-y-1 text-sm md:col-span-2">
+              <span className="font-medium text-neutral-800">Job posting URL</span>
+              <div className="relative">
+                <LinkIcon
+                  className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
+                  aria-hidden="true"
+                />
+                <input
+                  type="url"
+                  value={form.url}
+                  onChange={handleChange('url')}
+                  placeholder="https://jobs.example.com/frontend-engineer"
+                  className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
+                />
+              </div>
+            </label>
+          </div>
+
+          {/* Footer */}
+          <div className="mt-2 flex items-center justify-end gap-3 pt-3 border-t border-neutral-200/70">
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex items-center justify-center rounded-lg border border-neutral-200 bg-white/80 px-4 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-300"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={!canSubmit}
+              className={[
+                'inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium shadow-sm',
+                canSubmit
+                  ? 'bg-emerald-600 text-white hover:bg-emerald-500 focus-visible:ring-emerald-300'
+                  : 'cursor-not-allowed bg-neutral-200 text-neutral-500',
+                'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
+              ].join(' ')}
+            >
+              Save &amp; move to interviews
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+
+  return createPortal(dialog, document.body);
+}
