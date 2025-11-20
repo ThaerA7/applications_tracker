@@ -532,7 +532,7 @@ export default function InterviewsPage() {
                 {/* Top-right actions: Edit + Move on top, Delete centered below */}
                 <div className="absolute right-3 top-3 z-10 flex flex-col items-center gap-1">
                   {/* Top row: Edit + Move */}
-                  <div className="flex flex-row gap-1">
+                  <div className="flex flex-row gap-2">
                     {/* Edit (blue) */}
                     <button
                       type="button"
@@ -591,12 +591,14 @@ export default function InterviewsPage() {
                         {item.company}
                       </h2>
                     </div>
-                    <p className="truncate text-sm text-neutral-600 flex items-center gap-1">
+                    <p className="flex items-center gap-1 text-sm text-neutral-600">
                       <Briefcase
-                        className="h-3.5 w-3.5 text-neutral-400"
+                        className="h-3.5 w-3.5 flex-shrink-0 text-neutral-400"
                         aria-hidden="true"
                       />
-                      {item.role}
+                      <span className="truncate" title={item.role}>
+                        {item.role}
+                      </span>
                     </p>
                   </div>
                 </div>
