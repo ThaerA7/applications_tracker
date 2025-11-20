@@ -278,35 +278,34 @@ export default function ScheduleInterviewDialog({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-start justify-between border-b border-neutral-200/70 px-5 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-200 bg-white/80 overflow-hidden">
-              <img
-                src="/icons/calendar.png"
-                alt="Schedule interview"
-                className="h-8 w-8 object-contain"
-              />
-            </div>
-            <div>
-              <h2
-                id="schedule-interview-title"
-                className="text-sm font-semibold text-neutral-900"
-              >
-                {title}
-              </h2>
-              <p className="mt-0.5 text-xs text-neutral-600">{description}</p>
-            </div>
-          </div>
+<div className="flex items-start justify-between border-b border-neutral-200/70 px-5 py-4">
+  <div className="flex items-center gap-3">
+    <img
+      src="/icons/calendar.png"
+      alt="Schedule interview"
+      className="h-9 w-9 md:h-10 md:w-10 object-contain"
+    />
+    <div>
+      <h2
+        id="schedule-interview-title"
+        className="text-sm font-semibold text-neutral-900"
+      >
+        {title}
+      </h2>
+      <p className="mt-0.5 text-xs text-neutral-600">{description}</p>
+    </div>
+  </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 bg-white/80 text-neutral-500 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
-            aria-label="Close schedule interview dialog"
-          >
-            <X className="h-4 w-4" aria-hidden="true" />
-          </button>
-        </div>
+  <button
+    type="button"
+    onClick={onClose}
+    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 bg-white/80 text-neutral-500 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+    aria-label="Close schedule interview dialog"
+  >
+    <X className="h-4 w-4" aria-hidden="true" />
+  </button>
+</div>
+
 
         {/* Application summary (optional) */}
         {application && (
