@@ -380,15 +380,16 @@ export default function InterviewsPage() {
         mode={editingInterview ? 'edit' : 'add'}
       />
 
-      {/* Delete confirmation dialog */}
       {deleteTarget && (
-        <div className="fixed inset-y-0 right-0 left-64 z-[12000] flex items-center justify-center px-4 py-8">
-
+        <div className="fixed inset-y-0 right-0 left-64 z-[13000] flex items-center justify-center px-4 py-8">
+          {/* Backdrop (within the same content area as ScheduleInterviewDialog) */}
           <div
             className="absolute inset-0 bg-neutral-900/40"
             aria-hidden="true"
             onClick={handleCancelDelete}
           />
+
+          {/* Panel */}
           <div
             className={[
               'relative z-10 w-full max-w-sm rounded-2xl border border-neutral-200/80',
@@ -426,6 +427,7 @@ export default function InterviewsPage() {
           </div>
         </div>
       )}
+
 
       <section
         className={[
@@ -527,29 +529,32 @@ export default function InterviewsPage() {
                   'before:opacity-90',
                 ].join(' ')}
               >
-                {/* Top-right actions: Edit + Move + Delete in a row */}
-                <div className="absolute right-3 top-3 z-10 flex flex-row gap-1">
-                  {/* Edit (blue) */}
-                  <button
-                    type="button"
-                    onClick={() => handleEdit(item)}
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-sky-200 bg-sky-50 text-sky-600 shadow-sm hover:bg-sky-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-                    aria-label="Edit interview"
-                  >
-                    <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-                  </button>
+                {/* Top-right actions: Edit + Move on top, Delete centered below */}
+                <div className="absolute right-3 top-3 z-10 flex flex-col items-center gap-1">
+                  {/* Top row: Edit + Move */}
+                  <div className="flex flex-row gap-1">
+                    {/* Edit (blue) */}
+                    <button
+                      type="button"
+                      onClick={() => handleEdit(item)}
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-sky-200 bg-sky-50 text-sky-600 shadow-sm hover:bg-sky-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                      aria-label="Edit interview"
+                    >
+                      <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
 
-                  {/* Move (green) */}
-                  <button
-                    type="button"
-                    onClick={() => handleMove(item)}
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600 shadow-sm hover:bg-emerald-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
-                    aria-label="Move interview"
-                  >
-                    <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-                  </button>
+                    {/* Move (green) */}
+                    <button
+                      type="button"
+                      onClick={() => handleMove(item)}
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600 shadow-sm hover:bg-emerald-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                      aria-label="Move interview"
+                    >
+                      <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                  </div>
 
-                  {/* Delete (red) */}
+                  {/* Bottom: Delete centered under them */}
                   <button
                     type="button"
                     onClick={() => openDeleteDialog(item)}
@@ -559,6 +564,7 @@ export default function InterviewsPage() {
                     <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                   </button>
                 </div>
+
 
                 {/* Header with square logo + company/role */}
                 <div className="flex items-start gap-3 pr-20 sm:pr-24">
