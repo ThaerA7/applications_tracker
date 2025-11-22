@@ -286,7 +286,7 @@ export default function ScheduleInterviewDialog({
       >
         {/* Header */}
         <div className="flex items-start justify-between border-b border-neutral-200/70 px-5 py-4">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <img
               src="/icons/calendar.png"
               alt="Schedule interview"

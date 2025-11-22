@@ -3,6 +3,9 @@
 
 import Image from 'next/image';
 import { useMemo, useState } from 'react';
+import MoveToRejectedDialog, {
+  type RejectionDetails,
+} from '@/components/MoveToRejectedDialog';
 import {
   Search,
   Plus,
@@ -18,6 +21,7 @@ import {
   Ban,
   Link as LinkIcon,
 } from 'lucide-react';
+
 
 type InterviewType = 'phone' | 'video' | 'in-person';
 
@@ -93,6 +97,13 @@ function formatDate(iso: string) {
 
 export default function RejectedPage() {
   const [query, setQuery] = useState('');
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  // optional: do something when the dialog is submitted
+  const handleRejectionCreated = (details: RejectionDetails) => {
+    // For now just log, or replace with API call / state update
+    console.log('Rejection created from dialog:', details);
+  };
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
@@ -104,12 +115,15 @@ export default function RejectedPage() {
         item.location,
         item.contact?.name,
         item.contact?.email,
-        item.hadInterview ? INTERVIEW_TYPE_META[item.interviewType!]?.label : 'no interview',
+        item.hadInterview
+          ? INTERVIEW_TYPE_META[item.interviewType!]?.label
+          : 'no interview',
       ]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q)),
     );
   }, [query]);
+
 
   return (
     <section
@@ -158,9 +172,10 @@ export default function RejectedPage() {
     />
   </div>
 
-  {/* Add (glass, matches Filter) */}
+    {/* Add (glass, matches Filter) */}
   <button
     type="button"
+    onClick={() => setDialogOpen(true)}
     className={[
       'inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800',
       'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
@@ -171,6 +186,7 @@ export default function RejectedPage() {
     <Plus className="h-4 w-4" aria-hidden="true" />
     Add
   </button>
+
 
   {/* Filter (glass sibling) */}
   <button
@@ -327,11 +343,20 @@ export default function RejectedPage() {
         })}
 
         {filtered.length === 0 && (
-          <div className="col-span-full flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
-            <div className="mb-2 text-5xl">💔</div>
-            <p className="text-sm text-neutral-700">No rejected applications match your search.</p>
-          </div>
-        )}
+        <div className="col-span-full flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
+          <div className="mb-2 text-5xl">💔</div>
+          <p className="text-sm text-neutral-700">
+            No rejected applications match your search.
+          </p>
+        </div>
+      )}
+      {/* Dialog mount */}
+      <MoveToRejectedDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        application={null} // or pass a real application object when coming from another page
+        onRejectionCreated={handleRejectionCreated}
+      />
       </div>
     </section>
   );
