@@ -1,7 +1,5 @@
-// app/interviews/page.tsx
 'use client';
 
-import Image from 'next/image';
 import {
   useEffect,
   useMemo,
@@ -9,25 +7,7 @@ import {
   type ComponentType,
   type ComponentProps,
 } from 'react';
-import {
-  Search,
-  Plus,
-  Filter,
-  Briefcase,
-  MapPin,
-  Calendar,
-  Clock,
-  Phone,
-  Video,
-  User2,
-  Mail,
-  Link as LinkIcon,
-  Building2,
-  Trash2,
-  Pencil,
-  ArrowRight,
-  FileText,
-} from 'lucide-react';
+import { Search, Plus, Filter } from 'lucide-react';
 
 import ScheduleInterviewDialog, {
   type Interview,
@@ -35,6 +15,7 @@ import ScheduleInterviewDialog, {
 } from '../../components/ScheduleInterviewDialog';
 import MoveApplicationDialog from '../../components/MoveApplicationDialog';
 import type { RejectionDetails } from '../../components/MoveToRejectedDialog';
+import InterviewCard from './InterviewCard';
 
 const INTERVIEWS_STORAGE_KEY = 'job-tracker:interviews';
 const REJECTIONS_STORAGE_KEY = 'job-tracker:rejected';
@@ -69,9 +50,9 @@ const INTERVIEW_TYPE_META: Record<
   InterviewType,
   { label: string; Icon: ComponentType<any> }
 > = {
-  phone: { label: 'Phone screening', Icon: Phone },
-  video: { label: 'Video call', Icon: Video },
-  'in-person': { label: 'In person', Icon: MapPin },
+  phone: { label: 'Phone screening', Icon: () => null },
+  video: { label: 'Video call', Icon: () => null },
+  'in-person': { label: 'In person', Icon: () => null },
 };
 
 // Initial demo data (used only if localStorage is empty)
@@ -254,15 +235,16 @@ export default function InterviewsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogApplication, setDialogApplication] =
     useState<ApplicationLike>(null);
-  const [editingInterview, setEditingInterview] = useState<Interview | null>(
-    null,
-  );
+  const [editingInterview, setEditingInterview] =
+    useState<Interview | null>(null);
 
   // For countdown / countup, only on client to avoid hydration issues
   const [now, setNow] = useState<number | null>(null);
 
   // Delete confirmation dialog target
-  const [deleteTarget, setDeleteTarget] = useState<Interview | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Interview | null>(
+    null,
+  );
 
   // Move dialog state (reusing MoveApplicationDialog)
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
@@ -416,7 +398,10 @@ export default function InterviewsPage() {
             JSON.stringify(next),
           );
         } catch (err) {
-          console.error('Failed to persist interviews after create/edit', err);
+          console.error(
+            'Failed to persist interviews after create/edit',
+            err,
+          );
         }
       }
 
@@ -438,7 +423,9 @@ export default function InterviewsPage() {
       try {
         const raw = window.localStorage.getItem(REJECTIONS_STORAGE_KEY);
         const parsed = raw ? JSON.parse(raw) : [];
-        const prev: RejectionRecord[] = Array.isArray(parsed) ? parsed : [];
+        const prev: RejectionRecord[] = Array.isArray(parsed)
+          ? parsed
+          : [];
 
         const newItem: RejectionRecord = {
           id: makeId(prev.length),
@@ -496,7 +483,9 @@ export default function InterviewsPage() {
       try {
         const raw = window.localStorage.getItem(WITHDRAWN_STORAGE_KEY);
         const parsed = raw ? JSON.parse(raw) : [];
-        const prev: WithdrawnRecord[] = Array.isArray(parsed) ? parsed : [];
+        const prev: WithdrawnRecord[] = Array.isArray(parsed)
+          ? parsed
+          : [];
 
         const newItem: WithdrawnRecord = {
           id: makeId(prev.length),
@@ -631,9 +620,14 @@ export default function InterviewsPage() {
             </h2>
             <p className="mt-2 text-sm text-neutral-700">
               This will permanently remove the interview with{' '}
-              <span className="font-medium">{deleteTarget.company}</span> for
-              the role{' '}
-              <span className="font-medium">{deleteTarget.role}</span>.
+              <span className="font-medium">
+                {deleteTarget.company}
+              </span>{' '}
+              for the role{' '}
+              <span className="font-medium">
+                {deleteTarget.role}
+              </span>
+              .
             </p>
             <p className="mt-1 text-xs text-neutral-500">
               This action cannot be undone.
@@ -736,9 +730,7 @@ export default function InterviewsPage() {
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((item) => {
             const { date, time } = formatDateTime(item.date);
-            const { Icon: TypeIcon, label: typeLabel } =
-              INTERVIEW_TYPE_META[item.type];
-
+            const { label: typeLabel } = INTERVIEW_TYPE_META[item.type];
             const countdownLabel = getInterviewCountdownLabel(
               item.date,
               now,
@@ -748,290 +740,23 @@ export default function InterviewsPage() {
               now,
             );
 
+            // Use real icons in the card (mapped there) – we only pass label here
+            const typeIcon = (() => null) as ComponentType<any>;
+
             return (
-              <article
+              <InterviewCard
                 key={item.id}
-                className={[
-                  'relative group rounded-xl border border-neutral-200/80 p-5 shadow-sm transition-all',
-                  'bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70',
-                  'hover:-translate-y-0.5 hover:shadow-md',
-                  'before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl',
-                  'before:bg-gradient-to-b before:from-emerald-500 before:via-teal-500 before:to-cyan-500',
-                  'before:opacity-90',
-                ].join(' ')}
-              >
-                {/* Top-right actions: Edit + Move on top, Delete centered below */}
-                <div className="absolute right-3 top-3 z-10 flex flex-col items-center gap-1">
-                  {/* Top row: Edit + Move */}
-                  <div className="flex flex-row gap-2">
-                    {/* Edit (blue) */}
-                    <button
-                      type="button"
-                      onClick={() => handleEdit(item)}
-                      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-sky-200 bg-sky-50 text-sky-600 shadow-sm hover:bg-sky-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-                      aria-label="Edit interview"
-                    >
-                      <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-                    </button>
-
-                    {/* Move (green) */}
-                    <button
-                      type="button"
-                      onClick={() => handleMove(item)}
-                      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600 shadow-sm hover:bg-emerald-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
-                      aria-label="Move interview"
-                    >
-                      <ArrowRight
-                        className="h-3.5 w-3.5"
-                        aria-hidden="true"
-                      />
-                    </button>
-                  </div>
-
-                  {/* Bottom: Delete centered under them */}
-                  <button
-                    type="button"
-                    onClick={() => openDeleteDialog(item)}
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-600 shadow-sm hover:bg-rose-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
-                    aria-label="Delete interview"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                  </button>
-                </div>
-
-                {/* Header with square logo + company/role */}
-                <div className="flex items-start gap-3 pr-20 sm:pr-24">
-                  {item.logoUrl ? (
-                    <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-neutral-200 bg-white ring-1 ring-white/60">
-                      <Image
-                        src={item.logoUrl}
-                        alt={`${item.company} logo`}
-                        fill
-                        sizes="48px"
-                        className="object-contain p-1.5"
-                      />
-                    </div>
-                  ) : (
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-neutral-50 text-neutral-500">
-                      <Building2 className="h-6 w-6" aria-hidden="true" />
-                      <span className="sr-only">{item.company}</span>
-                    </div>
-                  )}
-
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h2 className="max-w-full truncate text-base font-semibold text-neutral-900">
-                        {item.company}
-                      </h2>
-                    </div>
-                    <p className="flex items-center gap-1 text-sm text-neutral-600">
-                      <Briefcase
-                        className="h-3.5 w-3.5 flex-shrink-0 text-neutral-400"
-                        aria-hidden="true"
-                      />
-                      <span className="truncate" title={item.role}>
-                        {item.role}
-                      </span>
-                    </p>
-                  </div>
-                </div>
-
-                {/* Divider */}
-                <div
-                  className="mt-3 h-px w-full bg-neutral-200/80"
-                  role="separator"
-                  aria-hidden="true"
-                />
-
-                {/* Details – show only fields with data for optional ones */}
-                <dl className="mt-4 grid grid-cols-1 gap-3 text-sm">
-                  {/* Date + countdown */}
-                  <div className="flex items-center gap-2">
-                    <Calendar
-                      className="h-4 w-4 text-neutral-500"
-                      aria-hidden="true"
-                    />
-                    <div className="flex flex-col">
-                      <dt className="text-neutral-500">Date</dt>
-                      <dd className="font-medium text-neutral-900 flex flex-wrap items-baseline gap-2">
-                        <span>{date || '-'}</span>
-                        {countdownLabel && (
-                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
-                            {countdownLabel}
-                          </span>
-                        )}
-                      </dd>
-                    </div>
-                  </div>
-
-                  {/* Time */}
-                  <div className="flex items-center gap-2">
-                    <Clock
-                      className="h-4 w-4 text-neutral-500"
-                      aria-hidden="true"
-                    />
-                    <div className="flex flex-col">
-                      <dt className="text-neutral-500">Time</dt>
-                      <dd className="font-medium text-neutral-900">
-                        {time ? `${time} (Berlin)` : '-'}
-                      </dd>
-                    </div>
-                  </div>
-
-                  {/* Type */}
-                  <div className="flex items-center gap-2">
-                    <TypeIcon
-                      className="h-4 w-4 text-neutral-500"
-                      aria-hidden="true"
-                    />
-                    <div className="flex flex-col">
-                      <dt className="text-neutral-500">Type</dt>
-                      <dd className="font-medium text-neutral-900">
-                        {typeLabel || '-'}
-                      </dd>
-                    </div>
-                  </div>
-
-                  {/* Employment type (optional) */}
-                  {item.employmentType && (
-                    <div className="flex items-center gap-2">
-                      <Briefcase
-                        className="h-4 w-4 text-neutral-500"
-                        aria-hidden="true"
-                      />
-                      <div className="flex flex-col">
-                        <dt className="text-neutral-500">Employment</dt>
-                        <dd className="font-medium text-neutral-900">
-                          {item.employmentType}
-                        </dd>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Applied date + countup (only if we have appliedOn) */}
-                  {item.appliedOn && (
-                    <div className="flex items-center gap-2">
-                      <Calendar
-                        className="h-4 w-4 text-neutral-500"
-                        aria-hidden="true"
-                      />
-                      <div className="flex flex-col">
-                        <dt className="text-neutral-500">Applied</dt>
-                        <dd className="font-medium text-neutral-900 flex flex-wrap items-baseline gap-2">
-                          <span>{item.appliedOn}</span>
-                          {appliedLabel && (
-                            <span className="rounded-full bg-neutral-50 px-2 py-0.5 text-xs font-medium text-neutral-700 ring-1 ring-inset ring-neutral-200">
-                              {appliedLabel}
-                            </span>
-                          )}
-                        </dd>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Location (optional) */}
-                  {item.location && (
-                    <div className="flex items-center gap-2">
-                      <MapPin
-                        className="h-4 w-4 text-neutral-500"
-                        aria-hidden="true"
-                      />
-                      <div className="flex flex-col">
-                        <dt className="text-neutral-500">Location</dt>
-                        <dd className="font-medium text-neutral-900">
-                          {item.location}
-                        </dd>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Contact name (optional) */}
-                  {item.contact?.name && (
-                    <div className="flex items-center gap-2">
-                      <User2
-                        className="h-4 w-4 text-neutral-500"
-                        aria-hidden="true"
-                      />
-                      <div className="flex flex-col">
-                        <dt className="text-neutral-500">Contact name</dt>
-                        <dd className="font-medium text-neutral-900">
-                          {item.contact.name}
-                        </dd>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Contact email (optional) */}
-                  {item.contact?.email && (
-                    <div className="flex items-center gap-2">
-                      <Mail
-                        className="h-4 w-4 text-neutral-500"
-                        aria-hidden="true"
-                      />
-                      <div className="flex flex-col">
-                        <dt className="text-neutral-500">Contact email</dt>
-                        <dd className="font-medium text-neutral-900">
-                          <a
-                            href={`mailto:${item.contact.email}`}
-                            className="underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-600"
-                          >
-                            {item.contact.email}
-                          </a>
-                        </dd>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Contact phone (optional) */}
-                  {item.contact?.phone && (
-                    <div className="flex items-center gap-2">
-                      <Phone
-                        className="h-4 w-4 text-neutral-500"
-                        aria-hidden="true"
-                      />
-                      <div className="flex flex-col">
-                        <dt className="text-neutral-500">Contact phone</dt>
-                        <dd className="font-medium text-neutral-900">
-                          <a
-                            href={`tel:${item.contact.phone}`}
-                            className="underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-600"
-                          >
-                            {item.contact.phone}
-                          </a>
-                        </dd>
-                      </div>
-                    </div>
-                  )}
-                </dl>
-
-                {/* Notes (if any) */}
-                {item.notes && (
-                  <div className="mt-4 rounded-lg border border-dashed border-neutral-200 bg-neutral-50/80 px-3 py-2">
-                    <div className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
-                      <FileText className="h-3 w-3" aria-hidden="true" />
-                      <span>Notes</span>
-                    </div>
-                    <p className="mt-1 text-xs text-neutral-800 whitespace-pre-line">
-                      {item.notes}
-                    </p>
-                  </div>
-                )}
-
-                {/* Footer – Job posting link */}
-                {item.url && (
-                  <div className="mt-4 flex justify-end">
-                    <a
-                      href={item.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-sm font-medium text-neutral-900 hover:underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-700"
-                    >
-                      <LinkIcon className="h-4 w-4" aria-hidden="true" />
-                      Job posting
-                    </a>
-                  </div>
-                )}
-              </article>
+                item={item}
+                typeIcon={typeIcon}
+                typeLabel={typeLabel}
+                date={date}
+                time={time}
+                countdownLabel={countdownLabel}
+                appliedLabel={appliedLabel}
+                onEdit={handleEdit}
+                onMove={handleMove}
+                onDelete={openDeleteDialog}
+              />
             );
           })}
 
