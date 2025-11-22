@@ -251,28 +251,27 @@ export default function MoveToRejectedDialog({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-<div className="flex items-start justify-between border-b border-neutral-200/70 px-5 py-4">
-  <div className="flex items-center gap-2">
-    {/* Title icon without background container */}
-    <img
-      src="/icons/cancel.png"
-      alt="Rejected"
-      className="h-9 w-9 md:h-10 md:w-10 object-contain"
-    />
+        <div className="flex items-start justify-between border-b border-neutral-200/70 px-5 py-4">
+          <div className="flex items-center gap-2">
+            {/* Title icon without background container */}
+            <img
+              src="/icons/cancel.png"
+              alt="Rejected"
+              className="h-9 w-9 md:h-10 md:w-10 object-contain"
+            />
 
-    <div>
-      <h2
-        id="move-to-rejected-title"
-        className="text-sm font-semibold text-neutral-900"
-      >
-        Move to the rejected section
-      </h2>
-      <p className="mt-0.5 text-xs text-neutral-600">
-        Capture how and when this application was rejected.
-      </p>
-    </div>
-  </div>
-
+            <div>
+              <h2
+                id="move-to-rejected-title"
+                className="text-sm font-semibold text-neutral-900"
+              >
+                Move to the rejected section
+              </h2>
+              <p className="mt-0.5 text-xs text-neutral-600">
+                Capture how and when this application was rejected.
+              </p>
+            </div>
+          </div>
 
           <button
             type="button"

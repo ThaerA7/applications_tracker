@@ -1,3 +1,4 @@
+// components/MoveApplicationDialog.tsx
 'use client';
 
 import { useState, type FC } from 'react';
@@ -34,6 +35,11 @@ type MoveApplicationDialogProps = {
   onMoveToWithdrawn: () => void;
   fmtDate: (date: string) => string;
   statusClasses: (status: string) => string;
+  /** 
+   * default  = used from Applications page (3 options)
+   * from-interviews = used from Interviews page (only Rejected + Withdrawn)
+   */
+  mode?: 'default' | 'from-interviews';
 };
 
 const MoveApplicationDialog: FC<MoveApplicationDialogProps> = ({
@@ -45,11 +51,15 @@ const MoveApplicationDialog: FC<MoveApplicationDialogProps> = ({
   onMoveToWithdrawn,
   fmtDate,
   statusClasses,
+  mode = 'default',
 }) => {
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [rejectedOpen, setRejectedOpen] = useState(false);
 
   if (!open || !application) return null;
+
+  const showInterviewsOption = mode !== 'from-interviews';
+  const destinationsCount = showInterviewsOption ? 3 : 2;
 
   return (
     <>
@@ -155,39 +165,41 @@ const MoveApplicationDialog: FC<MoveApplicationDialogProps> = ({
             <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-neutral-500">
               <span className="font-semibold">Select destination</span>
               <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-600">
-                3 options
+                {destinationsCount} options
               </span>
             </div>
 
             {/* Actions */}
             <div className="space-y-2.5">
-              {/* Interviews */}
-              <button
-                type="button"
-                onClick={() => setScheduleOpen(true)}
-                className={[
-                  'flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-medium',
-                  'border border-sky-200/80 bg-gradient-to-r from-sky-50 via-white to-sky-50',
-                  'shadow-sm hover:from-sky-100 hover:to-sky-50',
-                  'focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300',
-                  'transition-colors',
-                ].join(' ')}
-              >
-                <img
-                  src="/icons/interview.png"
-                  alt="Interview stage"
-                  className="h-7 w-7 md:h-8 md:w-8 object-contain"
-                />
-                <div className="flex flex-col">
-                  <span className="text-sm font-semibold text-sky-900">
-                    Move to interviews section
-                  </span>
-                  <span className="text-[11px] font-normal text-sky-900/80">
-                    When you&apos;ve been invited to a phone screen or any
-                    interview round.
-                  </span>
-                </div>
-              </button>
+              {/* Interviews – hidden when used from Interviews page */}
+              {showInterviewsOption && (
+                <button
+                  type="button"
+                  onClick={() => setScheduleOpen(true)}
+                  className={[
+                    'flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-medium',
+                    'border border-sky-200/80 bg-gradient-to-r from-sky-50 via-white to-sky-50',
+                    'shadow-sm hover:from-sky-100 hover:to-sky-50',
+                    'focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300',
+                    'transition-colors',
+                  ].join(' ')}
+                >
+                  <img
+                    src="/icons/interview.png"
+                    alt="Interview stage"
+                    className="h-7 w-7 md:h-8 md:w-8 object-contain"
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-sm font-semibold text-sky-900">
+                      Move to interviews section
+                    </span>
+                    <span className="text-[11px] font-normal text-sky-900/80">
+                      When you&apos;ve been invited to a phone screen or
+                      any interview round.
+                    </span>
+                  </div>
+                </button>
+              )}
 
               {/* Rejected */}
               <button

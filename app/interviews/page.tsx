@@ -2,7 +2,13 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useMemo, useState, type ComponentType } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type ComponentType,
+  type ComponentProps,
+} from 'react';
 import {
   Search,
   Plus,
@@ -27,11 +33,37 @@ import ScheduleInterviewDialog, {
   type Interview,
   type InterviewType,
 } from '../../components/ScheduleInterviewDialog';
+import MoveApplicationDialog from '../../components/MoveApplicationDialog';
+import type { RejectionDetails } from '../../components/MoveToRejectedDialog';
 
 const INTERVIEWS_STORAGE_KEY = 'job-tracker:interviews';
+const REJECTIONS_STORAGE_KEY = 'job-tracker:rejected';
+const WITHDRAWN_STORAGE_KEY = 'job-tracker:withdrawn';
 
 type ApplicationLike =
   React.ComponentProps<typeof ScheduleInterviewDialog>['application'];
+
+type MoveDialogApplication =
+  ComponentProps<typeof MoveApplicationDialog>['application'];
+
+type RejectionRecord = RejectionDetails & { id: string };
+
+type WithdrawnRecord = {
+  id: string;
+  company: string;
+  role: string;
+  location?: string;
+  appliedOn?: string;
+  employmentType?: string;
+  contactName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  url?: string;
+  logoUrl?: string;
+  interviewDate?: string;
+  interviewType?: InterviewType;
+  notes?: string;
+};
 
 const INTERVIEW_TYPE_META: Record<
   InterviewType,
@@ -206,6 +238,13 @@ function getAppliedCountupLabel(
   return `${diffDays} days ago`;
 }
 
+function makeId(existingLength: number): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${existingLength}`;
+}
+
 // --- Component ---
 
 export default function InterviewsPage() {
@@ -224,6 +263,13 @@ export default function InterviewsPage() {
 
   // Delete confirmation dialog target
   const [deleteTarget, setDeleteTarget] = useState<Interview | null>(null);
+
+  // Move dialog state (reusing MoveApplicationDialog)
+  const [moveDialogOpen, setMoveDialogOpen] = useState(false);
+  const [moveDialogApplication, setMoveDialogApplication] =
+    useState<MoveDialogApplication>(null);
+  const [moveTargetInterview, setMoveTargetInterview] =
+    useState<Interview | null>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -288,8 +334,30 @@ export default function InterviewsPage() {
   };
 
   const handleMove = (item: Interview) => {
-    // Placeholder: hook into your "move to another stage" logic here
-    console.log('Move interview', item.id, item.company, item.role);
+    const app: MoveDialogApplication = {
+      id: item.id,
+      company: item.company,
+      role: item.role,
+      location: item.location,
+      status: 'Interview',
+      appliedOn: item.appliedOn ?? '',
+      contactPerson: item.contact?.name,
+      contactEmail: item.contact?.email,
+      contactPhone: item.contact?.phone,
+      offerUrl: item.url,
+      logoUrl: item.logoUrl,
+      employmentType: item.employmentType,
+    };
+
+    setMoveTargetInterview(item);
+    setMoveDialogApplication(app);
+    setMoveDialogOpen(true);
+  };
+
+  const handleMoveDialogClose = () => {
+    setMoveDialogOpen(false);
+    setMoveDialogApplication(null);
+    setMoveTargetInterview(null);
   };
 
   const openDeleteDialog = (item: Interview) => {
@@ -360,6 +428,129 @@ export default function InterviewsPage() {
     setDialogApplication(null);
   };
 
+  const handleMoveToRejectedFromInterviews = (
+    details: RejectionDetails,
+  ) => {
+    const source = moveTargetInterview;
+
+    // 1) Append to rejected storage
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = window.localStorage.getItem(REJECTIONS_STORAGE_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        const prev: RejectionRecord[] = Array.isArray(parsed) ? parsed : [];
+
+        const newItem: RejectionRecord = {
+          id: makeId(prev.length),
+          ...details,
+        };
+
+        const nextRejected = [...prev, newItem];
+        window.localStorage.setItem(
+          REJECTIONS_STORAGE_KEY,
+          JSON.stringify(nextRejected),
+        );
+      } catch (err) {
+        console.error(
+          'Failed to persist rejected application from interview',
+          err,
+        );
+      }
+    }
+
+    // 2) Remove from interviews
+    if (source) {
+      const sourceId = source.id;
+      setItems((prev) => {
+        const next = prev.filter((i) => i.id !== sourceId);
+        if (typeof window !== 'undefined') {
+          try {
+            window.localStorage.setItem(
+              INTERVIEWS_STORAGE_KEY,
+              JSON.stringify(next),
+            );
+          } catch (err) {
+            console.error(
+              'Failed to persist interviews after moving to rejected',
+              err,
+            );
+          }
+        }
+        return next;
+      });
+    }
+
+    // Close whole dialog
+    handleMoveDialogClose();
+  };
+
+  const handleMoveToWithdrawnFromInterviews = () => {
+    const source = moveTargetInterview;
+    if (!source) {
+      handleMoveDialogClose();
+      return;
+    }
+
+    // 1) Append to withdrawn storage
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = window.localStorage.getItem(WITHDRAWN_STORAGE_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        const prev: WithdrawnRecord[] = Array.isArray(parsed) ? parsed : [];
+
+        const newItem: WithdrawnRecord = {
+          id: makeId(prev.length),
+          company: source.company,
+          role: source.role,
+          location: source.location,
+          appliedOn: source.appliedOn,
+          employmentType: source.employmentType,
+          contactName: source.contact?.name,
+          contactEmail: source.contact?.email,
+          contactPhone: source.contact?.phone,
+          url: source.url,
+          logoUrl: source.logoUrl,
+          interviewDate: source.date,
+          interviewType: source.type,
+          notes: source.notes,
+        };
+
+        const nextWithdrawn = [...prev, newItem];
+        window.localStorage.setItem(
+          WITHDRAWN_STORAGE_KEY,
+          JSON.stringify(nextWithdrawn),
+        );
+      } catch (err) {
+        console.error(
+          'Failed to persist withdrawn application from interview',
+          err,
+        );
+      }
+    }
+
+    // 2) Remove from interviews
+    const sourceId = source.id;
+    setItems((prev) => {
+      const next = prev.filter((i) => i.id !== sourceId);
+      if (typeof window !== 'undefined') {
+        try {
+          window.localStorage.setItem(
+            INTERVIEWS_STORAGE_KEY,
+            JSON.stringify(next),
+          );
+        } catch (err) {
+          console.error(
+            'Failed to persist interviews after moving to withdrawn',
+            err,
+          );
+        }
+      }
+      return next;
+    });
+
+    handleMoveDialogClose();
+  };
+
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
     if (!q) return items;
@@ -381,7 +572,14 @@ export default function InterviewsPage() {
     );
   }, [query, items]);
 
-  const hasSearchOrFilters = query.trim().length > 0;
+  // Formatting + status styles for MoveApplicationDialog
+  const fmtDate = (date: string) => date;
+  const statusClasses = (status: string) => {
+    if (status.toLowerCase().includes('interview')) {
+      return 'bg-sky-50 text-sky-900 border border-sky-200';
+    }
+    return 'bg-neutral-50 text-neutral-700 border border-neutral-200';
+  };
 
   return (
     <>
@@ -394,9 +592,27 @@ export default function InterviewsPage() {
         mode={editingInterview ? 'edit' : 'add'}
       />
 
+      {/* Move dialog (reusing MoveApplicationDialog with 2 buttons) */}
+      <MoveApplicationDialog
+        open={moveDialogOpen && !!moveDialogApplication}
+        application={moveDialogApplication}
+        onClose={handleMoveDialogClose}
+        onMoveToInterviews={
+          () => {
+            // Not used when mode="from-interviews"
+          }
+        }
+        onMoveToRejected={handleMoveToRejectedFromInterviews}
+        onMoveToWithdrawn={handleMoveToWithdrawnFromInterviews}
+        fmtDate={fmtDate}
+        statusClasses={statusClasses}
+        mode="from-interviews"
+      />
+
+      {/* Delete confirmation dialog */}
       {deleteTarget && (
         <div className="fixed inset-y-0 right-0 left-64 z-[13000] flex items-center justify-center px-4 py-8">
-          {/* Backdrop (within the same content area as ScheduleInterviewDialog) */}
+          {/* Backdrop */}
           <div
             className="absolute inset-0 bg-neutral-900/40"
             aria-hidden="true"
@@ -513,7 +729,6 @@ export default function InterviewsPage() {
             ].join(' ')}
           >
             <Filter className="h-4 w-4" aria-hidden="true" />
-            Filter
           </button>
         </div>
 
@@ -802,7 +1017,7 @@ export default function InterviewsPage() {
                   </div>
                 )}
 
-                {/* Footer – Job posting link (same style as Rejected card) */}
+                {/* Footer – Job posting link */}
                 {item.url && (
                   <div className="mt-4 flex justify-end">
                     <a
@@ -824,14 +1039,14 @@ export default function InterviewsPage() {
             <div className="col-span-full flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
               <div className="mb-2 text-5xl">📅</div>
 
-              {/* Different messages depending on whether there are items at all */}
               {items.length === 0 ? (
                 <>
                   <p className="text-sm text-neutral-700">
                     You don&apos;t have any interviews yet.
                   </p>
                   <p className="mt-1 text-xs text-neutral-500">
-                    Click <span className="font-medium">Add</span> to schedule your first interview.
+                    Click <span className="font-medium">Add</span> to
+                    schedule your first interview.
                   </p>
                 </>
               ) : (
