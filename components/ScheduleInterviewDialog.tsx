@@ -20,6 +20,7 @@ import {
   X,
   Briefcase,
   Building2,
+  FileText,
 } from 'lucide-react';
 
 const INTERVIEWS_STORAGE_KEY = 'job-tracker:interviews';
@@ -38,6 +39,7 @@ export type Interview = {
   logoUrl?: string;
   appliedOn?: string; // YYYY-MM-DD from original application
   employmentType?: string;
+  notes?: string;
 };
 
 type ScheduleInterviewDialogProps = {
@@ -56,6 +58,7 @@ type ScheduleInterviewDialogProps = {
         logoUrl?: string;
         appliedOn?: string;
         employmentType?: string;
+        notes?: string;
       }
     | null;
   /**
@@ -84,6 +87,7 @@ type FormState = {
   url: string;
   appliedDate: string; // YYYY-MM-DD
   employmentType: string;
+  notes: string;
 };
 
 const EMPLOYMENT_OPTIONS: string[] = [
@@ -122,6 +126,7 @@ function makeInitialForm(
     url: app?.offerUrl ?? '',
     appliedDate: app?.appliedOn ?? today,
     employmentType: app?.employmentType ?? '',
+    notes: app?.notes ?? '',
   };
 }
 
@@ -165,7 +170,7 @@ export default function ScheduleInterviewDialog({
 
   const handleChange =
     (field: keyof FormState) =>
-    (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
       const { value } = e.target;
       setForm((prev) => ({ ...prev, [field]: value }));
     };
@@ -186,6 +191,7 @@ export default function ScheduleInterviewDialog({
     const contactPhone = form.contactPhone.trim();
     const appliedDate = form.appliedDate.trim() || undefined;
     const employmentType = form.employmentType.trim();
+    const notes = form.notes.trim();
 
     const id =
       effectiveMode === 'edit' && application?.id
@@ -213,6 +219,7 @@ export default function ScheduleInterviewDialog({
       logoUrl: application?.logoUrl,
       appliedOn: appliedDate,
       employmentType: employmentType || undefined,
+      notes: notes || undefined,
     };
 
     // Persist to localStorage so /interviews page can read it
@@ -278,34 +285,33 @@ export default function ScheduleInterviewDialog({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-<div className="flex items-start justify-between border-b border-neutral-200/70 px-5 py-4">
-  <div className="flex items-center gap-3">
-    <img
-      src="/icons/calendar.png"
-      alt="Schedule interview"
-      className="h-9 w-9 md:h-10 md:w-10 object-contain"
-    />
-    <div>
-      <h2
-        id="schedule-interview-title"
-        className="text-sm font-semibold text-neutral-900"
-      >
-        {title}
-      </h2>
-      <p className="mt-0.5 text-xs text-neutral-600">{description}</p>
-    </div>
-  </div>
+        <div className="flex items-start justify-between border-b border-neutral-200/70 px-5 py-4">
+          <div className="flex items-center gap-3">
+            <img
+              src="/icons/calendar.png"
+              alt="Schedule interview"
+              className="h-9 w-9 md:h-10 md:w-10 object-contain"
+            />
+            <div>
+              <h2
+                id="schedule-interview-title"
+                className="text-sm font-semibold text-neutral-900"
+              >
+                {title}
+              </h2>
+              <p className="mt-0.5 text-xs text-neutral-600">{description}</p>
+            </div>
+          </div>
 
-  <button
-    type="button"
-    onClick={onClose}
-    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 bg-white/80 text-neutral-500 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
-    aria-label="Close schedule interview dialog"
-  >
-    <X className="h-4 w-4" aria-hidden="true" />
-  </button>
-</div>
-
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 bg-white/80 text-neutral-500 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+            aria-label="Close schedule interview dialog"
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
 
         {/* Application summary (optional) */}
         {application && (
@@ -574,6 +580,24 @@ export default function ScheduleInterviewDialog({
                   onChange={handleChange('url')}
                   placeholder="https://jobs.example.com/frontend-engineer"
                   className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
+                />
+              </div>
+            </label>
+
+            {/* Notes */}
+            <label className="space-y-1 text-sm md:col-span-2">
+              <span className="font-medium text-neutral-800">Notes</span>
+              <div className="relative">
+                <FileText
+                  className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-neutral-400"
+                  aria-hidden="true"
+                />
+                <textarea
+                  value={form.notes}
+                  onChange={handleChange('notes')}
+                  rows={3}
+                  placeholder="Anything you want to remember for this interview (agenda, prep tasks, who will be there, etc.)"
+                  className="w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 pt-2 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
                 />
               </div>
             </label>

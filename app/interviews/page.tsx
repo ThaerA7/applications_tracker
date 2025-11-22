@@ -20,6 +20,7 @@ import {
   Trash2,
   Pencil,
   ArrowRight,
+  FileText,
 } from 'lucide-react';
 
 import ScheduleInterviewDialog, {
@@ -54,6 +55,7 @@ const DEMO_INTERVIEWS: Interview[] = [
     url: 'https://jobs.example/acme/frontend',
     logoUrl: '/logos/acme.svg',
     employmentType: 'Full-time',
+    notes: 'Prepare system design questions and review React hooks.',
   },
   {
     id: '2',
@@ -65,6 +67,7 @@ const DEMO_INTERVIEWS: Interview[] = [
     type: 'phone',
     logoUrl: '/logos/globex.png',
     employmentType: 'Full-time',
+    notes: 'Phone screen with HR – ask about team structure.',
   },
   {
     id: '3',
@@ -77,6 +80,7 @@ const DEMO_INTERVIEWS: Interview[] = [
     url: 'https://initech.example/careers/123',
     logoUrl: '/logos/initech.svg',
     employmentType: 'Full-time',
+    notes: 'Onsite: bring printed CV, prepare examples for past projects.',
   },
 ];
 
@@ -275,6 +279,7 @@ export default function InterviewsPage() {
       logoUrl: item.logoUrl,
       appliedOn: item.appliedOn,
       employmentType: item.employmentType,
+      notes: item.notes ?? '',
     };
 
     setEditingInterview(item);
@@ -369,12 +374,15 @@ export default function InterviewsPage() {
         i.contact?.phone,
         i.appliedOn,
         i.employmentType,
+        i.notes,
       ]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q)),
     );
   }, [query, items]);
-const hasSearchOrFilters = query.trim().length > 0;
+
+  const hasSearchOrFilters = query.trim().length > 0;
+
   return (
     <>
       {/* Dialog shared for Add + Edit */}
@@ -779,10 +787,21 @@ const hasSearchOrFilters = query.trim().length > 0;
                       </div>
                     </div>
                   )}
-
-
-
                 </dl>
+
+                {/* Notes (if any) */}
+                {item.notes && (
+                  <div className="mt-4 rounded-lg border border-dashed border-neutral-200 bg-neutral-50/80 px-3 py-2">
+                    <div className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+                      <FileText className="h-3 w-3" aria-hidden="true" />
+                      <span>Notes</span>
+                    </div>
+                    <p className="mt-1 text-xs text-neutral-800 whitespace-pre-line">
+                      {item.notes}
+                    </p>
+                  </div>
+                )}
+
                 {/* Footer – Job posting link (same style as Rejected card) */}
                 {item.url && (
                   <div className="mt-4 flex justify-end">
@@ -801,7 +820,7 @@ const hasSearchOrFilters = query.trim().length > 0;
             );
           })}
 
-                    {filtered.length === 0 && (
+          {filtered.length === 0 && (
             <div className="col-span-full flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
               <div className="mb-2 text-5xl">📅</div>
 
@@ -822,7 +841,6 @@ const hasSearchOrFilters = query.trim().length > 0;
               )}
             </div>
           )}
-
         </div>
       </section>
     </>

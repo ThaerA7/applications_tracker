@@ -534,7 +534,7 @@ export default function AddApplicationDialog({
           </div>
 
           {/* Notes */}
-          <label className="space-y-1 text-sm">
+          <label className="mt-6 block space-y-1 text-sm">
             <span className="font-medium text-neutral-800">
               Notes
             </span>
@@ -548,7 +548,7 @@ export default function AddApplicationDialog({
                 onChange={handleChange('notes')}
                 rows={3}
                 placeholder="Interview prep, who you talked to, follow-up dates…"
-                className="w-full rounded-lg border border-neutral-200 bg:white/80 pl-8 pr-3 pt-2.5 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-sky-300"
+                className="w-full rounded-lg border border-neutral-200 bg:white/80 pl-8 pr-3 pt-2 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-sky-300"
               />
             </div>
           </label>
