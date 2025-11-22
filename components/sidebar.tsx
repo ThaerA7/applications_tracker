@@ -17,6 +17,7 @@ const items: Item[] = [
   { href: '/applied',    label: 'Applied',   icon: '/icons/checklist.png' },
   { href: '/interviews', label: 'Interviews',icon: '/icons/interview.png' },
   { href: '/rejected',   label: 'Rejected',  icon: '/icons/cancel.png' },
+  { href: '/withdrawn',  label: 'Withdrawn', icon: '/icons/withdrawn.png' }, // ⬅️ new
   { href: '/wishlist',   label: 'Wishlist',  icon: '/icons/star.png' },
   { href: '/calendar',   label: 'Calendar',  icon: '/icons/calendar.png' },
   { href: '/notes',      label: 'Notes',     icon: '/icons/note.png' },

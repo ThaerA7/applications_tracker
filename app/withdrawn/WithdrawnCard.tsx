@@ -1,0 +1,309 @@
+'use client';
+
+import Image from 'next/image';
+import type { ComponentType } from 'react';
+import {
+  Briefcase,
+  MapPin,
+  Calendar,
+  Phone,
+  Video,
+  User2,
+  Mail,
+  FileText,
+  Link as LinkIcon,
+  Trash2,
+  Clock,
+  Building2,
+} from 'lucide-react';
+import type { InterviewType } from '@/components/ScheduleInterviewDialog';
+
+export type WithdrawnRecord = {
+  id: string;
+  company: string;
+  role: string;
+  location?: string;
+  appliedOn?: string;
+  employmentType?: string;
+  contactName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  url?: string;
+  logoUrl?: string;
+  interviewDate?: string;
+  interviewType?: InterviewType;
+  notes?: string;
+};
+
+type WithdrawnCardProps = {
+  item: WithdrawnRecord;
+  onDelete: (item: WithdrawnRecord) => void;
+};
+
+type InterviewMeta = {
+  label: string;
+  Icon: ComponentType<any>;
+};
+
+const INTERVIEW_TYPE_META: Record<InterviewType, InterviewMeta> = {
+  phone: { label: 'Phone screening', Icon: Phone },
+  video: { label: 'Video call', Icon: Video },
+  'in-person': { label: 'In person', Icon: MapPin },
+};
+
+function formatDate(iso?: string) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return new Intl.DateTimeFormat('en-DE', {
+    weekday: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+  }).format(d);
+}
+
+function formatTime(iso?: string) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('en-DE', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(d);
+}
+
+export default function WithdrawnCard({ item, onDelete }: WithdrawnCardProps) {
+  const interviewMeta = item.interviewType
+    ? INTERVIEW_TYPE_META[item.interviewType]
+    : null;
+
+  const applied = item.appliedOn ? formatDate(item.appliedOn) : null;
+  const interviewDate = item.interviewDate
+    ? formatDate(item.interviewDate)
+    : null;
+  const interviewTime = item.interviewDate
+    ? formatTime(item.interviewDate)
+    : null;
+
+  return (
+    <article
+      className={[
+        'relative group rounded-xl border border-neutral-200/80 p-5 shadow-sm transition-all',
+        'bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70',
+        'hover:-translate-y-0.5 hover:shadow-md',
+        'before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl',
+        'before:bg-gradient-to-b before:from-amber-500 before:via-orange-500 before:to-rose-500',
+        'before:opacity-90',
+      ].join(' ')}
+    >
+      {/* Top-right: Delete */}
+      <div className="absolute right-3 top-3 z-10 flex flex-col items-center gap-1">
+        <button
+          type="button"
+          onClick={() => onDelete(item)}
+          className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 shadow-sm hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+          aria-label="Delete withdrawn application"
+        >
+          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+        </button>
+      </div>
+
+      {/* Header: logo + company/role */}
+      <div className="flex items-start gap-3 pr-16">
+        {item.logoUrl ? (
+          <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-neutral-200 bg-white ring-1 ring-white/60">
+            <Image
+              src={item.logoUrl}
+              alt={`${item.company} logo`}
+              fill
+              sizes="48px"
+              className="object-contain p-1.5"
+            />
+          </div>
+        ) : (
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-neutral-50 text-sm font-semibold text-neutral-700">
+            {item.company.slice(0, 1).toUpperCase()}
+          </div>
+        )}
+
+        <div className="min-w-0">
+          <h2 className="truncate text-base font-semibold text-neutral-900">
+            {item.company}
+          </h2>
+          <p className="flex items-center gap-1 truncate text-sm text-neutral-600">
+            <Briefcase
+              className="h-3.5 w-3.5 text-neutral-400"
+              aria-hidden="true"
+            />
+            {item.role}
+          </p>
+        </div>
+      </div>
+
+      {/* Divider */}
+      <div
+        className="mt-3 h-px w-full bg-neutral-200/80"
+        role="separator"
+        aria-hidden="true"
+      />
+
+      {/* Details */}
+      <dl className="mt-4 grid grid-cols-1 gap-3 text-sm">
+        {/* Applied date */}
+        {applied && (
+          <div className="flex items-center gap-2">
+            <Calendar
+              className="h-4 w-4 text-neutral-500"
+              aria-hidden="true"
+            />
+            <div className="flex flex-col">
+              <dt className="text-neutral-500">Applied on</dt>
+              <dd className="font-medium text-neutral-900">{applied}</dd>
+            </div>
+          </div>
+        )}
+
+        {/* Withdrawn stage */}
+        <div className="flex items-center gap-2">
+          {interviewMeta ? (
+            <interviewMeta.Icon
+              className="h-4 w-4 text-neutral-500"
+              aria-hidden="true"
+            />
+          ) : (
+            <Building2
+              className="h-4 w-4 text-neutral-500"
+              aria-hidden="true"
+            />
+          )}
+          <div className="flex flex-col">
+            <dt className="text-neutral-500">Stage</dt>
+            <dd className="font-medium text-neutral-900">
+              {interviewMeta
+                ? `Withdrawn during interview (${interviewMeta.label})`
+                : 'Withdrawn before interview'}
+            </dd>
+          </div>
+        </div>
+
+        {/* Interview date/time (if any) */}
+        {interviewDate && (
+          <div className="flex items-center gap-2">
+            <Clock
+              className="h-4 w-4 text-neutral-500"
+              aria-hidden="true"
+            />
+            <div className="flex flex-col">
+              <dt className="text-neutral-500">Interview date</dt>
+              <dd className="font-medium text-neutral-900">
+                {interviewDate}
+                {interviewTime && ` · ${interviewTime} (Berlin)`}
+              </dd>
+            </div>
+          </div>
+        )}
+
+        {/* Location */}
+        {item.location && (
+          <div className="flex items-center gap-2">
+            <MapPin
+              className="h-4 w-4 text-neutral-500"
+              aria-hidden="true"
+            />
+            <div className="flex flex-col">
+              <dt className="text-neutral-500">Location</dt>
+              <dd className="font-medium text-neutral-900">
+                {item.location}
+              </dd>
+            </div>
+          </div>
+        )}
+
+        {/* Employment type */}
+        {item.employmentType && (
+          <div className="flex items-center gap-2">
+            <Briefcase
+              className="h-4 w-4 text-neutral-500"
+              aria-hidden="true"
+            />
+            <div className="flex flex-col">
+              <dt className="text-neutral-500">Employment</dt>
+              <dd className="font-medium text-neutral-900">
+                {item.employmentType}
+              </dd>
+            </div>
+          </div>
+        )}
+
+        {/* Contact */}
+        {(item.contactName || item.contactEmail || item.contactPhone) && (
+          <div className="flex items-center gap-2">
+            <User2
+              className="h-4 w-4 text-neutral-500"
+              aria-hidden="true"
+            />
+            <div className="flex flex-col">
+              <dt className="text-neutral-500">Contact</dt>
+              <dd className="font-medium text-neutral-900">
+                {item.contactName}
+                {item.contactEmail && (
+                  <>
+                    {' '}
+                    <span className="text-neutral-500">·</span>{' '}
+                    <a
+                      href={`mailto:${item.contactEmail}`}
+                      className="underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-600"
+                    >
+                      {item.contactEmail}
+                    </a>
+                  </>
+                )}
+                {item.contactPhone && (
+                  <>
+                    {' '}
+                    <span className="text-neutral-500">·</span>{' '}
+                    <a
+                      href={`tel:${item.contactPhone}`}
+                      className="underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-600"
+                    >
+                      {item.contactPhone}
+                    </a>
+                  </>
+                )}
+              </dd>
+            </div>
+          </div>
+        )}
+      </dl>
+
+      {/* Notes */}
+      {item.notes && (
+        <div className="mt-4 rounded-lg border border-dashed border-neutral-200 bg-neutral-50/80 px-3 py-2">
+          <div className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+            <FileText className="h-3 w-3" aria-hidden="true" />
+            <span>Notes</span>
+          </div>
+          <p className="mt-1 text-xs text-neutral-800 whitespace-pre-line">
+            {item.notes}
+          </p>
+        </div>
+      )}
+
+      {/* Footer link */}
+      {item.url && (
+        <div className="mt-4 flex justify-end">
+          <a
+            href={item.url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-sm font-medium text-neutral-900 hover:underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-700"
+          >
+            <LinkIcon className="h-4 w-4" aria-hidden="true" />
+            Job posting
+          </a>
+        </div>
+      )}
+    </article>
+  );
+}

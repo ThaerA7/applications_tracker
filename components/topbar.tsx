@@ -16,8 +16,9 @@ const ROUTES: Record<string, RouteMeta> = {
   '/interviews': { title: 'Interviews', icon: '/icons/interview.png' },
   '/offers':     { title: 'Offers',     icon: '/icons/briefcase.png' },
   '/rejected':   { title: 'Rejected',   icon: '/icons/cancel.png' },
+  '/withdrawn':  { title: 'Withdrawn',  icon: '/icons/withdrawn.png' }, // ⬅️ new
   '/wishlist':   { title: 'Wishlist',   icon: '/icons/star.png' },
-  '/calendar':   { title: 'Calendar',   icon: '/icons/calendar.png' }, // ⬅️ new
+  '/calendar':   { title: 'Calendar',   icon: '/icons/calendar.png' },
   '/notes':      { title: 'Notes',      icon: '/icons/note.png' },
   '/settings':   { title: 'Settings',   icon: '/icons/settings.png' },
 };
@@ -36,8 +37,9 @@ const ACCENTS: Record<string, Accent> = {
   '/interviews': { washFrom: 'from-emerald-50', barFrom: 'after:from-emerald-500', barTo: 'after:to-teal-500',    focus: 'focus-visible:ring-emerald-300' },
   '/offers':     { washFrom: 'from-amber-50',   barFrom: 'after:from-amber-500',   barTo: 'after:to-orange-500',  focus: 'focus-visible:ring-amber-300' },
   '/rejected':   { washFrom: 'from-rose-50',    barFrom: 'after:from-rose-500',    barTo: 'after:to-pink-500',    focus: 'focus-visible:ring-rose-300' },
+  '/withdrawn':  { washFrom: 'from-amber-50',   barFrom: 'after:from-amber-500',   barTo: 'after:to-rose-500',    focus: 'focus-visible:ring-amber-300' }, // ⬅️ new
   '/wishlist':   { washFrom: 'from-violet-50',  barFrom: 'after:from-violet-500',  barTo: 'after:to-fuchsia-500', focus: 'focus-visible:ring-violet-300' },
-  '/calendar':   { washFrom: 'from-indigo-50',  barFrom: 'after:from-indigo-500',  barTo: 'after:to-sky-500',     focus: 'focus-visible:ring-indigo-300' }, // ⬅️ new
+  '/calendar':   { washFrom: 'from-indigo-50',  barFrom: 'after:from-indigo-500',  barTo: 'after:to-sky-500',     focus: 'focus-visible:ring-indigo-300' },
   '/notes':      { washFrom: 'from-fuchsia-50', barFrom: 'after:from-fuchsia-500', barTo: 'after:to-violet-500',  focus: 'focus-visible:ring-fuchsia-300' },
   '/settings':   { washFrom: 'from-slate-50',   barFrom: 'after:from-slate-500',   barTo: 'after:to-neutral-500', focus: 'focus-visible:ring-slate-300' },
 };
