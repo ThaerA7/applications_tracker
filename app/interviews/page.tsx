@@ -723,6 +723,7 @@ export default function InterviewsPage() {
             ].join(' ')}
           >
             <Filter className="h-4 w-4" aria-hidden="true" />
+            Fliter
           </button>
         </div>
 

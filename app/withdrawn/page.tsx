@@ -1,11 +1,16 @@
+// app/withdrawn/page.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Search, Filter } from 'lucide-react';
+import { Search, Filter, Plus } from 'lucide-react';
+
 import WithdrawnCard, {
   type WithdrawnRecord,
 } from './WithdrawnCard';
 import type { InterviewType } from '@/components/ScheduleInterviewDialog';
+import AddApplicationDialog, {
+  type NewApplicationForm,
+} from '@/components/AddApplicationDialog';
 
 const WITHDRAWN_STORAGE_KEY = 'job-tracker:withdrawn';
 
@@ -21,6 +26,9 @@ export default function WithdrawnPage() {
   const [deleteTarget, setDeleteTarget] = useState<WithdrawnRecord | null>(
     null,
   );
+
+  // Add dialog state
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -98,6 +106,61 @@ export default function WithdrawnPage() {
     setDeleteTarget(null);
   };
 
+  // --- Add withdrawn manually via AddApplicationDialog ---
+
+  const handleAdd = () => {
+    setDialogOpen(true);
+  };
+
+  const handleDialogClose = () => {
+    setDialogOpen(false);
+  };
+
+  const handleSaveWithdrawn = (data: NewApplicationForm) => {
+    setWithdrawn((prev) => {
+      const id =
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${prev.length}`;
+
+      const newItem: WithdrawnRecord = {
+        id,
+        company: data.company,
+        role: data.role,
+        location: data.location,
+        appliedOn: data.appliedOn,
+        employmentType: data.employmentType,
+        contactName: data.contactPerson,
+        contactEmail: data.contactEmail,
+        contactPhone: data.contactPhone,
+        url: data.offerUrl,
+        logoUrl: data.logoUrl,
+        notes: data.notes,
+        // interviewDate / interviewType left empty here (withdrawn before interview)
+      };
+
+      const next = [...prev, newItem];
+
+      if (typeof window !== 'undefined') {
+        try {
+          window.localStorage.setItem(
+            WITHDRAWN_STORAGE_KEY,
+            JSON.stringify(next),
+          );
+        } catch (err) {
+          console.error(
+            'Failed to persist withdrawn applications after create',
+            err,
+          );
+        }
+      }
+
+      return next;
+    });
+
+    setDialogOpen(false);
+  };
+
   return (
     <>
       {/* Delete confirmation dialog */}
@@ -170,8 +233,9 @@ export default function WithdrawnPage() {
           Applications you chose to step away from.
         </p>
 
-        {/* Toolbar */}
+        {/* Toolbar: Search + Add + Filter */}
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+          {/* Search */}
           <div className="relative flex-1">
             <Search
               className="pointer-events-none absolute left-3 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-neutral-400"
@@ -195,7 +259,22 @@ export default function WithdrawnPage() {
             />
           </div>
 
-          {/* Filter placeholder */}
+          {/* Add */}
+          <button
+            type="button"
+            onClick={handleAdd}
+            className={[
+              'inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800',
+              'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
+              'border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50',
+              'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-300',
+            ].join(' ')}
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Add
+          </button>
+
+          {/* Filter (placeholder) */}
           <button
             type="button"
             className={[
@@ -206,6 +285,7 @@ export default function WithdrawnPage() {
             ].join(' ')}
           >
             <Filter className="h-4 w-4" aria-hidden="true" />
+            Filter
           </button>
         </div>
 
@@ -221,7 +301,7 @@ export default function WithdrawnPage() {
 
           {filtered.length === 0 && (
             <div className="col-span-full flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
-              <div className="mb-2 text-5xl">🚪</div>
+              <div className="mb-2 text-5xl">😌</div>
 
               {withdrawn.length === 0 ? (
                 <>
@@ -229,8 +309,8 @@ export default function WithdrawnPage() {
                     You don&apos;t have any withdrawn applications yet.
                   </p>
                   <p className="mt-1 text-xs text-neutral-500">
-                    When you move an application to withdrawn, it will show up
-                    here.
+                    When you move an application to withdrawn or add one
+                    manually, it will show up here.
                   </p>
                 </>
               ) : (
@@ -242,6 +322,14 @@ export default function WithdrawnPage() {
           )}
         </div>
       </section>
+
+      {/* Add / edit dialog for manual withdrawn creation */}
+      <AddApplicationDialog
+        open={dialogOpen}
+        onClose={handleDialogClose}
+        initialData={undefined}
+        onSave={handleSaveWithdrawn}
+      />
     </>
   );
 }
