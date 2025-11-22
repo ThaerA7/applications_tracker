@@ -374,7 +374,7 @@ export default function InterviewsPage() {
         .some((v) => String(v).toLowerCase().includes(q)),
     );
   }, [query, items]);
-
+const hasSearchOrFilters = query.trim().length > 0;
   return (
     <>
       {/* Dialog shared for Add + Edit */}
@@ -801,14 +801,28 @@ export default function InterviewsPage() {
             );
           })}
 
-          {filtered.length === 0 && (
+                    {filtered.length === 0 && (
             <div className="col-span-full flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
               <div className="mb-2 text-5xl">📅</div>
-              <p className="text-sm text-neutral-700">
-                No interviews match your search.
-              </p>
+
+              {/* Different messages depending on whether there are items at all */}
+              {items.length === 0 ? (
+                <>
+                  <p className="text-sm text-neutral-700">
+                    You don&apos;t have any interviews yet.
+                  </p>
+                  <p className="mt-1 text-xs text-neutral-500">
+                    Click <span className="font-medium">Add</span> to schedule your first interview.
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-neutral-700">
+                  No interviews match your search.
+                </p>
+              )}
             </div>
           )}
+
         </div>
       </section>
     </>
