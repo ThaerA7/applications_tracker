@@ -1,4 +1,3 @@
-// components/MoveApplicationDialog.tsx
 'use client';
 
 import { useState, type FC } from 'react';
@@ -6,6 +5,9 @@ import { CalendarDays, MapPin, X } from 'lucide-react';
 import ScheduleInterviewDialog, {
   type Interview,
 } from './ScheduleInterviewDialog';
+import MoveToRejectedDialog, {
+  type RejectionDetails,
+} from './MoveToRejectedDialog';
 
 type MoveApplicationDialogProps = {
   open: boolean;
@@ -17,17 +19,18 @@ type MoveApplicationDialogProps = {
         location?: string;
         status: string;
         appliedOn: string;
-        // optional fields so we can prefill the schedule dialog
+        // optional fields so we can prefill dialogs
         contactPerson?: string;
         contactEmail?: string;
         contactPhone?: string;
         offerUrl?: string;
         logoUrl?: string;
+        employmentType?: string;
       }
     | null;
   onClose: () => void;
   onMoveToInterviews: (interview: Interview) => void;
-  onMoveToRejected: () => void;
+  onMoveToRejected: (details: RejectionDetails) => void;
   onMoveToWithdrawn: () => void;
   fmtDate: (date: string) => string;
   statusClasses: (status: string) => string;
@@ -44,6 +47,7 @@ const MoveApplicationDialog: FC<MoveApplicationDialogProps> = ({
   statusClasses,
 }) => {
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [rejectedOpen, setRejectedOpen] = useState(false);
 
   if (!open || !application) return null;
 
@@ -109,7 +113,9 @@ const MoveApplicationDialog: FC<MoveApplicationDialogProps> = ({
                   <div className="font-medium text-neutral-900">
                     {application.role || 'Role not set'}
                   </div>
-                  <div className="text-neutral-600">{application.company}</div>
+                  <div className="text-neutral-600">
+                    {application.company}
+                  </div>
                 </div>
                 {application.status && (
                   <span
@@ -177,7 +183,8 @@ const MoveApplicationDialog: FC<MoveApplicationDialogProps> = ({
                     Move to interviews section
                   </span>
                   <span className="text-[11px] font-normal text-sky-900/80">
-                    When you&apos;ve been invited to a phone screen or any interview round.
+                    When you&apos;ve been invited to a phone screen or any
+                    interview round.
                   </span>
                 </div>
               </button>
@@ -185,7 +192,7 @@ const MoveApplicationDialog: FC<MoveApplicationDialogProps> = ({
               {/* Rejected */}
               <button
                 type="button"
-                onClick={onMoveToRejected}
+                onClick={() => setRejectedOpen(true)}
                 className={[
                   'flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-medium',
                   'border border-rose-200/80 bg-gradient-to-r from-rose-50 via-white to-rose-50',
@@ -204,7 +211,8 @@ const MoveApplicationDialog: FC<MoveApplicationDialogProps> = ({
                     Move to the rejected section
                   </span>
                   <span className="text-[11px] font-normal text-rose-900/80">
-                    When the company declines or clearly rejects your application.
+                    When the company declines or clearly rejects your
+                    application.
                   </span>
                 </div>
               </button>
@@ -276,6 +284,31 @@ const MoveApplicationDialog: FC<MoveApplicationDialogProps> = ({
         onInterviewCreated={(interview) => {
           onMoveToInterviews(interview);
           setScheduleOpen(false);
+          onClose();
+        }}
+      />
+
+      {/* Third dialog: move to rejected (details) */}
+      <MoveToRejectedDialog
+        open={rejectedOpen}
+        onClose={() => setRejectedOpen(false)}
+        application={{
+          id: application.id,
+          company: application.company,
+          role: application.role,
+          location: application.location,
+          status: application.status,
+          appliedOn: application.appliedOn,
+          employmentType: application.employmentType,
+          contactPerson: application.contactPerson,
+          contactEmail: application.contactEmail,
+          contactPhone: application.contactPhone,
+          offerUrl: application.offerUrl,
+          logoUrl: application.logoUrl,
+        }}
+        onRejectionCreated={(details) => {
+          onMoveToRejected(details);
+          setRejectedOpen(false);
           onClose();
         }}
       />

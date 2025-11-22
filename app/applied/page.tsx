@@ -1,4 +1,3 @@
-// app/applied/page.tsx
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -31,11 +30,16 @@ import AddApplicationDialog, {
   NewApplicationForm,
 } from '../../components/AddApplicationDialog';
 import MoveApplicationDialog from '../../components/MoveApplicationDialog';
+import type { RejectionDetails } from '../../components/MoveToRejectedDialog';
 
 type Application = {
   id: string;
   website?: string;
 } & NewApplicationForm;
+
+type StoredRejection = RejectionDetails & { id: string };
+
+const REJECTIONS_STORAGE_KEY = 'job-tracker:rejected';
 
 function fmtDate(d: string) {
   const date = new Date(d);
@@ -207,7 +211,37 @@ export default function AppliedPage() {
     moveOutOfApplied();
   };
 
-  const moveToRejected = () => {
+  const moveToRejected = (details: RejectionDetails) => {
+    const id =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2);
+
+    const newRejection: StoredRejection = {
+      id,
+      ...details,
+    };
+
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = window.localStorage.getItem(REJECTIONS_STORAGE_KEY);
+        let existing: StoredRejection[] = [];
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            existing = parsed;
+          }
+        }
+        const next = [...existing, newRejection];
+        window.localStorage.setItem(
+          REJECTIONS_STORAGE_KEY,
+          JSON.stringify(next),
+        );
+      } catch (err) {
+        console.error('Failed to persist rejected application', err);
+      }
+    }
+
     moveOutOfApplied();
   };
 
@@ -887,7 +921,22 @@ export default function AppliedPage() {
       {/* Move dialog */}
       <MoveApplicationDialog
         open={moveDialogOpen}
-        application={appBeingMoved}
+        application={
+          appBeingMoved && {
+            id: appBeingMoved.id,
+            company: appBeingMoved.company,
+            role: appBeingMoved.role,
+            location: appBeingMoved.location,
+            status: appBeingMoved.status,
+            appliedOn: appBeingMoved.appliedOn,
+            contactPerson: appBeingMoved.contactPerson,
+            contactEmail: appBeingMoved.contactEmail,
+            contactPhone: appBeingMoved.contactPhone,
+            offerUrl: appBeingMoved.offerUrl,
+            logoUrl: appBeingMoved.logoUrl,
+            employmentType: appBeingMoved.employmentType,
+          }
+        }
         onClose={closeMoveDialog}
         onMoveToInterviews={moveToInterviews}
         onMoveToRejected={moveToRejected}

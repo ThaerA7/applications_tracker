@@ -1,9 +1,13 @@
-// app/rejected/page.tsx
 'use client';
 
 import Image from 'next/image';
 import type React from 'react';
-import { useMemo, useState, type ComponentType } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type ComponentType,
+} from 'react';
 import MoveToRejectedDialog, {
   type RejectionDetails,
 } from '@/components/MoveToRejectedDialog';
@@ -26,20 +30,12 @@ import {
 
 type InterviewType = 'phone' | 'video' | 'in-person';
 
-type Rejection = {
+const REJECTIONS_STORAGE_KEY = 'job-tracker:rejected';
+
+type Rejection = RejectionDetails & {
   id: string;
-  company: string;
-  role: string;
-  location?: string;
-  contact?: { name?: string; email?: string };
-  decisionDate: string; // string date/datetime
-  hadInterview: boolean;
-  interviewType?: InterviewType; // only when hadInterview = true
-  url?: string;
-  logoUrl?: string;
 };
 
-// Whatever type MoveToRejectedDialog expects for `application`
 type ApplicationLike =
   React.ComponentProps<typeof MoveToRejectedDialog>['application'];
 
@@ -51,6 +47,21 @@ const INTERVIEW_TYPE_META: Record<
   video: { label: 'Video call', Icon: Video },
   'in-person': { label: 'In person', Icon: MapPin },
 };
+
+function getInterviewMeta(
+  rejectionType: RejectionDetails['rejectionType'],
+): { label: string; Icon: ComponentType<any> } | null {
+  switch (rejectionType) {
+    case 'after-phone-screening':
+      return INTERVIEW_TYPE_META.phone;
+    case 'after-first-interview':
+      return INTERVIEW_TYPE_META.video;
+    case 'after-second-interview':
+      return INTERVIEW_TYPE_META['in-person'];
+    default:
+      return null;
+  }
+}
 
 function formatDate(iso: string) {
   const d = new Date(iso);
@@ -74,7 +85,28 @@ export default function RejectedPage() {
     useState<Rejection | null>(null);
 
   // Delete confirmation dialog target
-  const [deleteTarget, setDeleteTarget] = useState<Rejection | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Rejection | null>(
+    null,
+  );
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const raw = window.localStorage.getItem(REJECTIONS_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        setRejected(parsed);
+      }
+    } catch (err) {
+      console.error(
+        'Failed to load rejected applications from localStorage',
+        err,
+      );
+    }
+  }, []);
 
   const handleAdd = () => {
     setEditingRejection(null);
@@ -82,16 +114,18 @@ export default function RejectedPage() {
     setDialogOpen(true);
   };
 
-  // Edit existing rejection (same idea as Interviews page)
+  // Edit existing rejection
   const handleEdit = (item: Rejection) => {
     const app: ApplicationLike = {
-      // Map what we have from Rejection into the expected application shape.
-      // These keys mirror the ScheduleInterviewDialog mapping you used.
+      id: item.id,
       company: item.company,
       role: item.role,
       location: item.location,
-      contactPerson: item.contact?.name,
-      contactEmail: item.contact?.email,
+      appliedOn: item.appliedDate,
+      employmentType: item.employmentType,
+      contactPerson: item.contactName,
+      contactEmail: item.contactEmail,
+      contactPhone: item.contactPhone,
       offerUrl: item.url,
       logoUrl: item.logoUrl,
     } as ApplicationLike;
@@ -103,7 +137,12 @@ export default function RejectedPage() {
 
   // Placeholder – hook into your "move out of Rejected" logic
   const handleMove = (item: Rejection) => {
-    console.log('Move rejected application', item.id, item.company, item.role);
+    console.log(
+      'Move rejected application',
+      item.id,
+      item.company,
+      item.role,
+    );
   };
 
   const openDeleteDialog = (item: Rejection) => {
@@ -114,7 +153,26 @@ export default function RejectedPage() {
     if (!deleteTarget) return;
     const id = deleteTarget.id;
 
-    setRejected((prev) => prev.filter((i) => i.id !== id));
+    setRejected((prev) => {
+      const next = prev.filter((i) => i.id !== id);
+
+      if (typeof window !== 'undefined') {
+        try {
+          window.localStorage.setItem(
+            REJECTIONS_STORAGE_KEY,
+            JSON.stringify(next),
+          );
+        } catch (err) {
+          console.error(
+            'Failed to persist rejected applications after delete',
+            err,
+          );
+        }
+      }
+
+      return next;
+    });
+
     setDeleteTarget(null);
   };
 
@@ -131,26 +189,40 @@ export default function RejectedPage() {
   // Use dialog output to create or update cards
   const handleRejectionCreated = (details: RejectionDetails) => {
     setRejected((prev) => {
+      let next: Rejection[];
+
       if (editingRejection) {
-        // Update existing rejection
-        return prev.map((item) =>
+        next = prev.map((item) =>
           item.id === editingRejection.id
-            ? { ...item, ...(details as any) }
+            ? { ...item, ...details }
             : item,
         );
-      }
-
-      // Create new rejection
-      return [
-        ...prev,
-        {
-          ...(details as any),
+      } else {
+        const newItem: Rejection = {
           id:
             typeof crypto !== 'undefined' && 'randomUUID' in crypto
               ? crypto.randomUUID()
               : `${Date.now()}-${prev.length}`,
-        },
-      ];
+          ...details,
+        };
+        next = [...prev, newItem];
+      }
+
+      if (typeof window !== 'undefined') {
+        try {
+          window.localStorage.setItem(
+            REJECTIONS_STORAGE_KEY,
+            JSON.stringify(next),
+          );
+        } catch (err) {
+          console.error(
+            'Failed to persist rejected applications to localStorage',
+            err,
+          );
+        }
+      }
+
+      return next;
     });
 
     setDialogOpen(false);
@@ -167,11 +239,11 @@ export default function RejectedPage() {
         item.company,
         item.role,
         item.location,
-        item.contact?.name,
-        item.contact?.email,
-        item.hadInterview
-          ? INTERVIEW_TYPE_META[item.interviewType!]?.label
-          : 'no interview',
+        item.contactName,
+        item.contactEmail,
+        item.rejectionType === 'no-interview'
+          ? 'no interview'
+          : 'interview',
       ]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q)),
@@ -201,8 +273,8 @@ export default function RejectedPage() {
             </h2>
             <p className="mt-2 text-sm text-neutral-700">
               This will permanently remove the rejected application at{' '}
-              <span className="font-medium">{deleteTarget.company}</span> for
-              the role{' '}
+              <span className="font-medium">{deleteTarget.company}</span>{' '}
+              for the role{' '}
               <span className="font-medium">{deleteTarget.role}</span>.
             </p>
             <p className="mt-1 text-xs text-neutral-500">
@@ -240,7 +312,9 @@ export default function RejectedPage() {
         <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-rose-400/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-pink-400/20 blur-3xl" />
 
-        <h1 className="text-2xl font-semibold text-neutral-900">Rejected</h1>
+        <h1 className="text-2xl font-semibold text-neutral-900">
+          Rejected
+        </h1>
         <p className="mt-1 text-neutral-700">
           Applications that didn’t work out.
         </p>
@@ -297,7 +371,6 @@ export default function RejectedPage() {
             ].join(' ')}
           >
             <Filter className="h-4 w-4" aria-hidden="true" />
-            Filter
           </button>
         </div>
 
@@ -305,10 +378,7 @@ export default function RejectedPage() {
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((item) => {
             const date = formatDate(item.decisionDate);
-            const WithType =
-              item.hadInterview && item.interviewType
-                ? INTERVIEW_TYPE_META[item.interviewType]
-                : null;
+            const WithType = getInterviewMeta(item.rejectionType);
 
             return (
               <article
@@ -332,7 +402,10 @@ export default function RejectedPage() {
                       className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-sky-200 bg-sky-50 text-sky-600 shadow-sm hover:bg-sky-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
                       aria-label="Edit rejected application"
                     >
-                      <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                      <Pencil
+                        className="h-3.5 w-3.5"
+                        aria-hidden="true"
+                      />
                     </button>
 
                     {/* Move (green) */}
@@ -408,12 +481,14 @@ export default function RejectedPage() {
                     />
                     <div className="flex flex-col">
                       <dt className="text-neutral-500">Decision date</dt>
-                      <dd className="font-medium text-neutral-900">{date}</dd>
+                      <dd className="font-medium text-neutral-900">
+                        {date}
+                      </dd>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {item.hadInterview && WithType?.Icon ? (
+                    {WithType ? (
                       <WithType.Icon
                         className="h-4 w-4 text-neutral-500"
                         aria-hidden="true"
@@ -427,8 +502,8 @@ export default function RejectedPage() {
                     <div className="flex flex-col">
                       <dt className="text-neutral-500">Interview</dt>
                       <dd className="font-medium text-neutral-900">
-                        {item.hadInterview
-                          ? `With interview (${WithType?.label ?? 'N/A'})`
+                        {WithType
+                          ? `With interview (${WithType.label})`
                           : 'No interview'}
                       </dd>
                     </div>
@@ -449,7 +524,9 @@ export default function RejectedPage() {
                     </div>
                   )}
 
-                  {item.contact?.name && (
+                  {(item.contactName ||
+                    item.contactEmail ||
+                    item.contactPhone) && (
                     <div className="flex items-center gap-2">
                       <User2
                         className="h-4 w-4 text-neutral-500"
@@ -458,19 +535,21 @@ export default function RejectedPage() {
                       <div className="flex flex-col">
                         <dt className="text-neutral-500">Contact</dt>
                         <dd className="font-medium text-neutral-900">
-                          {item.contact.name}
-                          {item.contact.email ? (
+                          {item.contactName}
+                          {item.contactEmail && (
                             <>
                               {' '}
-                              <span className="text-neutral-500">·</span>{' '}
+                              <span className="text-neutral-500">
+                                ·
+                              </span>{' '}
                               <a
-                                href={`mailto:${item.contact.email}`}
+                                href={`mailto:${item.contactEmail}`}
                                 className="underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-600"
                               >
-                                {item.contact.email}
+                                {item.contactEmail}
                               </a>
                             </>
-                          ) : null}
+                          )}
                         </dd>
                       </div>
                     </div>
@@ -486,7 +565,10 @@ export default function RejectedPage() {
                       rel="noreferrer"
                       className="inline-flex items-center gap-1 text-sm font-medium text-neutral-900 hover:underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-700"
                     >
-                      <LinkIcon className="h-4 w-4" aria-hidden="true" />
+                      <LinkIcon
+                        className="h-4 w-4"
+                        aria-hidden="true"
+                      />
                       Job posting
                     </a>
                   </div>
@@ -505,8 +587,8 @@ export default function RejectedPage() {
                     You don&apos;t have any rejected applications yet.
                   </p>
                   <p className="mt-1 text-xs text-neutral-500">
-                    Once you mark an application as rejected, it will show up
-                    here.
+                    Once you mark an application as rejected, it will show
+                    up here.
                   </p>
                 </>
               ) : (
@@ -521,7 +603,7 @@ export default function RejectedPage() {
           <MoveToRejectedDialog
             open={dialogOpen}
             onClose={handleDialogClose}
-            application={dialogApplication} // prefill for edit / null for add
+            application={dialogApplication}
             onRejectionCreated={handleRejectionCreated}
           />
         </div>
