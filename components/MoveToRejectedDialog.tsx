@@ -1,4 +1,3 @@
-// components/MoveToRejectedDialog.tsx
 'use client';
 
 import {
@@ -19,6 +18,7 @@ import {
   Briefcase,
   Building2,
   AlertCircle,
+  FileText,
 } from 'lucide-react';
 
 export type RejectionType =
@@ -43,6 +43,7 @@ export type RejectionDetails = {
   contactPhone?: string;
   url?: string;
   logoUrl?: string;
+  notes?: string;
 };
 
 type MoveToRejectedDialogProps = {
@@ -62,6 +63,7 @@ type MoveToRejectedDialogProps = {
         contactPhone?: string;
         offerUrl?: string;
         logoUrl?: string;
+        notes?: string;
       }
     | null;
   /**
@@ -86,6 +88,7 @@ type FormState = {
   contactEmail: string;
   contactPhone: string;
   url: string;
+  notes: string;
 };
 
 const REJECTION_OPTIONS: {
@@ -154,6 +157,7 @@ function makeInitialForm(
     contactEmail: app?.contactEmail ?? '',
     contactPhone: app?.contactPhone ?? '',
     url: app?.offerUrl ?? '',
+    notes: app?.notes ?? '',
   };
 }
 
@@ -172,7 +176,7 @@ export default function MoveToRejectedDialog({
 
   const handleChange =
     (field: keyof FormState) =>
-    (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
       const { value } = e.target;
       setForm((prev) => ({ ...prev, [field]: value }));
     };
@@ -198,6 +202,7 @@ export default function MoveToRejectedDialog({
     const contactEmail = form.contactEmail.trim();
     const contactPhone = form.contactPhone.trim();
     const url = form.url.trim();
+    const notes = form.notes.trim();
 
     const details: RejectionDetails = {
       company,
@@ -217,6 +222,7 @@ export default function MoveToRejectedDialog({
     if (contactEmail) details.contactEmail = contactEmail;
     if (contactPhone) details.contactPhone = contactPhone;
     if (url) details.url = url;
+    if (notes) details.notes = notes;
 
     onRejectionCreated?.(details);
     onClose();
@@ -628,6 +634,28 @@ export default function MoveToRejectedDialog({
                     className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-300"
                   />
                 </div>
+              </label>
+
+              <label className="space-y-1 text-sm md:col-span-2">
+                <span className="font-medium text-neutral-800">
+                  Notes
+                </span>
+                <div className="relative">
+                  <FileText
+                    className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-neutral-400"
+                    aria-hidden="true"
+                  />
+                  <textarea
+                    value={form.notes}
+                    onChange={handleChange('notes')}
+                    rows={3}
+                    placeholder="Anything you want to remember about this rejection (feedback, feelings, lessons, etc.)"
+                    className="w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 pt-2 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-300"
+                  />
+                </div>
+                <p className="mt-1 text-[11px] text-neutral-500">
+                  Optional, but useful later to spot patterns and improve.
+                </p>
               </label>
             </div>
           </div>

@@ -14,6 +14,7 @@ import {
   Link as LinkIcon,
   Trash2,
   Pencil,
+  FileText,
 } from 'lucide-react';
 
 type InterviewType = 'phone' | 'video' | 'in-person';
@@ -218,6 +219,21 @@ export default function RejectedCard({
                     </a>
                   </>
                 )}
+              </dd>
+            </div>
+          </div>
+        )}
+
+        {item.notes && (
+          <div className="flex items-start gap-2">
+            <FileText
+              className="mt-0.5 h-4 w-4 text-neutral-500"
+              aria-hidden="true"
+            />
+            <div className="flex flex-col">
+              <dt className="text-neutral-500">Notes</dt>
+              <dd className="font-medium text-neutral-900 whitespace-pre-wrap">
+                {item.notes}
               </dd>
             </div>
           </div>

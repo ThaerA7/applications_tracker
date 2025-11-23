@@ -69,6 +69,7 @@ export default function RejectedPage() {
       contactPhone: item.contactPhone,
       offerUrl: item.url,
       logoUrl: item.logoUrl,
+      notes: item.notes,
     } as ApplicationLike;
 
     setEditingRejection(item);
@@ -172,6 +173,7 @@ export default function RejectedPage() {
         item.location,
         item.contactName,
         item.contactEmail,
+        item.notes,
         item.rejectionType === 'no-interview'
           ? 'no interview'
           : 'interview',
