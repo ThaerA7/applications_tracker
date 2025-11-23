@@ -1,3 +1,4 @@
+// app/withdrawn/WithdrawnCard.tsx
 'use client';
 
 import Image from 'next/image';
@@ -15,8 +16,13 @@ import {
   Trash2,
   Clock,
   Building2,
+  AlertCircle,
 } from 'lucide-react';
 import type { InterviewType } from '@/components/ScheduleInterviewDialog';
+import type {
+  WithdrawnDetails,
+  WithdrawnReason,
+} from '@/components/MoveToWithdrawnDialog';
 
 export type WithdrawnRecord = {
   id: string;
@@ -33,6 +39,8 @@ export type WithdrawnRecord = {
   interviewDate?: string;
   interviewType?: InterviewType;
   notes?: string;
+  withdrawnDate?: string;
+  withdrawnReason?: WithdrawnDetails['reason'];
 };
 
 type WithdrawnCardProps = {
@@ -49,6 +57,16 @@ const INTERVIEW_TYPE_META: Record<InterviewType, InterviewMeta> = {
   phone: { label: 'Phone screening', Icon: Phone },
   video: { label: 'Video call', Icon: Video },
   'in-person': { label: 'In person', Icon: MapPin },
+};
+
+const WITHDRAWN_REASON_LABEL: Record<WithdrawnReason, string> = {
+  'accepted-other-offer': 'Accepted another offer',
+  'salary-not-right': 'Salary / conditions not right',
+  'role-not-fit': 'Role not a good fit',
+  'location-commute': 'Location / commute issues',
+  'process-too-slow': 'Process took too long',
+  'personal-reasons': 'Personal reasons',
+  other: 'Other',
 };
 
 function formatDate(iso?: string) {
@@ -79,6 +97,9 @@ export default function WithdrawnCard({ item, onDelete }: WithdrawnCardProps) {
     : null;
 
   const applied = item.appliedOn ? formatDate(item.appliedOn) : null;
+  const withdrawnOn = item.withdrawnDate
+    ? formatDate(item.withdrawnDate)
+    : null;
   const interviewDate = item.interviewDate
     ? formatDate(item.interviewDate)
     : null;
@@ -164,28 +185,61 @@ export default function WithdrawnCard({ item, onDelete }: WithdrawnCardProps) {
           </div>
         )}
 
-        {/* Withdrawn stage */}
+        {/* Withdrawn date */}
+        {withdrawnOn && (
+          <div className="flex items-center gap-2">
+            <Calendar
+              className="h-4 w-4 text-neutral-500"
+              aria-hidden="true"
+            />
+            <div className="flex flex-col">
+              <dt className="text-neutral-500">Withdrawn on</dt>
+              <dd className="font-medium text-neutral-900">
+                {withdrawnOn}
+              </dd>
+            </div>
+          </div>
+        )}
+
+              {/* Withdrawn stage */}
+      <div className="flex items-center gap-2">
+        {interviewMeta ? (
+          <interviewMeta.Icon
+            className="h-4 w-4 text-neutral-500"
+            aria-hidden="true"
+          />
+        ) : (
+          <Building2
+            className="h-4 w-4 text-neutral-500"
+            aria-hidden="true"
+          />
+        )}
+        <div className="flex flex-col">
+          <dt className="text-neutral-500">Stage</dt>
+          <dd className="font-medium text-neutral-900">
+            {interviewMeta
+              ? `Withdrawn during interview (${interviewMeta.label})`
+              : 'Withdrawn before interview'}
+          </dd>
+        </div>
+      </div>
+
+      {/* Withdrawn reason – its own field */}
+      {item.withdrawnReason && (
         <div className="flex items-center gap-2">
-          {interviewMeta ? (
-            <interviewMeta.Icon
-              className="h-4 w-4 text-neutral-500"
-              aria-hidden="true"
-            />
-          ) : (
-            <Building2
-              className="h-4 w-4 text-neutral-500"
-              aria-hidden="true"
-            />
-          )}
+          <AlertCircle
+            className="h-4 w-4 text-neutral-500"
+            aria-hidden="true"
+          />
           <div className="flex flex-col">
-            <dt className="text-neutral-500">Stage</dt>
+            <dt className="text-neutral-500">Reason</dt>
             <dd className="font-medium text-neutral-900">
-              {interviewMeta
-                ? `Withdrawn during interview (${interviewMeta.label})`
-                : 'Withdrawn before interview'}
+              {WITHDRAWN_REASON_LABEL[item.withdrawnReason]}
             </dd>
           </div>
         </div>
+      )}
+
 
         {/* Interview date/time (if any) */}
         {interviewDate && (

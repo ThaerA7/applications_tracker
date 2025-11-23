@@ -1,3 +1,4 @@
+// app/applied/page.tsx
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -10,13 +11,32 @@ import AddApplicationDialog, {
 } from '../../components/AddApplicationDialog';
 import MoveApplicationDialog from '../../components/MoveApplicationDialog';
 import type { RejectionDetails } from '../../components/MoveToRejectedDialog';
+import type { WithdrawnDetails } from '../../components/MoveToWithdrawnDialog';
 import ApplicationCard, {
   type Application,
 } from './ApplicationCard';
 
 type StoredRejection = RejectionDetails & { id: string };
 
+type StoredWithdrawn = {
+  id: string;
+  company: string;
+  role: string;
+  location?: string;
+  appliedOn?: string;
+  employmentType?: string;
+  contactName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  url?: string;
+  logoUrl?: string;
+  notes?: string;
+  withdrawnDate?: string;
+  withdrawnReason?: WithdrawnDetails['reason'];
+};
+
 const REJECTIONS_STORAGE_KEY = 'job-tracker:rejected';
+const WITHDRAWN_STORAGE_KEY = 'job-tracker:withdrawn';
 
 function fmtDate(d: string) {
   const date = new Date(d);
@@ -205,7 +225,54 @@ export default function AppliedPage() {
     moveOutOfApplied();
   };
 
-  const moveToWithdrawn = () => {
+  const moveToWithdrawn = (details: WithdrawnDetails) => {
+    if (!appBeingMoved) {
+      moveOutOfApplied();
+      return;
+    }
+
+    const source = appBeingMoved;
+
+    const id =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2);
+
+    const newWithdrawn: StoredWithdrawn = {
+      id,
+      company: details.company || source.company,
+      role: details.role || source.role,
+      location: details.location || source.location,
+      appliedOn: details.appliedDate || source.appliedOn,
+      employmentType:
+        details.employmentType || source.employmentType,
+      contactName: details.contactName || source.contactPerson,
+      contactEmail: details.contactEmail || source.contactEmail,
+      contactPhone: details.contactPhone || source.contactPhone,
+      url: details.url || source.offerUrl,
+      logoUrl: details.logoUrl || source.logoUrl,
+      notes: details.notes || source.notes,
+      withdrawnDate: details.withdrawnDate,
+      withdrawnReason: details.reason,
+    };
+
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = window.localStorage.getItem(WITHDRAWN_STORAGE_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        const existing: StoredWithdrawn[] = Array.isArray(parsed)
+          ? parsed
+          : [];
+        const next = [...existing, newWithdrawn];
+        window.localStorage.setItem(
+          WITHDRAWN_STORAGE_KEY,
+          JSON.stringify(next),
+        );
+      } catch (err) {
+        console.error('Failed to persist withdrawn application', err);
+      }
+    }
+
     moveOutOfApplied();
   };
 
@@ -333,6 +400,7 @@ export default function AppliedPage() {
             offerUrl: appBeingMoved.offerUrl,
             logoUrl: appBeingMoved.logoUrl,
             employmentType: appBeingMoved.employmentType,
+            notes: appBeingMoved.notes,
           }
         }
         onClose={closeMoveDialog}

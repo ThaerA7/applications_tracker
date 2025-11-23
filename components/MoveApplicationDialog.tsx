@@ -9,6 +9,9 @@ import ScheduleInterviewDialog, {
 import MoveToRejectedDialog, {
   type RejectionDetails,
 } from './MoveToRejectedDialog';
+import MoveToWithdrawnDialog, {
+  type WithdrawnDetails,
+} from './MoveToWithdrawnDialog';
 
 type MoveApplicationDialogProps = {
   open: boolean;
@@ -27,15 +30,16 @@ type MoveApplicationDialogProps = {
         offerUrl?: string;
         logoUrl?: string;
         employmentType?: string;
+        notes?: string;
       }
     | null;
   onClose: () => void;
   onMoveToInterviews: (interview: Interview) => void;
   onMoveToRejected: (details: RejectionDetails) => void;
-  onMoveToWithdrawn: () => void;
+  onMoveToWithdrawn: (details: WithdrawnDetails) => void;
   fmtDate: (date: string) => string;
   statusClasses: (status: string) => string;
-  /** 
+  /**
    * default  = used from Applications page (3 options)
    * from-interviews = used from Interviews page (only Rejected + Withdrawn)
    */
@@ -55,6 +59,7 @@ const MoveApplicationDialog: FC<MoveApplicationDialogProps> = ({
 }) => {
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [rejectedOpen, setRejectedOpen] = useState(false);
+  const [withdrawnOpen, setWithdrawnOpen] = useState(false);
 
   if (!open || !application) return null;
 
@@ -232,7 +237,7 @@ const MoveApplicationDialog: FC<MoveApplicationDialogProps> = ({
               {/* Withdrawn */}
               <button
                 type="button"
-                onClick={onMoveToWithdrawn}
+                onClick={() => setWithdrawnOpen(true)}
                 className={[
                   'flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-medium',
                   'border border-amber-200/80 bg-gradient-to-r from-amber-50 via-white to-amber-50',
@@ -317,10 +322,37 @@ const MoveApplicationDialog: FC<MoveApplicationDialogProps> = ({
           contactPhone: application.contactPhone,
           offerUrl: application.offerUrl,
           logoUrl: application.logoUrl,
+          notes: application.notes,
         }}
         onRejectionCreated={(details) => {
           onMoveToRejected(details);
           setRejectedOpen(false);
+          onClose();
+        }}
+      />
+
+      {/* Fourth dialog: move to withdrawn (details) */}
+      <MoveToWithdrawnDialog
+        open={withdrawnOpen}
+        onClose={() => setWithdrawnOpen(false)}
+        application={{
+          id: application.id,
+          company: application.company,
+          role: application.role,
+          location: application.location,
+          status: application.status,
+          appliedOn: application.appliedOn,
+          employmentType: application.employmentType,
+          contactPerson: application.contactPerson,
+          contactEmail: application.contactEmail,
+          contactPhone: application.contactPhone,
+          offerUrl: application.offerUrl,
+          logoUrl: application.logoUrl,
+          notes: application.notes,
+        }}
+        onWithdrawnCreated={(details) => {
+          onMoveToWithdrawn(details);
+          setWithdrawnOpen(false);
           onClose();
         }}
       />

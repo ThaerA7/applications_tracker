@@ -1,3 +1,4 @@
+// app/interviews/page.tsx
 'use client';
 
 import {
@@ -7,7 +8,14 @@ import {
   type ComponentType,
   type ComponentProps,
 } from 'react';
-import { Search, Plus, Filter } from 'lucide-react';
+import {
+  Search,
+  Plus,
+  Filter,
+  PhoneCall,
+  Video,
+  Users,
+} from 'lucide-react';
 
 import ScheduleInterviewDialog, {
   type Interview,
@@ -15,6 +23,7 @@ import ScheduleInterviewDialog, {
 } from '../../components/ScheduleInterviewDialog';
 import MoveApplicationDialog from '../../components/MoveApplicationDialog';
 import type { RejectionDetails } from '../../components/MoveToRejectedDialog';
+import type { WithdrawnDetails } from '../../components/MoveToWithdrawnDialog';
 import InterviewCard from './InterviewCard';
 
 const INTERVIEWS_STORAGE_KEY = 'job-tracker:interviews';
@@ -22,7 +31,7 @@ const REJECTIONS_STORAGE_KEY = 'job-tracker:rejected';
 const WITHDRAWN_STORAGE_KEY = 'job-tracker:withdrawn';
 
 type ApplicationLike =
-  React.ComponentProps<typeof ScheduleInterviewDialog>['application'];
+  ComponentProps<typeof ScheduleInterviewDialog>['application'];
 
 type MoveDialogApplication =
   ComponentProps<typeof MoveApplicationDialog>['application'];
@@ -44,15 +53,17 @@ type WithdrawnRecord = {
   interviewDate?: string;
   interviewType?: InterviewType;
   notes?: string;
+  withdrawnDate?: string;
+  withdrawnReason?: WithdrawnDetails['reason'];
 };
 
 const INTERVIEW_TYPE_META: Record<
   InterviewType,
   { label: string; Icon: ComponentType<any> }
 > = {
-  phone: { label: 'Phone screening', Icon: () => null },
-  video: { label: 'Video call', Icon: () => null },
-  'in-person': { label: 'In person', Icon: () => null },
+  phone: { label: 'Phone screening', Icon: PhoneCall },
+  video: { label: 'Video call', Icon: Video },
+  'in-person': { label: 'In person', Icon: Users },
 };
 
 // Initial demo data (used only if localStorage is empty)
@@ -329,6 +340,7 @@ export default function InterviewsPage() {
       offerUrl: item.url,
       logoUrl: item.logoUrl,
       employmentType: item.employmentType,
+      notes: item.notes,
     };
 
     setMoveTargetInterview(item);
@@ -471,7 +483,9 @@ export default function InterviewsPage() {
     handleMoveDialogClose();
   };
 
-  const handleMoveToWithdrawnFromInterviews = () => {
+  const handleMoveToWithdrawnFromInterviews = (
+    details: WithdrawnDetails,
+  ) => {
     const source = moveTargetInterview;
     if (!source) {
       handleMoveDialogClose();
@@ -489,19 +503,22 @@ export default function InterviewsPage() {
 
         const newItem: WithdrawnRecord = {
           id: makeId(prev.length),
-          company: source.company,
-          role: source.role,
-          location: source.location,
-          appliedOn: source.appliedOn,
-          employmentType: source.employmentType,
-          contactName: source.contact?.name,
-          contactEmail: source.contact?.email,
-          contactPhone: source.contact?.phone,
-          url: source.url,
-          logoUrl: source.logoUrl,
+          company: details.company || source.company,
+          role: details.role || source.role,
+          location: details.location || source.location,
+          appliedOn: details.appliedDate || source.appliedOn,
+          employmentType:
+            details.employmentType || source.employmentType,
+          contactName: details.contactName || source.contact?.name,
+          contactEmail: details.contactEmail || source.contact?.email,
+          contactPhone: details.contactPhone || source.contact?.phone,
+          url: details.url || source.url,
+          logoUrl: details.logoUrl || source.logoUrl,
           interviewDate: source.date,
           interviewType: source.type,
-          notes: source.notes,
+          notes: details.notes || source.notes,
+          withdrawnDate: details.withdrawnDate,
+          withdrawnReason: details.reason,
         };
 
         const nextWithdrawn = [...prev, newItem];
@@ -723,7 +740,7 @@ export default function InterviewsPage() {
             ].join(' ')}
           >
             <Filter className="h-4 w-4" aria-hidden="true" />
-            Fliter
+            Filter
           </button>
         </div>
 
@@ -731,7 +748,10 @@ export default function InterviewsPage() {
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((item) => {
             const { date, time } = formatDateTime(item.date);
-            const { label: typeLabel } = INTERVIEW_TYPE_META[item.type];
+            const {
+              label: typeLabel,
+              Icon: TypeIcon,
+            } = INTERVIEW_TYPE_META[item.type];
             const countdownLabel = getInterviewCountdownLabel(
               item.date,
               now,
@@ -741,14 +761,11 @@ export default function InterviewsPage() {
               now,
             );
 
-            // Use real icons in the card (mapped there) – we only pass label here
-            const typeIcon = (() => null) as ComponentType<any>;
-
             return (
               <InterviewCard
                 key={item.id}
                 item={item}
-                typeIcon={typeIcon}
+                typeIcon={TypeIcon}
                 typeLabel={typeLabel}
                 date={date}
                 time={time}
