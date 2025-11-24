@@ -9,6 +9,7 @@ import type { InterviewType } from "@/components/ScheduleInterviewDialog";
 import MoveToWithdrawnDialog, {
   type WithdrawnDetails,
 } from "@/components/MoveToWithdrawnDialog";
+import { animateCardExit } from "@/components/cardExitAnimation";
 
 const WITHDRAWN_STORAGE_KEY = "job-tracker:withdrawn";
 
@@ -76,28 +77,31 @@ export default function WithdrawnPage() {
   const handleConfirmDelete = () => {
     if (!deleteTarget) return;
     const id = deleteTarget.id;
+    const elementId = `withdrawn-card-${id}`;
 
-    setWithdrawn((prev) => {
-      const next = prev.filter((i) => i.id !== id);
+    animateCardExit(elementId, "delete", () => {
+      setWithdrawn((prev) => {
+        const next = prev.filter((i) => i.id !== id);
 
-      if (typeof window !== "undefined") {
-        try {
-          window.localStorage.setItem(
-            WITHDRAWN_STORAGE_KEY,
-            JSON.stringify(next)
-          );
-        } catch (err) {
-          console.error(
-            "Failed to persist withdrawn applications after delete",
-            err
-          );
+        if (typeof window !== "undefined") {
+          try {
+            window.localStorage.setItem(
+              WITHDRAWN_STORAGE_KEY,
+              JSON.stringify(next)
+            );
+          } catch (err) {
+            console.error(
+              "Failed to persist withdrawn applications after delete",
+              err
+            );
+          }
         }
-      }
 
-      return next;
+        return next;
+      });
+
+      setDeleteTarget(null);
     });
-
-    setDeleteTarget(null);
   };
 
   const handleCancelDelete = () => {

@@ -1,8 +1,8 @@
 // app/withdrawn/WithdrawnCard.tsx
-'use client';
+"use client";
 
-import Image from 'next/image';
-import type { ComponentType } from 'react';
+import Image from "next/image";
+import type { ComponentType } from "react";
 import {
   Briefcase,
   MapPin,
@@ -17,12 +17,12 @@ import {
   Clock,
   Building2,
   AlertCircle,
-} from 'lucide-react';
-import type { InterviewType } from '@/components/ScheduleInterviewDialog';
+} from "lucide-react";
+import type { InterviewType } from "@/components/ScheduleInterviewDialog";
 import type {
   WithdrawnDetails,
   WithdrawnReason,
-} from '@/components/MoveToWithdrawnDialog';
+} from "@/components/MoveToWithdrawnDialog";
 
 export type WithdrawnRecord = {
   id: string;
@@ -40,7 +40,7 @@ export type WithdrawnRecord = {
   interviewType?: InterviewType;
   notes?: string;
   withdrawnDate?: string;
-  withdrawnReason?: WithdrawnDetails['reason'];
+  withdrawnReason?: WithdrawnDetails["reason"];
 };
 
 type WithdrawnCardProps = {
@@ -54,40 +54,40 @@ type InterviewMeta = {
 };
 
 const INTERVIEW_TYPE_META: Record<InterviewType, InterviewMeta> = {
-  phone: { label: 'Phone screening', Icon: Phone },
-  video: { label: 'Video call', Icon: Video },
-  'in-person': { label: 'In person', Icon: MapPin },
+  phone: { label: "Phone screening", Icon: Phone },
+  video: { label: "Video call", Icon: Video },
+  "in-person": { label: "In person", Icon: MapPin },
 };
 
 const WITHDRAWN_REASON_LABEL: Record<WithdrawnReason, string> = {
-  'accepted-other-offer': 'Accepted another offer',
-  'salary-not-right': 'Salary / conditions not right',
-  'role-not-fit': 'Role not a good fit',
-  'location-commute': 'Location / commute issues',
-  'process-too-slow': 'Process took too long',
-  'personal-reasons': 'Personal reasons',
-  other: 'Other',
+  "accepted-other-offer": "Accepted another offer",
+  "salary-not-right": "Salary / conditions not right",
+  "role-not-fit": "Role not a good fit",
+  "location-commute": "Location / commute issues",
+  "process-too-slow": "Process took too long",
+  "personal-reasons": "Personal reasons",
+  other: "Other",
 };
 
 function formatDate(iso?: string) {
-  if (!iso) return '';
+  if (!iso) return "";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return new Intl.DateTimeFormat('en-DE', {
-    weekday: 'short',
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
+  return new Intl.DateTimeFormat("en-DE", {
+    weekday: "short",
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
   }).format(d);
 }
 
 function formatTime(iso?: string) {
-  if (!iso) return '';
+  if (!iso) return "";
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return new Intl.DateTimeFormat('en-DE', {
-    hour: '2-digit',
-    minute: '2-digit',
+  if (Number.isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("en-DE", {
+    hour: "2-digit",
+    minute: "2-digit",
   }).format(d);
 }
 
@@ -109,14 +109,15 @@ export default function WithdrawnCard({ item, onDelete }: WithdrawnCardProps) {
 
   return (
     <article
+      id={`withdrawn-card-${item.id}`}
       className={[
-        'relative group rounded-xl border border-neutral-200/80 p-5 shadow-sm transition-all',
-        'bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70',
-        'hover:-translate-y-0.5 hover:shadow-md',
-        'before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl',
-        'before:bg-gradient-to-b before:from-amber-500 before:via-orange-500 before:to-rose-500',
-        'before:opacity-90',
-      ].join(' ')}
+        "relative group rounded-xl border border-neutral-200/80 p-5 shadow-sm transition-all",
+        "bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70",
+        "hover:-translate-y-0.5 hover:shadow-md",
+        "before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl",
+        "before:bg-gradient-to-b before:from-amber-500 before:via-orange-500 before:to-rose-500",
+        "before:opacity-90",
+      ].join(" ")}
     >
       {/* Top-right: Delete */}
       <div className="absolute right-3 top-3 z-10 flex flex-col items-center gap-1">
@@ -174,10 +175,7 @@ export default function WithdrawnCard({ item, onDelete }: WithdrawnCardProps) {
         {/* Applied date */}
         {applied && (
           <div className="flex items-center gap-2">
-            <Calendar
-              className="h-4 w-4 text-neutral-500"
-              aria-hidden="true"
-            />
+            <Calendar className="h-4 w-4 text-neutral-500" aria-hidden="true" />
             <div className="flex flex-col">
               <dt className="text-neutral-500">Applied on</dt>
               <dd className="font-medium text-neutral-900">{applied}</dd>
@@ -188,66 +186,57 @@ export default function WithdrawnCard({ item, onDelete }: WithdrawnCardProps) {
         {/* Withdrawn date */}
         {withdrawnOn && (
           <div className="flex items-center gap-2">
-            <Calendar
+            <Calendar className="h-4 w-4 text-neutral-500" aria-hidden="true" />
+            <div className="flex flex-col">
+              <dt className="text-neutral-500">Withdrawn on</dt>
+              <dd className="font-medium text-neutral-900">{withdrawnOn}</dd>
+            </div>
+          </div>
+        )}
+
+        {/* Withdrawn stage */}
+        <div className="flex items-center gap-2">
+          {interviewMeta ? (
+            <interviewMeta.Icon
+              className="h-4 w-4 text-neutral-500"
+              aria-hidden="true"
+            />
+          ) : (
+            <Building2
+              className="h-4 w-4 text-neutral-500"
+              aria-hidden="true"
+            />
+          )}
+          <div className="flex flex-col">
+            <dt className="text-neutral-500">Stage</dt>
+            <dd className="font-medium text-neutral-900">
+              {interviewMeta
+                ? `Withdrawn during interview (${interviewMeta.label})`
+                : "Withdrawn before interview"}
+            </dd>
+          </div>
+        </div>
+
+        {/* Withdrawn reason */}
+        {item.withdrawnReason && (
+          <div className="flex items-center gap-2">
+            <AlertCircle
               className="h-4 w-4 text-neutral-500"
               aria-hidden="true"
             />
             <div className="flex flex-col">
-              <dt className="text-neutral-500">Withdrawn on</dt>
+              <dt className="text-neutral-500">Reason</dt>
               <dd className="font-medium text-neutral-900">
-                {withdrawnOn}
+                {WITHDRAWN_REASON_LABEL[item.withdrawnReason]}
               </dd>
             </div>
           </div>
         )}
 
-              {/* Withdrawn stage */}
-      <div className="flex items-center gap-2">
-        {interviewMeta ? (
-          <interviewMeta.Icon
-            className="h-4 w-4 text-neutral-500"
-            aria-hidden="true"
-          />
-        ) : (
-          <Building2
-            className="h-4 w-4 text-neutral-500"
-            aria-hidden="true"
-          />
-        )}
-        <div className="flex flex-col">
-          <dt className="text-neutral-500">Stage</dt>
-          <dd className="font-medium text-neutral-900">
-            {interviewMeta
-              ? `Withdrawn during interview (${interviewMeta.label})`
-              : 'Withdrawn before interview'}
-          </dd>
-        </div>
-      </div>
-
-      {/* Withdrawn reason – its own field */}
-      {item.withdrawnReason && (
-        <div className="flex items-center gap-2">
-          <AlertCircle
-            className="h-4 w-4 text-neutral-500"
-            aria-hidden="true"
-          />
-          <div className="flex flex-col">
-            <dt className="text-neutral-500">Reason</dt>
-            <dd className="font-medium text-neutral-900">
-              {WITHDRAWN_REASON_LABEL[item.withdrawnReason]}
-            </dd>
-          </div>
-        </div>
-      )}
-
-
         {/* Interview date/time (if any) */}
         {interviewDate && (
           <div className="flex items-center gap-2">
-            <Clock
-              className="h-4 w-4 text-neutral-500"
-              aria-hidden="true"
-            />
+            <Clock className="h-4 w-4 text-neutral-500" aria-hidden="true" />
             <div className="flex flex-col">
               <dt className="text-neutral-500">Interview date</dt>
               <dd className="font-medium text-neutral-900">
@@ -261,15 +250,10 @@ export default function WithdrawnCard({ item, onDelete }: WithdrawnCardProps) {
         {/* Location */}
         {item.location && (
           <div className="flex items-center gap-2">
-            <MapPin
-              className="h-4 w-4 text-neutral-500"
-              aria-hidden="true"
-            />
+            <MapPin className="h-4 w-4 text-neutral-500" aria-hidden="true" />
             <div className="flex flex-col">
               <dt className="text-neutral-500">Location</dt>
-              <dd className="font-medium text-neutral-900">
-                {item.location}
-              </dd>
+              <dd className="font-medium text-neutral-900">{item.location}</dd>
             </div>
           </div>
         )}
@@ -293,18 +277,15 @@ export default function WithdrawnCard({ item, onDelete }: WithdrawnCardProps) {
         {/* Contact */}
         {(item.contactName || item.contactEmail || item.contactPhone) && (
           <div className="flex items-center gap-2">
-            <User2
-              className="h-4 w-4 text-neutral-500"
-              aria-hidden="true"
-            />
+            <User2 className="h-4 w-4 text-neutral-500" aria-hidden="true" />
             <div className="flex flex-col">
               <dt className="text-neutral-500">Contact</dt>
               <dd className="font-medium text-neutral-900">
                 {item.contactName}
                 {item.contactEmail && (
                   <>
-                    {' '}
-                    <span className="text-neutral-500">·</span>{' '}
+                    {" "}
+                    <span className="text-neutral-500">·</span>{" "}
                     <a
                       href={`mailto:${item.contactEmail}`}
                       className="underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-600"
@@ -315,8 +296,8 @@ export default function WithdrawnCard({ item, onDelete }: WithdrawnCardProps) {
                 )}
                 {item.contactPhone && (
                   <>
-                    {' '}
-                    <span className="text-neutral-500">·</span>{' '}
+                    {" "}
+                    <span className="text-neutral-500">·</span>{" "}
                     <a
                       href={`tel:${item.contactPhone}`}
                       className="underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-600"
