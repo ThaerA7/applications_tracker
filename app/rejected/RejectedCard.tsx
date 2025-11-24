@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import Image from 'next/image';
-import type { ComponentType } from 'react';
-import type { RejectionDetails } from '@/components/MoveToRejectedDialog';
+import Image from "next/image";
+import type { ComponentType } from "react";
+import type { RejectionDetails } from "@/components/MoveToRejectedDialog";
 import {
   Briefcase,
   MapPin,
@@ -15,29 +15,29 @@ import {
   Trash2,
   Pencil,
   FileText,
-} from 'lucide-react';
+} from "lucide-react";
 
-type InterviewType = 'phone' | 'video' | 'in-person';
+type InterviewType = "phone" | "video" | "in-person";
 
 const INTERVIEW_TYPE_META: Record<
   InterviewType,
   { label: string; Icon: ComponentType<any> }
 > = {
-  phone: { label: 'Phone', Icon: Phone },
-  video: { label: 'Video call', Icon: Video },
-  'in-person': { label: 'In person', Icon: MapPin },
+  phone: { label: "Phone", Icon: Phone },
+  video: { label: "Video call", Icon: Video },
+  "in-person": { label: "In person", Icon: MapPin },
 };
 
 function getInterviewMeta(
-  rejectionType: RejectionDetails['rejectionType'],
+  rejectionType: RejectionDetails["rejectionType"]
 ): { label: string; Icon: ComponentType<any> } | null {
   switch (rejectionType) {
-    case 'after-phone-screening':
+    case "after-phone-screening":
       return INTERVIEW_TYPE_META.phone;
-    case 'after-first-interview':
+    case "after-first-interview":
       return INTERVIEW_TYPE_META.video;
-    case 'after-second-interview':
-      return INTERVIEW_TYPE_META['in-person'];
+    case "after-second-interview":
+      return INTERVIEW_TYPE_META["in-person"];
     default:
       return null;
   }
@@ -45,12 +45,12 @@ function getInterviewMeta(
 
 function formatDate(iso: string) {
   const d = new Date(iso);
-  return new Intl.DateTimeFormat('en-DE', {
-    weekday: 'short',
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    timeZone: 'Europe/Berlin',
+  return new Intl.DateTimeFormat("en-DE", {
+    weekday: "short",
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    timeZone: "Europe/Berlin",
   }).format(d);
 }
 
@@ -74,14 +74,15 @@ export default function RejectedCard({
 
   return (
     <article
+      id={`rejected-card-${item.id}`}
       className={[
-        'relative group rounded-xl border border-neutral-200/80 p-5 shadow-sm transition-all',
-        'bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70',
-        'hover:-translate-y-0.5 hover:shadow-md',
-        'before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl',
-        'before:bg-gradient-to-b before:from-rose-500 before:via-pink-500 before:to-fuchsia-500',
-        'before:opacity-90',
-      ].join(' ')}
+        "relative group rounded-xl border border-neutral-200/80 p-5 shadow-sm transition-all",
+        "bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70",
+        "hover:-translate-y-0.5 hover:shadow-md",
+        "before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl",
+        "before:bg-gradient-to-b before:from-rose-500 before:via-pink-500 before:to-fuchsia-500",
+        "before:opacity-90",
+      ].join(" ")}
     >
       {/* Top-right actions: Edit + Delete stacked vertically */}
       <div className="absolute right-3 top-3 z-10 flex flex-col items-center gap-1">
@@ -148,10 +149,7 @@ export default function RejectedCard({
       {/* Details */}
       <dl className="mt-4 grid grid-cols-1 gap-3 text-sm">
         <div className="flex items-center gap-2">
-          <Calendar
-            className="h-4 w-4 text-neutral-500"
-            aria-hidden="true"
-          />
+          <Calendar className="h-4 w-4 text-neutral-500" aria-hidden="true" />
           <div className="flex flex-col">
             <dt className="text-neutral-500">Decision date</dt>
             <dd className="font-medium text-neutral-900">{date}</dd>
@@ -165,52 +163,37 @@ export default function RejectedCard({
               aria-hidden="true"
             />
           ) : (
-            <Ban
-              className="h-4 w-4 text-neutral-500"
-              aria-hidden="true"
-            />
+            <Ban className="h-4 w-4 text-neutral-500" aria-hidden="true" />
           )}
           <div className="flex flex-col">
             <dt className="text-neutral-500">Interview</dt>
             <dd className="font-medium text-neutral-900">
-              {WithType
-                ? `With interview (${WithType.label})`
-                : 'No interview'}
+              {WithType ? `With interview (${WithType.label})` : "No interview"}
             </dd>
           </div>
         </div>
 
         {item.location && (
           <div className="flex items-center gap-2">
-            <MapPin
-              className="h-4 w-4 text-neutral-500"
-              aria-hidden="true"
-            />
+            <MapPin className="h-4 w-4 text-neutral-500" aria-hidden="true" />
             <div className="flex flex-col">
               <dt className="text-neutral-500">Location</dt>
-              <dd className="font-medium text-neutral-900">
-                {item.location}
-              </dd>
+              <dd className="font-medium text-neutral-900">{item.location}</dd>
             </div>
           </div>
         )}
 
-        {(item.contactName ||
-          item.contactEmail ||
-          item.contactPhone) && (
+        {(item.contactName || item.contactEmail || item.contactPhone) && (
           <div className="flex items-center gap-2">
-            <User2
-              className="h-4 w-4 text-neutral-500"
-              aria-hidden="true"
-            />
+            <User2 className="h-4 w-4 text-neutral-500" aria-hidden="true" />
             <div className="flex flex-col">
               <dt className="text-neutral-500">Contact</dt>
               <dd className="font-medium text-neutral-900">
                 {item.contactName}
                 {item.contactEmail && (
                   <>
-                    {' '}
-                    <span className="text-neutral-500">·</span>{' '}
+                    {" "}
+                    <span className="text-neutral-500">·</span>{" "}
                     <a
                       href={`mailto:${item.contactEmail}`}
                       className="underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-600"
@@ -225,7 +208,7 @@ export default function RejectedCard({
         )}
 
         {item.notes && (
-          <div className="flex items-start gap-2">
+          <div className="flex items.start gap-2">
             <FileText
               className="mt-0.5 h-4 w-4 text-neutral-500"
               aria-hidden="true"

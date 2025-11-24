@@ -9,6 +9,7 @@ import RejectedCard, {
   type Rejection,
 } from './RejectedCard';
 import { Search, Plus, Filter } from 'lucide-react';
+import { animateCardExit } from '@/components/cardExitAnimation';
 
 const REJECTIONS_STORAGE_KEY = 'job-tracker:rejected';
 
@@ -84,28 +85,31 @@ export default function RejectedPage() {
   const handleConfirmDelete = () => {
     if (!deleteTarget) return;
     const id = deleteTarget.id;
+    const elementId = `rejected-card-${id}`;
 
-    setRejected((prev) => {
-      const next = prev.filter((i) => i.id !== id);
+    animateCardExit(elementId, 'delete', () => {
+      setRejected((prev) => {
+        const next = prev.filter((i) => i.id !== id);
 
-      if (typeof window !== 'undefined') {
-        try {
-          window.localStorage.setItem(
-            REJECTIONS_STORAGE_KEY,
-            JSON.stringify(next),
-          );
-        } catch (err) {
-          console.error(
-            'Failed to persist rejected applications after delete',
-            err,
-          );
+        if (typeof window !== 'undefined') {
+          try {
+            window.localStorage.setItem(
+              REJECTIONS_STORAGE_KEY,
+              JSON.stringify(next),
+            );
+          } catch (err) {
+            console.error(
+              'Failed to persist rejected applications after delete',
+              err,
+            );
+          }
         }
-      }
 
-      return next;
+        return next;
+      });
+
+      setDeleteTarget(null);
     });
-
-    setDeleteTarget(null);
   };
 
   const handleCancelDelete = () => {

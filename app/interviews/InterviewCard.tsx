@@ -1,7 +1,8 @@
-'use client';
+// app/interviews/InterviewCard.tsx
+"use client";
 
-import Image from 'next/image';
-import { type ComponentType } from 'react';
+import Image from "next/image";
+import { type ComponentType } from "react";
 import {
   Briefcase,
   MapPin,
@@ -16,8 +17,8 @@ import {
   Pencil,
   ArrowRight,
   FileText,
-} from 'lucide-react';
-import type { Interview } from '../../components/ScheduleInterviewDialog';
+} from "lucide-react";
+import type { Interview } from "../../components/ScheduleInterviewDialog";
 
 type InterviewCardProps = {
   item: Interview;
@@ -46,14 +47,15 @@ export default function InterviewCard({
 }: InterviewCardProps) {
   return (
     <article
+      id={`interview-card-${item.id}`}
       className={[
-        'relative group rounded-xl border border-neutral-200/80 p-5 shadow-sm transition-all',
-        'bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70',
-        'hover:-translate-y-0.5 hover:shadow-md',
-        'before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl',
-        'before:bg-gradient-to-b before:from-emerald-500 before:via-teal-500 before:to-cyan-500',
-        'before:opacity-90',
-      ].join(' ')}
+        "relative group rounded-xl border border-neutral-200/80 p-5 shadow-sm transition-all",
+        "bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70",
+        "hover:-translate-y-0.5 hover:shadow-md",
+        "before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl",
+        "before:bg-gradient-to-b before:from-emerald-500 before:via-teal-500 before:to-cyan-500",
+        "before:opacity-90",
+      ].join(" ")}
     >
       {/* Top-right actions: Edit + Move on top, Delete centered below */}
       <div className="absolute right-3 top-3 z-10 flex flex-col items-center gap-1">
@@ -139,14 +141,11 @@ export default function InterviewCard({
       <dl className="mt-4 grid grid-cols-1 gap-3 text-sm">
         {/* Date + countdown */}
         <div className="flex items-center gap-2">
-          <Calendar
-            className="h-4 w-4 text-neutral-500"
-            aria-hidden="true"
-          />
+          <Calendar className="h-4 w-4 text-neutral-500" aria-hidden="true" />
           <div className="flex flex-col">
             <dt className="text-neutral-500">Date</dt>
             <dd className="font-medium text-neutral-900 flex flex-wrap items-baseline gap-2">
-              <span>{date || '-'}</span>
+              <span>{date || "-"}</span>
               {countdownLabel && (
                 <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
                   {countdownLabel}
@@ -158,29 +157,21 @@ export default function InterviewCard({
 
         {/* Time */}
         <div className="flex items-center gap-2">
-          <Clock
-            className="h-4 w-4 text-neutral-500"
-            aria-hidden="true"
-          />
+          <Clock className="h-4 w-4 text-neutral-500" aria-hidden="true" />
           <div className="flex flex-col">
             <dt className="text-neutral-500">Time</dt>
             <dd className="font-medium text-neutral-900">
-              {time ? `${time} (Berlin)` : '-'}
+              {time ? `${time} (Berlin)` : "-"}
             </dd>
           </div>
         </div>
 
         {/* Type */}
         <div className="flex items-center gap-2">
-          <TypeIcon
-            className="h-4 w-4 text-neutral-500"
-            aria-hidden="true"
-          />
+          <TypeIcon className="h-4 w-4 text-neutral-500" aria-hidden="true" />
           <div className="flex flex-col">
             <dt className="text-neutral-500">Type</dt>
-            <dd className="font-medium text-neutral-900">
-              {typeLabel || '-'}
-            </dd>
+            <dd className="font-medium text-neutral-900">{typeLabel || "-"}</dd>
           </div>
         </div>
 
@@ -203,10 +194,7 @@ export default function InterviewCard({
         {/* Applied date + countup (only if we have appliedOn) */}
         {item.appliedOn && (
           <div className="flex items-center gap-2">
-            <Calendar
-              className="h-4 w-4 text-neutral-500"
-              aria-hidden="true"
-            />
+            <Calendar className="h-4 w-4 text-neutral-500" aria-hidden="true" />
             <div className="flex flex-col">
               <dt className="text-neutral-500">Applied</dt>
               <dd className="font-medium text-neutral-900 flex flex-wrap items-baseline gap-2">
@@ -224,15 +212,10 @@ export default function InterviewCard({
         {/* Location (optional) */}
         {item.location && (
           <div className="flex items-center gap-2">
-            <MapPin
-              className="h-4 w-4 text-neutral-500"
-              aria-hidden="true"
-            />
+            <MapPin className="h-4 w-4 text-neutral-500" aria-hidden="true" />
             <div className="flex flex-col">
               <dt className="text-neutral-500">Location</dt>
-              <dd className="font-medium text-neutral-900">
-                {item.location}
-              </dd>
+              <dd className="font-medium text-neutral-900">{item.location}</dd>
             </div>
           </div>
         )}
@@ -240,10 +223,7 @@ export default function InterviewCard({
         {/* Contact name (optional) */}
         {item.contact?.name && (
           <div className="flex items-center gap-2">
-            <User2
-              className="h-4 w-4 text-neutral-500"
-              aria-hidden="true"
-            />
+            <User2 className="h-4 w-4 text-neutral-500" aria-hidden="true" />
             <div className="flex flex-col">
               <dt className="text-neutral-500">Contact name</dt>
               <dd className="font-medium text-neutral-900">
@@ -256,10 +236,7 @@ export default function InterviewCard({
         {/* Contact email (optional) */}
         {item.contact?.email && (
           <div className="flex items-center gap-2">
-            <Mail
-              className="h-4 w-4 text-neutral-500"
-              aria-hidden="true"
-            />
+            <Mail className="h-4 w-4 text-neutral-500" aria-hidden="true" />
             <div className="flex flex-col">
               <dt className="text-neutral-500">Contact email</dt>
               <dd className="font-medium text-neutral-900">
@@ -277,10 +254,7 @@ export default function InterviewCard({
         {/* Contact phone (optional) */}
         {item.contact?.phone && (
           <div className="flex items-center gap-2">
-            <Phone
-              className="h-4 w-4 text-neutral-500"
-              aria-hidden="true"
-            />
+            <Phone className="h-4 w-4 text-neutral-500" aria-hidden="true" />
             <div className="flex flex-col">
               <dt className="text-neutral-500">Contact phone</dt>
               <dd className="font-medium text-neutral-900">
@@ -316,7 +290,7 @@ export default function InterviewCard({
             href={item.url}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1 text-sm font-medium text-neutral-900 hover:underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-700"
+            className="inline-flex items.center gap-1 text-sm font-medium text-neutral-900 hover:underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-700"
           >
             <LinkIcon className="h-4 w-4" aria-hidden="true" />
             Job posting

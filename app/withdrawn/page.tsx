@@ -1,30 +1,28 @@
 // app/withdrawn/page.tsx
-'use client';
+"use client";
 
-import { useEffect, useMemo, useState } from 'react';
-import { Search, Filter, Plus } from 'lucide-react';
+import { useEffect, useMemo, useState } from "react";
+import { Search, Filter, Plus } from "lucide-react";
 
-import WithdrawnCard, {
-  type WithdrawnRecord,
-} from './WithdrawnCard';
-import type { InterviewType } from '@/components/ScheduleInterviewDialog';
-import AddApplicationDialog, {
-  type NewApplicationForm,
-} from '@/components/AddApplicationDialog';
+import WithdrawnCard, { type WithdrawnRecord } from "./WithdrawnCard";
+import type { InterviewType } from "@/components/ScheduleInterviewDialog";
+import MoveToWithdrawnDialog, {
+  type WithdrawnDetails,
+} from "@/components/MoveToWithdrawnDialog";
 
-const WITHDRAWN_STORAGE_KEY = 'job-tracker:withdrawn';
+const WITHDRAWN_STORAGE_KEY = "job-tracker:withdrawn";
 
 const INTERVIEW_TYPE_LABEL: Record<InterviewType, string> = {
-  phone: 'Phone screening',
-  video: 'Video call',
-  'in-person': 'In person',
+  phone: "Phone screening",
+  video: "Video call",
+  "in-person": "In person",
 };
 
 export default function WithdrawnPage() {
   const [withdrawn, setWithdrawn] = useState<WithdrawnRecord[]>([]);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<WithdrawnRecord | null>(
-    null,
+    null
   );
 
   // Add dialog state
@@ -32,7 +30,7 @@ export default function WithdrawnPage() {
 
   // Load from localStorage on mount
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
 
     try {
       const raw = window.localStorage.getItem(WITHDRAWN_STORAGE_KEY);
@@ -43,8 +41,8 @@ export default function WithdrawnPage() {
       }
     } catch (err) {
       console.error(
-        'Failed to load withdrawn applications from localStorage',
-        err,
+        "Failed to load withdrawn applications from localStorage",
+        err
       );
     }
   }, []);
@@ -67,7 +65,7 @@ export default function WithdrawnPage() {
           : undefined,
       ]
         .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(q)),
+        .some((v) => String(v).toLowerCase().includes(q))
     );
   }, [query, withdrawn]);
 
@@ -82,16 +80,16 @@ export default function WithdrawnPage() {
     setWithdrawn((prev) => {
       const next = prev.filter((i) => i.id !== id);
 
-      if (typeof window !== 'undefined') {
+      if (typeof window !== "undefined") {
         try {
           window.localStorage.setItem(
             WITHDRAWN_STORAGE_KEY,
-            JSON.stringify(next),
+            JSON.stringify(next)
           );
         } catch (err) {
           console.error(
-            'Failed to persist withdrawn applications after delete',
-            err,
+            "Failed to persist withdrawn applications after delete",
+            err
           );
         }
       }
@@ -106,7 +104,7 @@ export default function WithdrawnPage() {
     setDeleteTarget(null);
   };
 
-  // --- Add withdrawn manually via AddApplicationDialog ---
+  // --- Add withdrawn manually via MoveToWithdrawnDialog ---
 
   const handleAdd = () => {
     setDialogOpen(true);
@@ -116,41 +114,43 @@ export default function WithdrawnPage() {
     setDialogOpen(false);
   };
 
-  const handleSaveWithdrawn = (data: NewApplicationForm) => {
+  const handleSaveWithdrawn = (details: WithdrawnDetails) => {
     setWithdrawn((prev) => {
       const id =
-        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        typeof crypto !== "undefined" && "randomUUID" in crypto
           ? crypto.randomUUID()
           : `${Date.now()}-${prev.length}`;
 
       const newItem: WithdrawnRecord = {
         id,
-        company: data.company,
-        role: data.role,
-        location: data.location,
-        appliedOn: data.appliedOn,
-        employmentType: data.employmentType,
-        contactName: data.contactPerson,
-        contactEmail: data.contactEmail,
-        contactPhone: data.contactPhone,
-        url: data.offerUrl,
-        logoUrl: data.logoUrl,
-        notes: data.notes,
+        company: details.company,
+        role: details.role,
+        location: details.location,
+        appliedOn: details.appliedDate,
+        withdrawnDate: details.withdrawnDate,
+        withdrawnReason: details.reason,
+        employmentType: details.employmentType,
+        contactName: details.contactName,
+        contactEmail: details.contactEmail,
+        contactPhone: details.contactPhone,
+        url: details.url,
+        logoUrl: details.logoUrl,
+        notes: details.notes,
         // interviewDate / interviewType left empty here (withdrawn before interview)
       };
 
       const next = [...prev, newItem];
 
-      if (typeof window !== 'undefined') {
+      if (typeof window !== "undefined") {
         try {
           window.localStorage.setItem(
             WITHDRAWN_STORAGE_KEY,
-            JSON.stringify(next),
+            JSON.stringify(next)
           );
         } catch (err) {
           console.error(
-            'Failed to persist withdrawn applications after create',
-            err,
+            "Failed to persist withdrawn applications after create",
+            err
           );
         }
       }
@@ -173,23 +173,17 @@ export default function WithdrawnPage() {
           />
           <div
             className={[
-              'relative z-10 w-full max-w-sm rounded-2xl border border-neutral-200/80',
-              'bg-white shadow-2xl p-5',
-            ].join(' ')}
+              "relative z-10 w-full max-w-sm rounded-2xl border border-neutral-200/80",
+              "bg-white shadow-2xl p-5",
+            ].join(" ")}
           >
             <h2 className="text-sm font-semibold text-neutral-900">
               Delete withdrawn application?
             </h2>
             <p className="mt-2 text-sm text-neutral-700">
-              This will permanently remove the withdrawn application at{' '}
-              <span className="font-medium">
-                {deleteTarget.company}
-              </span>{' '}
-              for the role{' '}
-              <span className="font-medium">
-                {deleteTarget.role}
-              </span>
-              .
+              This will permanently remove the withdrawn application at{" "}
+              <span className="font-medium">{deleteTarget.company}</span> for
+              the role <span className="font-medium">{deleteTarget.role}</span>.
             </p>
             <p className="mt-1 text-xs text-neutral-500">
               This action cannot be undone.
@@ -217,18 +211,16 @@ export default function WithdrawnPage() {
 
       <section
         className={[
-          'relative rounded-2xl border border-neutral-200/70',
-          'bg-gradient-to-br from-amber-50 via-white to-rose-50',
-          'p-8 shadow-md overflow-hidden',
-        ].join(' ')}
+          "relative rounded-2xl border border-neutral-200/70",
+          "bg-gradient-to-br from-amber-50 via-white to-rose-50",
+          "p-8 shadow-md overflow-hidden",
+        ].join(" ")}
       >
         {/* soft amber/rose blobs */}
         <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-amber-400/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-rose-400/20 blur-3xl" />
 
-        <h1 className="text-2xl font-semibold text-neutral-900">
-          Withdrawn
-        </h1>
+        <h1 className="text-2xl font-semibold text-neutral-900">Withdrawn</h1>
         <p className="mt-1 text-neutral-700">
           Applications you chose to step away from.
         </p>
@@ -248,14 +240,14 @@ export default function WithdrawnPage() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className={[
-                'h-11 w-full rounded-lg pl-10 pr-3 text-sm text-neutral-900 placeholder:text-neutral-500',
-                'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
-                'border border-neutral-200 shadow-sm',
-                'hover:bg-white focus:bg-white',
-                'ring-1 ring-transparent',
-                'focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-300',
-                'transition-shadow',
-              ].join(' ')}
+                "h-11 w-full rounded-lg pl-10 pr-3 text-sm text-neutral-900 placeholder:text-neutral-500",
+                "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
+                "border border-neutral-200 shadow-sm",
+                "hover:bg-white focus:bg-white",
+                "ring-1 ring-transparent",
+                "focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-300",
+                "transition-shadow",
+              ].join(" ")}
             />
           </div>
 
@@ -264,11 +256,11 @@ export default function WithdrawnPage() {
             type="button"
             onClick={handleAdd}
             className={[
-              'inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800',
-              'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
-              'border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50',
-              'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-300',
-            ].join(' ')}
+              "inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800",
+              "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
+              "border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50",
+              "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-300",
+            ].join(" ")}
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
             Add
@@ -278,11 +270,11 @@ export default function WithdrawnPage() {
           <button
             type="button"
             className={[
-              'inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800',
-              'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
-              'border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50',
-              'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-300',
-            ].join(' ')}
+              "inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800",
+              "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
+              "border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50",
+              "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-300",
+            ].join(" ")}
           >
             <Filter className="h-4 w-4" aria-hidden="true" />
             Filter
@@ -301,7 +293,7 @@ export default function WithdrawnPage() {
 
           {filtered.length === 0 && (
             <div className="col-span-full flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
-              <div className="mb-2 text-5xl">😌</div>
+              <div className="mb-2 text-5xl">🚪</div>
 
               {withdrawn.length === 0 ? (
                 <>
@@ -323,12 +315,13 @@ export default function WithdrawnPage() {
         </div>
       </section>
 
-      {/* Add / edit dialog for manual withdrawn creation */}
-      <AddApplicationDialog
+      {/* Manual add-to-withdrawn dialog (uses same component as move) */}
+      <MoveToWithdrawnDialog
         open={dialogOpen}
         onClose={handleDialogClose}
-        initialData={undefined}
-        onSave={handleSaveWithdrawn}
+        application={null}
+        mode="add"
+        onWithdrawnCreated={handleSaveWithdrawn}
       />
     </>
   );

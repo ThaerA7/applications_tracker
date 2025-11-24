@@ -1,5 +1,5 @@
 // app/interviews/page.tsx
-'use client';
+"use client";
 
 import {
   useEffect,
@@ -7,34 +7,30 @@ import {
   useState,
   type ComponentType,
   type ComponentProps,
-} from 'react';
-import {
-  Search,
-  Plus,
-  Filter,
-  PhoneCall,
-  Video,
-  Users,
-} from 'lucide-react';
+} from "react";
+import { Search, Plus, Filter, PhoneCall, Video, Users } from "lucide-react";
 
 import ScheduleInterviewDialog, {
   type Interview,
   type InterviewType,
-} from '../../components/ScheduleInterviewDialog';
-import MoveApplicationDialog from '../../components/MoveApplicationDialog';
-import type { RejectionDetails } from '../../components/MoveToRejectedDialog';
-import type { WithdrawnDetails } from '../../components/MoveToWithdrawnDialog';
-import InterviewCard from './InterviewCard';
+} from "../../components/ScheduleInterviewDialog";
+import MoveApplicationDialog from "../../components/MoveApplicationDialog";
+import type { RejectionDetails } from "../../components/MoveToRejectedDialog";
+import type { WithdrawnDetails } from "../../components/MoveToWithdrawnDialog";
+import InterviewCard from "./InterviewCard";
+import { animateCardExit } from "../../components/cardExitAnimation";
 
-const INTERVIEWS_STORAGE_KEY = 'job-tracker:interviews';
-const REJECTIONS_STORAGE_KEY = 'job-tracker:rejected';
-const WITHDRAWN_STORAGE_KEY = 'job-tracker:withdrawn';
+const INTERVIEWS_STORAGE_KEY = "job-tracker:interviews";
+const REJECTIONS_STORAGE_KEY = "job-tracker:rejected";
+const WITHDRAWN_STORAGE_KEY = "job-tracker:withdrawn";
 
-type ApplicationLike =
-  ComponentProps<typeof ScheduleInterviewDialog>['application'];
+type ApplicationLike = ComponentProps<
+  typeof ScheduleInterviewDialog
+>["application"];
 
-type MoveDialogApplication =
-  ComponentProps<typeof MoveApplicationDialog>['application'];
+type MoveDialogApplication = ComponentProps<
+  typeof MoveApplicationDialog
+>["application"];
 
 type RejectionRecord = RejectionDetails & { id: string };
 
@@ -54,76 +50,76 @@ type WithdrawnRecord = {
   interviewType?: InterviewType;
   notes?: string;
   withdrawnDate?: string;
-  withdrawnReason?: WithdrawnDetails['reason'];
+  withdrawnReason?: WithdrawnDetails["reason"];
 };
 
 const INTERVIEW_TYPE_META: Record<
   InterviewType,
   { label: string; Icon: ComponentType<any> }
 > = {
-  phone: { label: 'Phone screening', Icon: PhoneCall },
-  video: { label: 'Video call', Icon: Video },
-  'in-person': { label: 'In person', Icon: Users },
+  phone: { label: "Phone screening", Icon: PhoneCall },
+  video: { label: "Video call", Icon: Video },
+  "in-person": { label: "In person", Icon: Users },
 };
 
 // Initial demo data (used only if localStorage is empty)
 const DEMO_INTERVIEWS: Interview[] = [
   {
-    id: '1',
-    company: 'Acme Corp',
-    role: 'Frontend Engineer',
-    location: 'Berlin',
-    contact: { name: 'Julia Meyer', email: 'j.meyer@acme.example' },
-    date: '2025-11-12T14:00',
-    type: 'video',
-    url: 'https://jobs.example/acme/frontend',
-    logoUrl: '/logos/acme.svg',
-    employmentType: 'Full-time',
-    notes: 'Prepare system design questions and review React hooks.',
+    id: "1",
+    company: "Acme Corp",
+    role: "Frontend Engineer",
+    location: "Berlin",
+    contact: { name: "Julia Meyer", email: "j.meyer@acme.example" },
+    date: "2025-11-12T14:00",
+    type: "video",
+    url: "https://jobs.example/acme/frontend",
+    logoUrl: "/logos/acme.svg",
+    employmentType: "Full-time",
+    notes: "Prepare system design questions and review React hooks.",
   },
   {
-    id: '2',
-    company: 'Globex',
-    role: 'Mobile Developer (Flutter)',
-    location: 'Remote',
-    contact: { name: 'HR Team' },
-    date: '2025-11-15T10:30',
-    type: 'phone',
-    logoUrl: '/logos/globex.png',
-    employmentType: 'Full-time',
-    notes: 'Phone screen with HR – ask about team structure.',
+    id: "2",
+    company: "Globex",
+    role: "Mobile Developer (Flutter)",
+    location: "Remote",
+    contact: { name: "HR Team" },
+    date: "2025-11-15T10:30",
+    type: "phone",
+    logoUrl: "/logos/globex.png",
+    employmentType: "Full-time",
+    notes: "Phone screen with HR – ask about team structure.",
   },
   {
-    id: '3',
-    company: 'Initech',
-    role: 'Full-Stack Developer',
-    location: 'Munich HQ',
-    contact: { name: 'Samir', email: 'samir@initech.example' },
-    date: '2025-11-20T09:15',
-    type: 'in-person',
-    url: 'https://initech.example/careers/123',
-    logoUrl: '/logos/initech.svg',
-    employmentType: 'Full-time',
-    notes: 'Onsite: bring printed CV, prepare examples for past projects.',
+    id: "3",
+    company: "Initech",
+    role: "Full-Stack Developer",
+    location: "Munich HQ",
+    contact: { name: "Samir", email: "samir@initech.example" },
+    date: "2025-11-20T09:15",
+    type: "in-person",
+    url: "https://initech.example/careers/123",
+    logoUrl: "/logos/initech.svg",
+    employmentType: "Full-time",
+    notes: "Onsite: bring printed CV, prepare examples for past projects.",
   },
 ];
 
 // --- Pure, deterministic date formatting for display (no Date/Intl) ---
 
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 const MONTHS_SHORT = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
 ] as const;
 
 function getWeekday(year: number, month: number, day: number): string {
@@ -144,12 +140,12 @@ function getWeekday(year: number, month: number, day: number): string {
 }
 
 function formatDateTime(iso: string) {
-  if (!iso) return { date: '', time: '' };
+  if (!iso) return { date: "", time: "" };
 
-  const [datePart, timePartRaw] = iso.split('T');
-  if (!datePart) return { date: '', time: '' };
+  const [datePart, timePartRaw] = iso.split("T");
+  if (!datePart) return { date: "", time: "" };
 
-  const [yearStr, monthStr, dayStr] = datePart.split('-');
+  const [yearStr, monthStr, dayStr] = datePart.split("-");
   const year = Number(yearStr);
   const month = Number(monthStr);
   const day = Number(dayStr);
@@ -157,15 +153,17 @@ function formatDateTime(iso: string) {
   if (!year || !month || !day) {
     return {
       date: iso,
-      time: timePartRaw ? timePartRaw.slice(0, 5) : '',
+      time: timePartRaw ? timePartRaw.slice(0, 5) : "",
     };
   }
 
   const weekday = getWeekday(year, month, day);
-  const monthName =
-    MONTHS_SHORT[month - 1] ?? String(month).padStart(2, '0');
-  const date = `${weekday}, ${String(day).padStart(2, '0')} ${monthName} ${year}`;
-  const time = timePartRaw ? timePartRaw.slice(0, 5) : '';
+  const monthName = MONTHS_SHORT[month - 1] ?? String(month).padStart(2, "0");
+  const date = `${weekday}, ${String(day).padStart(
+    2,
+    "0"
+  )} ${monthName} ${year}`;
+  const time = timePartRaw ? timePartRaw.slice(0, 5) : "";
 
   return { date, time };
 }
@@ -176,9 +174,9 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 function parseToUtcMidnight(dateLike: string): number | null {
   if (!dateLike) return null;
-  const [datePart] = dateLike.split('T');
+  const [datePart] = dateLike.split("T");
   if (!datePart) return null;
-  const [yStr, mStr, dStr] = datePart.split('-');
+  const [yStr, mStr, dStr] = datePart.split("-");
   const y = Number(yStr);
   const m = Number(mStr);
   const d = Number(dStr);
@@ -188,16 +186,12 @@ function parseToUtcMidnight(dateLike: string): number | null {
 
 function getTodayUtcMidnight(nowMs: number): number {
   const now = new Date(nowMs);
-  return Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate(),
-  );
+  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
 }
 
 function getInterviewCountdownLabel(
   interviewIso: string,
-  nowMs: number | null,
+  nowMs: number | null
 ): string | null {
   if (!nowMs) return null;
   const interviewDay = parseToUtcMidnight(interviewIso);
@@ -207,15 +201,15 @@ function getInterviewCountdownLabel(
   const diffDays = Math.round((interviewDay - today) / MS_PER_DAY);
 
   if (diffDays > 1) return `in ${diffDays} days`;
-  if (diffDays === 1) return 'in 1 day';
-  if (diffDays === 0) return 'today';
-  if (diffDays === -1) return '1 day ago';
+  if (diffDays === 1) return "in 1 day";
+  if (diffDays === 0) return "today";
+  if (diffDays === -1) return "1 day ago";
   return `${Math.abs(diffDays)} days ago`;
 }
 
 function getAppliedCountupLabel(
   appliedDate: string | undefined,
-  nowMs: number | null,
+  nowMs: number | null
 ): string | null {
   if (!nowMs || !appliedDate) return null;
   const appliedDay = parseToUtcMidnight(appliedDate);
@@ -225,13 +219,13 @@ function getAppliedCountupLabel(
   const diffDays = Math.round((today - appliedDay) / MS_PER_DAY);
 
   if (diffDays < 0) return null; // future applied date, ignore
-  if (diffDays === 0) return 'today';
-  if (diffDays === 1) return '1 day ago';
+  if (diffDays === 0) return "today";
+  if (diffDays === 1) return "1 day ago";
   return `${diffDays} days ago`;
 }
 
 function makeId(existingLength: number): string {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
   }
   return `${Date.now()}-${existingLength}`;
@@ -240,22 +234,21 @@ function makeId(existingLength: number): string {
 // --- Component ---
 
 export default function InterviewsPage() {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const [items, setItems] = useState<Interview[]>(DEMO_INTERVIEWS);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogApplication, setDialogApplication] =
     useState<ApplicationLike>(null);
-  const [editingInterview, setEditingInterview] =
-    useState<Interview | null>(null);
+  const [editingInterview, setEditingInterview] = useState<Interview | null>(
+    null
+  );
 
   // For countdown / countup, only on client to avoid hydration issues
   const [now, setNow] = useState<number | null>(null);
 
   // Delete confirmation dialog target
-  const [deleteTarget, setDeleteTarget] = useState<Interview | null>(
-    null,
-  );
+  const [deleteTarget, setDeleteTarget] = useState<Interview | null>(null);
 
   // Move dialog state (reusing MoveApplicationDialog)
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
@@ -265,7 +258,7 @@ export default function InterviewsPage() {
     useState<Interview | null>(null);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
     setNow(Date.now());
     const id = window.setInterval(() => {
       setNow(Date.now());
@@ -275,7 +268,7 @@ export default function InterviewsPage() {
 
   // Load from localStorage on mount
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
 
     try {
       const raw = window.localStorage.getItem(INTERVIEWS_STORAGE_KEY);
@@ -290,11 +283,11 @@ export default function InterviewsPage() {
       // If nothing in storage, seed with demo data
       window.localStorage.setItem(
         INTERVIEWS_STORAGE_KEY,
-        JSON.stringify(DEMO_INTERVIEWS),
+        JSON.stringify(DEMO_INTERVIEWS)
       );
       setItems(DEMO_INTERVIEWS);
     } catch (err) {
-      console.error('Failed to load interviews from localStorage', err);
+      console.error("Failed to load interviews from localStorage", err);
       setItems(DEMO_INTERVIEWS);
     }
   }, []);
@@ -318,7 +311,7 @@ export default function InterviewsPage() {
       logoUrl: item.logoUrl,
       appliedOn: item.appliedOn,
       employmentType: item.employmentType,
-      notes: item.notes ?? '',
+      notes: item.notes ?? "",
     };
 
     setEditingInterview(item);
@@ -332,8 +325,8 @@ export default function InterviewsPage() {
       company: item.company,
       role: item.role,
       location: item.location,
-      status: 'Interview',
-      appliedOn: item.appliedOn ?? '',
+      status: "Interview",
+      appliedOn: item.appliedOn ?? "",
       contactPerson: item.contact?.name,
       contactEmail: item.contact?.email,
       contactPhone: item.contact?.phone,
@@ -361,23 +354,26 @@ export default function InterviewsPage() {
   const handleConfirmDelete = () => {
     if (!deleteTarget) return;
     const id = deleteTarget.id;
+    const elementId = `interview-card-${id}`;
 
-    setItems((prev) => {
-      const next = prev.filter((i) => i.id !== id);
-      if (typeof window !== 'undefined') {
-        try {
-          window.localStorage.setItem(
-            INTERVIEWS_STORAGE_KEY,
-            JSON.stringify(next),
-          );
-        } catch (err) {
-          console.error('Failed to persist interviews after delete', err);
+    animateCardExit(elementId, "delete", () => {
+      setItems((prev) => {
+        const next = prev.filter((i) => i.id !== id);
+        if (typeof window !== "undefined") {
+          try {
+            window.localStorage.setItem(
+              INTERVIEWS_STORAGE_KEY,
+              JSON.stringify(next)
+            );
+          } catch (err) {
+            console.error("Failed to persist interviews after delete", err);
+          }
         }
-      }
-      return next;
-    });
+        return next;
+      });
 
-    setDeleteTarget(null);
+      setDeleteTarget(null);
+    });
   };
 
   const handleCancelDelete = () => {
@@ -396,24 +392,21 @@ export default function InterviewsPage() {
       if (editingInterview) {
         // Replace existing interview by id
         next = prev.map((item) =>
-          item.id === editingInterview.id ? created : item,
+          item.id === editingInterview.id ? created : item
         );
       } else {
         // Add new interview
         next = [...prev, created];
       }
 
-      if (typeof window !== 'undefined') {
+      if (typeof window !== "undefined") {
         try {
           window.localStorage.setItem(
             INTERVIEWS_STORAGE_KEY,
-            JSON.stringify(next),
+            JSON.stringify(next)
           );
         } catch (err) {
-          console.error(
-            'Failed to persist interviews after create/edit',
-            err,
-          );
+          console.error("Failed to persist interviews after create/edit", err);
         }
       }
 
@@ -425,19 +418,15 @@ export default function InterviewsPage() {
     setDialogApplication(null);
   };
 
-  const handleMoveToRejectedFromInterviews = (
-    details: RejectionDetails,
-  ) => {
+  const handleMoveToRejectedFromInterviews = (details: RejectionDetails) => {
     const source = moveTargetInterview;
 
     // 1) Append to rejected storage
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       try {
         const raw = window.localStorage.getItem(REJECTIONS_STORAGE_KEY);
         const parsed = raw ? JSON.parse(raw) : [];
-        const prev: RejectionRecord[] = Array.isArray(parsed)
-          ? parsed
-          : [];
+        const prev: RejectionRecord[] = Array.isArray(parsed) ? parsed : [];
 
         const newItem: RejectionRecord = {
           id: makeId(prev.length),
@@ -447,45 +436,49 @@ export default function InterviewsPage() {
         const nextRejected = [...prev, newItem];
         window.localStorage.setItem(
           REJECTIONS_STORAGE_KEY,
-          JSON.stringify(nextRejected),
+          JSON.stringify(nextRejected)
         );
       } catch (err) {
         console.error(
-          'Failed to persist rejected application from interview',
-          err,
+          "Failed to persist rejected application from interview",
+          err
         );
       }
     }
 
-    // 2) Remove from interviews
+    // 2) Remove from interviews with animation
     if (source) {
       const sourceId = source.id;
-      setItems((prev) => {
-        const next = prev.filter((i) => i.id !== sourceId);
-        if (typeof window !== 'undefined') {
-          try {
-            window.localStorage.setItem(
-              INTERVIEWS_STORAGE_KEY,
-              JSON.stringify(next),
-            );
-          } catch (err) {
-            console.error(
-              'Failed to persist interviews after moving to rejected',
-              err,
-            );
-          }
-        }
-        return next;
-      });
-    }
+      const elementId = `interview-card-${sourceId}`;
 
-    // Close whole dialog
-    handleMoveDialogClose();
+      animateCardExit(elementId, "move", () => {
+        setItems((prev) => {
+          const next = prev.filter((i) => i.id !== sourceId);
+          if (typeof window !== "undefined") {
+            try {
+              window.localStorage.setItem(
+                INTERVIEWS_STORAGE_KEY,
+                JSON.stringify(next)
+              );
+            } catch (err) {
+              console.error(
+                "Failed to persist interviews after moving to rejected",
+                err
+              );
+            }
+          }
+          return next;
+        });
+
+        // Close whole dialog after animation + removal
+        handleMoveDialogClose();
+      });
+    } else {
+      handleMoveDialogClose();
+    }
   };
 
-  const handleMoveToWithdrawnFromInterviews = (
-    details: WithdrawnDetails,
-  ) => {
+  const handleMoveToWithdrawnFromInterviews = (details: WithdrawnDetails) => {
     const source = moveTargetInterview;
     if (!source) {
       handleMoveDialogClose();
@@ -493,13 +486,11 @@ export default function InterviewsPage() {
     }
 
     // 1) Append to withdrawn storage
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       try {
         const raw = window.localStorage.getItem(WITHDRAWN_STORAGE_KEY);
         const parsed = raw ? JSON.parse(raw) : [];
-        const prev: WithdrawnRecord[] = Array.isArray(parsed)
-          ? parsed
-          : [];
+        const prev: WithdrawnRecord[] = Array.isArray(parsed) ? parsed : [];
 
         const newItem: WithdrawnRecord = {
           id: makeId(prev.length),
@@ -507,8 +498,7 @@ export default function InterviewsPage() {
           role: details.role || source.role,
           location: details.location || source.location,
           appliedOn: details.appliedDate || source.appliedOn,
-          employmentType:
-            details.employmentType || source.employmentType,
+          employmentType: details.employmentType || source.employmentType,
           contactName: details.contactName || source.contact?.name,
           contactEmail: details.contactEmail || source.contact?.email,
           contactPhone: details.contactPhone || source.contact?.phone,
@@ -524,37 +514,41 @@ export default function InterviewsPage() {
         const nextWithdrawn = [...prev, newItem];
         window.localStorage.setItem(
           WITHDRAWN_STORAGE_KEY,
-          JSON.stringify(nextWithdrawn),
+          JSON.stringify(nextWithdrawn)
         );
       } catch (err) {
         console.error(
-          'Failed to persist withdrawn application from interview',
-          err,
+          "Failed to persist withdrawn application from interview",
+          err
         );
       }
     }
 
-    // 2) Remove from interviews
+    // 2) Remove from interviews with animation
     const sourceId = source.id;
-    setItems((prev) => {
-      const next = prev.filter((i) => i.id !== sourceId);
-      if (typeof window !== 'undefined') {
-        try {
-          window.localStorage.setItem(
-            INTERVIEWS_STORAGE_KEY,
-            JSON.stringify(next),
-          );
-        } catch (err) {
-          console.error(
-            'Failed to persist interviews after moving to withdrawn',
-            err,
-          );
-        }
-      }
-      return next;
-    });
+    const elementId = `interview-card-${sourceId}`;
 
-    handleMoveDialogClose();
+    animateCardExit(elementId, "move", () => {
+      setItems((prev) => {
+        const next = prev.filter((i) => i.id !== sourceId);
+        if (typeof window !== "undefined") {
+          try {
+            window.localStorage.setItem(
+              INTERVIEWS_STORAGE_KEY,
+              JSON.stringify(next)
+            );
+          } catch (err) {
+            console.error(
+              "Failed to persist interviews after moving to withdrawn",
+              err
+            );
+          }
+        }
+        return next;
+      });
+
+      handleMoveDialogClose();
+    });
   };
 
   const filtered = useMemo(() => {
@@ -574,17 +568,17 @@ export default function InterviewsPage() {
         i.notes,
       ]
         .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(q)),
+        .some((v) => String(v).toLowerCase().includes(q))
     );
   }, [query, items]);
 
   // Formatting + status styles for MoveApplicationDialog
   const fmtDate = (date: string) => date;
   const statusClasses = (status: string) => {
-    if (status.toLowerCase().includes('interview')) {
-      return 'bg-sky-50 text-sky-900 border border-sky-200';
+    if (status.toLowerCase().includes("interview")) {
+      return "bg-sky-50 text-sky-900 border border-sky-200";
     }
-    return 'bg-neutral-50 text-neutral-700 border border-neutral-200';
+    return "bg-neutral-50 text-neutral-700 border border-neutral-200";
   };
 
   return (
@@ -595,7 +589,7 @@ export default function InterviewsPage() {
         onClose={handleDialogClose}
         application={dialogApplication}
         onInterviewCreated={handleInterviewCreated}
-        mode={editingInterview ? 'edit' : 'add'}
+        mode={editingInterview ? "edit" : "add"}
       />
 
       {/* Move dialog (reusing MoveApplicationDialog with 2 buttons) */}
@@ -603,11 +597,9 @@ export default function InterviewsPage() {
         open={moveDialogOpen && !!moveDialogApplication}
         application={moveDialogApplication}
         onClose={handleMoveDialogClose}
-        onMoveToInterviews={
-          () => {
-            // Not used when mode="from-interviews"
-          }
-        }
+        onMoveToInterviews={() => {
+          // Not used when mode="from-interviews"
+        }}
         onMoveToRejected={handleMoveToRejectedFromInterviews}
         onMoveToWithdrawn={handleMoveToWithdrawnFromInterviews}
         fmtDate={fmtDate}
@@ -628,23 +620,17 @@ export default function InterviewsPage() {
           {/* Panel */}
           <div
             className={[
-              'relative z-10 w-full max-w-sm rounded-2xl border border-neutral-200/80',
-              'bg-white shadow-2xl p-5',
-            ].join(' ')}
+              "relative z-10 w-full max-w-sm rounded-2xl border border-neutral-200/80",
+              "bg-white shadow-2xl p-5",
+            ].join(" ")}
           >
             <h2 className="text-sm font-semibold text-neutral-900">
               Delete interview?
             </h2>
             <p className="mt-2 text-sm text-neutral-700">
-              This will permanently remove the interview with{' '}
-              <span className="font-medium">
-                {deleteTarget.company}
-              </span>{' '}
-              for the role{' '}
-              <span className="font-medium">
-                {deleteTarget.role}
-              </span>
-              .
+              This will permanently remove the interview with{" "}
+              <span className="font-medium">{deleteTarget.company}</span> for
+              the role <span className="font-medium">{deleteTarget.role}</span>.
             </p>
             <p className="mt-1 text-xs text-neutral-500">
               This action cannot be undone.
@@ -672,18 +658,16 @@ export default function InterviewsPage() {
 
       <section
         className={[
-          'relative rounded-2xl border border-neutral-200/70',
-          'bg-gradient-to-br from-emerald-50 via-white to-teal-50',
-          'p-8 shadow-md overflow-hidden',
-        ].join(' ')}
+          "relative rounded-2xl border border-neutral-200/70",
+          "bg-gradient-to-br from-emerald-50 via-white to-teal-50",
+          "p-8 shadow-md overflow-hidden",
+        ].join(" ")}
       >
         {/* soft emerald/teal blobs */}
         <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-emerald-400/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-teal-400/20 blur-3xl" />
 
-        <h1 className="text-2xl font-semibold text-neutral-900">
-          Interviews
-        </h1>
+        <h1 className="text-2xl font-semibold text-neutral-900">Interviews</h1>
         <p className="mt-1 text-neutral-700">
           Track upcoming and past interviews, outcomes, and notes.
         </p>
@@ -703,14 +687,14 @@ export default function InterviewsPage() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className={[
-                'h-11 w-full rounded-lg pl-10 pr-3 text-sm text-neutral-900 placeholder:text-neutral-500',
-                'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
-                'border border-neutral-200 shadow-sm',
-                'hover:bg-white focus:bg-white',
-                'ring-1 ring-transparent',
-                'focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-300',
-                'transition-shadow',
-              ].join(' ')}
+                "h-11 w-full rounded-lg pl-10 pr-3 text-sm text-neutral-900 placeholder:text-neutral-500",
+                "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
+                "border border-neutral-200 shadow-sm",
+                "hover:bg-white focus:bg-white",
+                "ring-1 ring-transparent",
+                "focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-300",
+                "transition-shadow",
+              ].join(" ")}
             />
           </div>
 
@@ -719,11 +703,11 @@ export default function InterviewsPage() {
             type="button"
             onClick={handleAdd}
             className={[
-              'inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800',
-              'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
-              'border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50',
-              'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-300',
-            ].join(' ')}
+              "inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800",
+              "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
+              "border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50",
+              "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-300",
+            ].join(" ")}
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
             Add
@@ -733,11 +717,11 @@ export default function InterviewsPage() {
           <button
             type="button"
             className={[
-              'inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800',
-              'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
-              'border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50',
-              'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-300',
-            ].join(' ')}
+              "inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800",
+              "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
+              "border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50",
+              "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-300",
+            ].join(" ")}
           >
             <Filter className="h-4 w-4" aria-hidden="true" />
             Filter
@@ -748,18 +732,10 @@ export default function InterviewsPage() {
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((item) => {
             const { date, time } = formatDateTime(item.date);
-            const {
-              label: typeLabel,
-              Icon: TypeIcon,
-            } = INTERVIEW_TYPE_META[item.type];
-            const countdownLabel = getInterviewCountdownLabel(
-              item.date,
-              now,
-            );
-            const appliedLabel = getAppliedCountupLabel(
-              item.appliedOn,
-              now,
-            );
+            const { label: typeLabel, Icon: TypeIcon } =
+              INTERVIEW_TYPE_META[item.type];
+            const countdownLabel = getInterviewCountdownLabel(item.date, now);
+            const appliedLabel = getAppliedCountupLabel(item.appliedOn, now);
 
             return (
               <InterviewCard
@@ -788,8 +764,8 @@ export default function InterviewsPage() {
                     You don&apos;t have any interviews yet.
                   </p>
                   <p className="mt-1 text-xs text-neutral-500">
-                    Click <span className="font-medium">Add</span> to
-                    schedule your first interview.
+                    Click <span className="font-medium">Add</span> to schedule
+                    your first interview.
                   </p>
                 </>
               ) : (

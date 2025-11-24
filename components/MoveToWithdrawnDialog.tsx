@@ -1,12 +1,8 @@
-'use client';
+// components/MoveToWithdrawnDialog.tsx
+"use client";
 
-import {
-  useEffect,
-  useState,
-  type ChangeEvent,
-  type FormEvent,
-} from 'react';
-import { createPortal } from 'react-dom';
+import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import {
   CalendarDays,
   MapPin,
@@ -18,16 +14,16 @@ import {
   Briefcase,
   Building2,
   FileText,
-} from 'lucide-react';
+} from "lucide-react";
 
 export type WithdrawnReason =
-  | 'accepted-other-offer'
-  | 'salary-not-right'
-  | 'role-not-fit'
-  | 'location-commute'
-  | 'process-too-slow'
-  | 'personal-reasons'
-  | 'other';
+  | "accepted-other-offer"
+  | "salary-not-right"
+  | "role-not-fit"
+  | "location-commute"
+  | "process-too-slow"
+  | "personal-reasons"
+  | "other";
 
 export type WithdrawnDetails = {
   company: string;
@@ -43,33 +39,39 @@ export type WithdrawnDetails = {
   url?: string;
   logoUrl?: string;
   notes?: string;
+  /** Free-text detail when 'other' is selected as the reason */
+  otherReasonText?: string;
 };
 
 type MoveToWithdrawnDialogProps = {
   open: boolean;
   onClose: () => void;
-  application?:
-    | {
-        id: string;
-        company: string;
-        role?: string;
-        location?: string;
-        status?: string;
-        appliedOn?: string;
-        employmentType?: string;
-        contactPerson?: string;
-        contactEmail?: string;
-        contactPhone?: string;
-        offerUrl?: string;
-        logoUrl?: string;
-        notes?: string;
-      }
-    | null;
+  application?: {
+    id: string;
+    company: string;
+    role?: string;
+    location?: string;
+    status?: string;
+    appliedOn?: string;
+    employmentType?: string;
+    contactPerson?: string;
+    contactEmail?: string;
+    contactPhone?: string;
+    offerUrl?: string;
+    logoUrl?: string;
+    notes?: string;
+  } | null;
   /**
    * Called when the user submits the withdrawn form.
    * You can persist this data and/or move the application to /withdrawn.
    */
   onWithdrawnCreated?: (details: WithdrawnDetails) => void;
+  /**
+   * Controls the copy & intent:
+   * - "move" (default): from Applications page ("Move to withdrawn")
+   * - "add": manual add from /withdrawn ("Add withdrawn application")
+   */
+  mode?: "move" | "add";
 };
 
 type FormState = {
@@ -85,6 +87,7 @@ type FormState = {
   contactPhone: string;
   url: string;
   notes: string;
+  otherReasonText: string;
 };
 
 const REASON_OPTIONS: {
@@ -93,79 +96,80 @@ const REASON_OPTIONS: {
   description: string;
 }[] = [
   {
-    value: 'accepted-other-offer',
-    label: 'Accepted another offer',
-    description: 'You chose another company or offer instead.',
+    value: "accepted-other-offer",
+    label: "Accepted another offer",
+    description: "You chose another company or offer instead.",
   },
   {
-    value: 'salary-not-right',
-    label: 'Salary / conditions not right',
-    description: 'Compensation, benefits, or contract terms were not a fit.',
+    value: "salary-not-right",
+    label: "Salary / conditions not right",
+    description: "Compensation, benefits, or contract terms were not a fit.",
   },
   {
-    value: 'role-not-fit',
-    label: 'Role not a good fit',
-    description: 'Responsibilities, seniority, or tech stack didn’t match.',
+    value: "role-not-fit",
+    label: "Role not a good fit",
+    description: "Responsibilities, seniority, or tech stack didn’t match.",
   },
   {
-    value: 'location-commute',
-    label: 'Location / commute issues',
-    description: 'On-site requirements, relocation, or commute problems.',
+    value: "location-commute",
+    label: "Location / commute issues",
+    description: "On-site requirements, relocation, or commute problems.",
   },
   {
-    value: 'process-too-slow',
-    label: 'Process took too long',
-    description: 'Hiring process or communication was too slow.',
+    value: "process-too-slow",
+    label: "Process took too long",
+    description: "Hiring process or communication was too slow.",
   },
   {
-    value: 'personal-reasons',
-    label: 'Personal reasons',
-    description: 'Health, family, timing, or other personal factors.',
+    value: "personal-reasons",
+    label: "Personal reasons",
+    description: "Health, family, timing, or other personal factors.",
   },
   {
-    value: 'other',
-    label: 'Other',
-    description: 'Any other reason not listed above.',
+    value: "other",
+    label: "Other",
+    description: "Any other reason not listed above.",
   },
 ];
 
 const EMPLOYMENT_OPTIONS: string[] = [
-  'Full-time',
-  'Part-time',
-  'Internship',
-  'Working student',
-  'Contract',
-  'Temporary',
-  'Mini-job',
-  'Freelance',
+  "Full-time",
+  "Part-time",
+  "Internship",
+  "Working student",
+  "Contract",
+  "Temporary",
+  "Mini-job",
+  "Freelance",
 ];
 
 function todayISO() {
   const now = new Date();
   const yyyy = now.getFullYear();
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  const dd = String(now.getDate()).padStart(2, '0');
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
 }
 
 function makeInitialForm(
-  app: MoveToWithdrawnDialogProps['application'],
+  app: MoveToWithdrawnDialogProps["application"]
 ): FormState {
   const today = todayISO();
 
   return {
-    company: app?.company ?? '',
-    role: app?.role ?? '',
+    company: app?.company ?? "",
+    role: app?.role ?? "",
     appliedDate: app?.appliedOn ?? today,
     withdrawnDate: today,
-    reason: 'personal-reasons',
-    employmentType: app?.employmentType ?? '',
-    location: app?.location ?? '',
-    contactName: app?.contactPerson ?? '',
-    contactEmail: app?.contactEmail ?? '',
-    contactPhone: app?.contactPhone ?? '',
-    url: app?.offerUrl ?? '',
-    notes: app?.notes ?? '',
+    reason: "personal-reasons",
+    employmentType: app?.employmentType ?? "",
+    location: app?.location ?? "",
+    contactName: app?.contactPerson ?? "",
+    contactEmail: app?.contactEmail ?? "",
+    contactPhone: app?.contactPhone ?? "",
+    url: app?.offerUrl ?? "",
+    notes: app?.notes ?? "",
+    otherReasonText: "",
   };
 }
 
@@ -174,8 +178,23 @@ export default function MoveToWithdrawnDialog({
   onClose,
   application = null,
   onWithdrawnCreated,
+  mode = "move",
 }: MoveToWithdrawnDialogProps) {
   const [form, setForm] = useState<FormState>(() => makeInitialForm(null));
+
+  const isAddMode = mode === "add";
+
+  const title = isAddMode
+    ? "Add withdrawn application"
+    : "Move to the withdrawn section";
+
+  const description = isAddMode
+    ? "Record an application you previously withdrew from."
+    : "Capture when and why you decided to withdraw.";
+
+  const submitLabel = isAddMode
+    ? "Save withdrawn application"
+    : "Save & move to withdrawn";
 
   useEffect(() => {
     if (!open) return;
@@ -183,7 +202,7 @@ export default function MoveToWithdrawnDialog({
   }, [open, application]);
 
   if (!open) return null;
-  if (typeof document === 'undefined') return null;
+  if (typeof document === "undefined") return null;
 
   const handleChange =
     (field: keyof FormState) =>
@@ -191,7 +210,7 @@ export default function MoveToWithdrawnDialog({
       e:
         | ChangeEvent<HTMLInputElement>
         | ChangeEvent<HTMLSelectElement>
-        | ChangeEvent<HTMLTextAreaElement>,
+        | ChangeEvent<HTMLTextAreaElement>
     ) => {
       const { value } = e.target;
       setForm((prev) => ({ ...prev, [field]: value }));
@@ -216,6 +235,7 @@ export default function MoveToWithdrawnDialog({
     const contactPhone = form.contactPhone.trim();
     const url = form.url.trim();
     const notes = form.notes.trim();
+    const otherReasonText = form.otherReasonText.trim();
 
     const details: WithdrawnDetails = {
       company,
@@ -233,6 +253,9 @@ export default function MoveToWithdrawnDialog({
     if (contactPhone) details.contactPhone = contactPhone;
     if (url) details.url = url;
     if (notes) details.notes = notes;
+    if (form.reason === "other" && otherReasonText) {
+      details.otherReasonText = otherReasonText;
+    }
 
     onWithdrawnCreated?.(details);
     onClose();
@@ -258,9 +281,9 @@ export default function MoveToWithdrawnDialog({
         aria-modal="true"
         aria-labelledby="move-to-withdrawn-title"
         className={[
-          'relative z-10 w-full max-w-xl overflow-hidden rounded-2xl border border-neutral-200/80',
-          'bg-gradient-to-br from-amber-50 via-white to-emerald-50 shadow-2xl',
-        ].join(' ')}
+          "relative z-10 w-full max-w-xl overflow-hidden rounded-2xl border border-neutral-200/80",
+          "bg-gradient-to-br from-amber-50 via-white to-emerald-50 shadow-2xl",
+        ].join(" ")}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -276,11 +299,9 @@ export default function MoveToWithdrawnDialog({
                 id="move-to-withdrawn-title"
                 className="text-sm font-semibold text-neutral-900"
               >
-                Move to the withdrawn section
+                {title}
               </h2>
-              <p className="mt-0.5 text-xs text-neutral-600">
-                Capture when and why you decided to withdraw.
-              </p>
+              <p className="mt-0.5 text-xs text-neutral-600">{description}</p>
             </div>
           </div>
 
@@ -313,7 +334,7 @@ export default function MoveToWithdrawnDialog({
                   </div>
                   <div>
                     <div className="font-medium text-neutral-900">
-                      {application.role || 'Role not set'}
+                      {application.role || "Role not set"}
                     </div>
                     <div className="text-neutral-600">
                       {application.company}
@@ -367,7 +388,7 @@ export default function MoveToWithdrawnDialog({
                 <input
                   type="text"
                   value={form.company}
-                  onChange={handleChange('company')}
+                  onChange={handleChange("company")}
                   placeholder="Acme GmbH"
                   className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-300"
                   required
@@ -382,7 +403,7 @@ export default function MoveToWithdrawnDialog({
               <input
                 type="text"
                 value={form.role}
-                onChange={handleChange('role')}
+                onChange={handleChange("role")}
                 placeholder="Frontend Engineer"
                 className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 px-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-300"
                 required
@@ -390,9 +411,7 @@ export default function MoveToWithdrawnDialog({
             </label>
 
             <label className="space-y-1 text-sm">
-              <span className="font-medium text-neutral-800">
-                Applied date
-              </span>
+              <span className="font-medium text-neutral-800">Applied date</span>
               <div className="relative">
                 <CalendarDays
                   className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
@@ -401,7 +420,7 @@ export default function MoveToWithdrawnDialog({
                 <input
                   type="date"
                   value={form.appliedDate}
-                  onChange={handleChange('appliedDate')}
+                  onChange={handleChange("appliedDate")}
                   className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-300"
                 />
               </div>
@@ -419,7 +438,7 @@ export default function MoveToWithdrawnDialog({
                 <input
                   type="date"
                   value={form.withdrawnDate}
-                  onChange={handleChange('withdrawnDate')}
+                  onChange={handleChange("withdrawnDate")}
                   className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-300"
                   required
                 />
@@ -437,7 +456,7 @@ export default function MoveToWithdrawnDialog({
                 />
                 <select
                   value={form.employmentType}
-                  onChange={handleChange('employmentType')}
+                  onChange={handleChange("employmentType")}
                   className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-300"
                 >
                   <option value="">Select type…</option>
@@ -460,7 +479,7 @@ export default function MoveToWithdrawnDialog({
                 <input
                   type="text"
                   value={form.location}
-                  onChange={handleChange('location')}
+                  onChange={handleChange("location")}
                   placeholder="Berlin HQ / Remote"
                   className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-300"
                 />
@@ -481,7 +500,7 @@ export default function MoveToWithdrawnDialog({
               <div className="relative">
                 <select
                   value={form.reason}
-                  onChange={handleChange('reason')}
+                  onChange={handleChange("reason")}
                   className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 px-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-300"
                   required
                 >
@@ -498,12 +517,25 @@ export default function MoveToWithdrawnDialog({
               </p>
             </label>
 
+            {form.reason === "other" && (
+              <label className="space-y-1 text-sm">
+                <span className="font-medium text-neutral-800">
+                  Describe (optional)
+                </span>
+                <input
+                  type="text"
+                  value={form.otherReasonText}
+                  onChange={handleChange("otherReasonText")}
+                  placeholder="E.g. interview timing, company culture, specific concerns…"
+                  className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 px-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-300"
+                />
+              </label>
+            )}
+
             <div className="rounded-lg border border-dashed border-neutral-200 bg-neutral-50/70 p-3 text-xs text-neutral-700">
-              <span className="font-medium text-neutral-800">
-                Tip:{' '}
-              </span>
-              Use this later to spot patterns (for example, always
-              withdrawing for salary reasons or location).
+              <span className="font-medium text-neutral-800">Tip: </span>
+              Use this later to spot patterns (for example, always withdrawing
+              for salary reasons or location).
             </div>
           </div>
 
@@ -526,7 +558,7 @@ export default function MoveToWithdrawnDialog({
                   <input
                     type="text"
                     value={form.contactName}
-                    onChange={handleChange('contactName')}
+                    onChange={handleChange("contactName")}
                     placeholder="Julia Meyer"
                     className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-300"
                   />
@@ -545,7 +577,7 @@ export default function MoveToWithdrawnDialog({
                   <input
                     type="email"
                     value={form.contactEmail}
-                    onChange={handleChange('contactEmail')}
+                    onChange={handleChange("contactEmail")}
                     placeholder="recruiting@example.com"
                     className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-300"
                   />
@@ -564,7 +596,7 @@ export default function MoveToWithdrawnDialog({
                   <input
                     type="tel"
                     value={form.contactPhone}
-                    onChange={handleChange('contactPhone')}
+                    onChange={handleChange("contactPhone")}
                     placeholder="+49 30 123456"
                     className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-300"
                   />
@@ -583,7 +615,7 @@ export default function MoveToWithdrawnDialog({
                   <input
                     type="url"
                     value={form.url}
-                    onChange={handleChange('url')}
+                    onChange={handleChange("url")}
                     placeholder="https://jobs.example.com/frontend-engineer"
                     className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-300"
                   />
@@ -591,9 +623,7 @@ export default function MoveToWithdrawnDialog({
               </label>
 
               <label className="space-y-1 text-sm md:col-span-2">
-                <span className="font-medium text-neutral-800">
-                  Notes
-                </span>
+                <span className="font-medium text-neutral-800">Notes</span>
                 <div className="relative">
                   <FileText
                     className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-neutral-400"
@@ -601,15 +631,15 @@ export default function MoveToWithdrawnDialog({
                   />
                   <textarea
                     value={form.notes}
-                    onChange={handleChange('notes')}
+                    onChange={handleChange("notes")}
                     rows={3}
-                    placeholder="Optional. For example: what they offered, what felt off, or anything you want to remember."
+                    placeholder="Anything you want to remember about what they offered, what felt off, or anything you want to remember."
                     className="w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 pt-2 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-300"
                   />
                 </div>
                 <p className="mt-1 text-[11px] text-neutral-500">
-                  Great for later reflection and spotting patterns across
-                  your applications.
+                  Great for later reflection and spotting patterns across your
+                  applications.
                 </p>
               </label>
             </div>
@@ -628,14 +658,14 @@ export default function MoveToWithdrawnDialog({
               type="submit"
               disabled={!canSubmit}
               className={[
-                'inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium shadow-sm',
+                "inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium shadow-sm",
                 canSubmit
-                  ? 'bg-amber-600 text-white hover:bg-amber-500 focus-visible:ring-amber-300'
-                  : 'cursor-not-allowed bg-neutral-200 text-neutral-500',
-                'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
-              ].join(' ')}
+                  ? "bg-amber-600 text-white hover:bg-amber-500 focus-visible:ring-amber-300"
+                  : "cursor-not-allowed bg-neutral-200 text-neutral-500",
+                "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+              ].join(" ")}
             >
-              Save &amp; move to withdrawn
+              {submitLabel}
             </button>
           </div>
         </form>
