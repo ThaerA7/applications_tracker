@@ -144,8 +144,9 @@ export default function WithdrawnCard({ item, onDelete }: WithdrawnCardProps) {
             />
           </div>
         ) : (
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-neutral-50 text-sm font-semibold text-neutral-700">
-            {item.company.slice(0, 1).toUpperCase()}
+          // Fallback: show an icon when no logo is provided
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-neutral-50 text-neutral-600">
+            <Briefcase className="h-5 w-5" aria-hidden="true" />
           </div>
         )}
 
