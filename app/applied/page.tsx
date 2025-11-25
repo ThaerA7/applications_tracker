@@ -292,8 +292,8 @@ export default function AppliedPage() {
   <Image
     src="/icons/checklist.png" // same icon you used for Applied
     alt=""
-    width={36}
-    height={36}
+    width={37}
+    height={37}
     aria-hidden="true"
     className="shrink-0"
   />
