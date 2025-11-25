@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import {
-  Calendar as CalendarIcon,
   ChevronLeft,
   ChevronRight,
   Briefcase,
@@ -11,6 +11,8 @@ import {
   Undo2,
   Sparkles,
 } from "lucide-react";
+
+
 
 type ActivityKind =
   | "applied"
@@ -376,13 +378,19 @@ export default function CalendarPage() {
         {/* Header */}
         <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="flex items-center gap-2 text-2xl font-semibold text-neutral-900">
-              <CalendarIcon
-                className="h-6 w-6 text-indigo-500"
+            <div className="flex items-center gap-1">
+              <Image
+                src="/icons/calendar.png" // your calendar icon
+                alt=""
+                width={37}
+                height={37}
                 aria-hidden="true"
+                className="shrink-0 -mt-1"
               />
-              Activity calendar
-            </h1>
+              <h1 className="text-2xl font-semibold text-neutral-900">
+                Activity calendar
+              </h1>
+            </div>
             <p className="mt-1 text-sm text-neutral-700">
               A big overview of when you applied, interviewed, got rejected or
               withdrew.
