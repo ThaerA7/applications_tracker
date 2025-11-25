@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   useEffect,
@@ -7,9 +7,9 @@ import {
   useRef,
   useState,
   ReactNode,
-} from "react";
-import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
+} from 'react';
+import { createPortal } from 'react-dom';
+import { useRouter } from 'next/navigation';
 import {
   Search,
   MapPin,
@@ -31,8 +31,8 @@ import {
   Briefcase,
   Ruler,
   CalendarDays,
-  Heart,
-} from "lucide-react";
+  Star,
+} from 'lucide-react';
 
 type JobRow = {
   title: string;
@@ -47,14 +47,14 @@ type JobRow = {
 };
 
 // shared wishlist key + type
-const WISHLIST_STORAGE_KEY = "job-wishlist-v1";
+const WISHLIST_STORAGE_KEY = 'job-wishlist-v1';
 
 type WishlistItem = {
   id: string;
   company: string;
   role?: string;
   location?: string;
-  priority?: "Dream" | "High" | "Medium" | "Low";
+  priority?: 'Dream' | 'High' | 'Medium' | 'Low';
   logoUrl?: string;
   website?: string;
   notes?: string;
@@ -66,8 +66,8 @@ type WishlistItem = {
 function normalize(s: string) {
   return s
     .toLowerCase()
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "");
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '');
 }
 function rankedSuggestions(source: string[], q: string, max = 8) {
   const nq = normalize(q.trim());
@@ -90,45 +90,59 @@ function pickJobIcon(title: string) {
   const t = title.toLowerCase();
   if (
     /(dev|software|frontend|backend|full[- ]?stack|react|angular|vue|typescript|engineer|programm)/.test(
-      t
+      t,
     )
   )
     return Code2;
   if (
     /(data|ml|ai|cloud|devops|kubernetes|docker|sysadmin|sre|platform|server)/.test(
-      t
+      t,
     )
   )
     return Server;
-  if (/(nurse|pfleg|arzt|ärzt|medizin|therap|apothe|health|care)/.test(t))
+  if (
+    /(nurse|pfleg|arzt|ärzt|medizin|therap|apothe|health|care)/.test(t)
+  )
     return Stethoscope;
   if (
     /(mechanic|mechatron|installat|wartung|techniker|elektrik|elektron|service)/.test(
-      t
+      t,
     )
   )
     return Wrench;
-  if (/(bau|construction|maurer|zimmerer|tiefbau|hochbau|handwerk)/.test(t))
+  if (
+    /(bau|construction|maurer|zimmerer|tiefbau|hochbau|handwerk)/.test(
+      t,
+    )
+  )
     return Hammer;
-  if (/(driver|fahrer|logistik|liefer|kurier|transport|truck|flotte)/.test(t))
+  if (
+    /(driver|fahrer|logistik|liefer|kurier|transport|truck|flotte)/.test(t)
+  )
     return Truck;
   if (
-    /(koch|küche|chef|gastronomie|restaurant|küchenhilfe|kitchen|cook)/.test(t)
+    /(koch|küche|chef|gastronomie|restaurant|küchenhilfe|kitchen|cook)/.test(
+      t,
+    )
   )
     return ChefHat;
   if (/(design|ux|ui|grafik|creative|art|produktdesign)/.test(t))
     return Palette;
   if (
     /(teacher|ausbilder|trainer|schule|bildung|dozent|professor|ausbildung)/.test(
-      t
+      t,
     )
   )
     return GraduationCap;
   if (
-    /(factory|produktion|fertigung|betrieb|warehouse|lager|industrie)/.test(t)
+    /(factory|produktion|fertigung|betrieb|warehouse|lager|industrie)/.test(
+      t,
+    )
   )
     return Building2;
-  if (/(sales|vertrieb|account|customer|kunden|business|consult)/.test(t))
+  if (
+    /(sales|vertrieb|account|customer|kunden|business|consult)/.test(t)
+  )
     return Briefcase;
   return Briefcase;
 }
@@ -137,49 +151,53 @@ function pickJobIcon(title: string) {
 /** UI → BA `angebotsart` */
 function angebotToParam(v: string): string | null {
   switch (v) {
-    case "werkstudent":
-    case "minijob":
-    case "teilzeit":
-    case "vollzeit":
-      return "1"; // Arbeit
-    case "freelance":
-      return "2"; // Selbstständigkeit
-    case "ausbildung":
-    case "duales-studium":
-      return "4"; // Ausbildung/Duales Studium
-    case "praktikum":
-    case "trainee":
-      return "34"; // Praktikum/Trainee
+    case 'werkstudent':
+    case 'minijob':
+    case 'teilzeit':
+    case 'vollzeit':
+      return '1'; // Arbeit
+    case 'freelance':
+      return '2'; // Selbstständigkeit
+    case 'ausbildung':
+    case 'duales-studium':
+      return '4'; // Ausbildung/Duales Studium
+    case 'praktikum':
+    case 'trainee':
+      return '34'; // Praktikum/Trainee
     default:
       return null;
   }
 }
 /** UI → BA `arbeitszeit` (lowercase codes) */
-function arbeitszeitParam(v: string): "vz" | "tz" | "mj" | null {
-  if (v === "vollzeit") return "vz";
-  if (v === "teilzeit") return "tz";
-  if (v === "minijob") return "mj";
+function arbeitszeitParam(
+  v: string,
+): 'vz' | 'tz' | 'mj' | null {
+  if (v === 'vollzeit') return 'vz';
+  if (v === 'teilzeit') return 'tz';
+  if (v === 'minijob') return 'mj';
   return null;
 }
 
 const OFFER_OPTIONS = [
-  { value: "", label: "Any offer" },
-  { value: "ausbildung", label: "Ausbildung" },
-  { value: "duales-studium", label: "Duales Studium" },
-  { value: "praktikum", label: "Praktikum" },
-  { value: "trainee", label: "Trainee" },
-  { value: "werkstudent", label: "Werkstudent" },
-  { value: "minijob", label: "Minijob" },
-  { value: "teilzeit", label: "Teilzeit Job" },
-  { value: "vollzeit", label: "Vollzeit Job" },
-  { value: "freelance", label: "Selbstständigkeit" },
+  { value: '', label: 'Any offer' },
+  { value: 'ausbildung', label: 'Ausbildung' },
+  { value: 'duales-studium', label: 'Duales Studium' },
+  { value: 'praktikum', label: 'Praktikum' },
+  { value: 'trainee', label: 'Trainee' },
+  { value: 'werkstudent', label: 'Werkstudent' },
+  { value: 'minijob', label: 'Minijob' },
+  { value: 'teilzeit', label: 'Teilzeit Job' },
+  { value: 'vollzeit', label: 'Vollzeit Job' },
+  { value: 'freelance', label: 'Selbstständigkeit' },
 ] as const;
 
 const OFFER_LABEL = (v?: string) => {
-  if (!v) return "";
+  if (!v) return '';
   const found = OFFER_OPTIONS.find((o) => o.value === v);
   if (found) return found.label;
-  return v.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  return v
+    .replace(/-/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 };
 
 function formatStartDate(raw?: string | null): string | null {
@@ -188,7 +206,7 @@ function formatStartDate(raw?: string | null): string | null {
   if (!trimmed) return null;
 
   if (/ab\s*sofort/i.test(trimmed)) {
-    return "ab sofort";
+    return 'ab sofort';
   }
 
   const d = new Date(trimmed);
@@ -202,13 +220,13 @@ function formatStartDate(raw?: string | null): string | null {
   start.setHours(0, 0, 0, 0);
 
   if (start <= today) {
-    return "ab sofort";
+    return 'ab sofort';
   }
 
-  return start.toLocaleDateString("de-DE", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
+  return start.toLocaleDateString('de-DE', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
   });
 }
 
@@ -239,24 +257,24 @@ function FloatingMenu({
   onClose,
   width = 224,
   children,
-  align = "right",
+  align = 'right',
 }: {
   anchorRef: React.RefObject<HTMLElement>;
   open: boolean;
   onClose: () => void;
   width?: number;
   children: ReactNode;
-  align?: "left" | "right";
+  align?: 'left' | 'right';
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{
     left: number;
     top: number;
-    visibility: "hidden" | "visible";
+    visibility: 'hidden' | 'visible';
   }>({
     left: -9999,
     top: -9999,
-    visibility: "hidden",
+    visibility: 'hidden',
   });
 
   const calc = () => {
@@ -264,17 +282,17 @@ function FloatingMenu({
     const menu = menuRef.current;
     if (!anchor || !menu) return;
     const a = anchor.getBoundingClientRect();
-    let left = align === "right" ? a.right - width : a.left;
+    let left = align === 'right' ? a.right - width : a.left;
     left = Math.max(8, Math.min(left, window.innerWidth - width - 8));
     let top = a.bottom + 6;
-    menu.style.position = "fixed";
+    menu.style.position = 'fixed';
     menu.style.left = `${left}px`;
     menu.style.top = `${top}px`;
     menu.style.width = `${width}px`;
     const m = menu.getBoundingClientRect();
     if (m.bottom > window.innerHeight - 8)
       top = Math.max(8, a.top - m.height - 6);
-    setPos({ left, top, visibility: "visible" });
+    setPos({ left, top, visibility: 'visible' });
   };
 
   useLayoutEffect(() => {
@@ -282,16 +300,16 @@ function FloatingMenu({
     calc();
     const onScroll = () => calc();
     const onResize = () => calc();
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("scroll", onScroll, {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('scroll', onScroll, {
       passive: true,
     });
-    window.addEventListener("resize", onResize);
-    window.addEventListener("keydown", onKey);
+    window.addEventListener('resize', onResize);
+    window.addEventListener('keydown', onKey);
     return () => {
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onResize);
-      window.removeEventListener("keydown", onKey);
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('keydown', onKey);
     };
   }, [open, onClose]);
 
@@ -303,8 +321,8 @@ function FloatingMenu({
       if (anchorRef.current?.contains(t as Node)) return;
       onClose();
     }
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
   }, [open, onClose]);
 
   if (!open) return null;
@@ -314,7 +332,7 @@ function FloatingMenu({
       ref={menuRef}
       role="menu"
       style={{
-        position: "fixed",
+        position: 'fixed',
         left: pos.left,
         top: pos.top,
         width,
@@ -341,14 +359,14 @@ function AutoCompleteInput({
   name,
   submitOnPick = true,
   rightAddon,
-  rightPadClass = "pr-3",
+  rightPadClass = 'pr-3',
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
   ariaLabel: string;
   suggestionsSource: string[];
-  icon: "search" | "location";
+  icon: 'search' | 'location';
   name?: string;
   submitOnPick?: boolean;
   rightAddon?: ReactNode;
@@ -362,7 +380,7 @@ function AutoCompleteInput({
   const dropdownRef = useRef<HTMLUListElement>(null);
   const items = useMemo(
     () => rankedSuggestions(suggestionsSource, value, 8),
-    [suggestionsSource, value]
+    [suggestionsSource, value],
   );
 
   useEffect(() => setMounted(true), []);
@@ -376,8 +394,8 @@ function AutoCompleteInput({
       if (!rootRef.current) return;
       if (!rootRef.current.contains(e.target as Node)) setOpen(false);
     }
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
   }, []);
 
   const [pos, setPos] = useState<{
@@ -398,22 +416,31 @@ function AutoCompleteInput({
       const spaceAbove = rect.top;
       if (spaceBelow < approxHeight && spaceAbove > spaceBelow)
         top =
-          rect.top + window.scrollY - Math.min(approxHeight, spaceAbove) - 8;
+          rect.top +
+          window.scrollY -
+          Math.min(approxHeight, spaceAbove) -
+          8;
       setPos({ left, top, width: rect.width });
     };
     update();
-    const events = ["scroll", "resize"];
+    const events = ['scroll', 'resize'];
     events.forEach((ev) =>
-      window.addEventListener(ev, update, { passive: true } as any)
+      window.addEventListener(
+        ev,
+        update,
+        { passive: true } as any,
+      ),
     );
     const raf = requestAnimationFrame(update);
     return () => {
-      events.forEach((ev) => window.removeEventListener(ev, update));
+      events.forEach((ev) =>
+        window.removeEventListener(ev, update),
+      );
       cancelAnimationFrame(raf);
     };
   }, [open, value]);
 
-  const Icon = icon === "search" ? Search : MapPin;
+  const Icon = icon === 'search' ? Search : MapPin;
 
   const dropdownEl = (
     <ul
@@ -421,7 +448,7 @@ function AutoCompleteInput({
       role="listbox"
       className="z-[9999] max-h-80 overflow-auto rounded-lg border border-neutral-200 bg-white/95 backdrop-blur shadow-lg"
       style={{
-        position: "absolute",
+        position: 'absolute',
         left: pos?.left ?? -9999,
         top: pos?.top ?? -9999,
         width: pos?.width ?? undefined,
@@ -436,12 +463,15 @@ function AutoCompleteInput({
             e.preventDefault();
             onChange(s);
             setOpen(false);
-            if (submitOnPick) inputRef.current?.form?.requestSubmit();
+            if (submitOnPick)
+              inputRef.current?.form?.requestSubmit();
           }}
           className={[
-            "cursor-pointer px-3 py-2 text-sm",
-            idx === active ? "bg-neutral-100" : "hover:bg-neutral-50",
-          ].join(" ")}
+            'cursor-pointer px-3 py-2 text-sm',
+            idx === active
+              ? 'bg-neutral-100'
+              : 'hover:bg-neutral-50',
+          ].join(' ')}
         >
           {s}
         </li>
@@ -453,9 +483,11 @@ function AutoCompleteInput({
     <div ref={rootRef} className="relative">
       <div
         className={[
-          "pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 z-10",
-          icon === "search" ? "text-amber-600" : "text-orange-600",
-        ].join(" ")}
+          'pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 z-10',
+          icon === 'search'
+            ? 'text-amber-600'
+            : 'text-orange-600',
+        ].join(' ')}
         aria-hidden="true"
       >
         <Icon className="h-5 w-5" />
@@ -470,51 +502,59 @@ function AutoCompleteInput({
         aria-autocomplete="list"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        onFocus={() => items.length > 0 && setOpen(true)}
+        onFocus={() =>
+          items.length > 0 && setOpen(true)
+        }
         onKeyDown={(e) => {
           if (open) {
-            if (e.key === "ArrowDown") {
+            if (e.key === 'ArrowDown') {
               e.preventDefault();
-              setActive((i) => Math.min(i + 1, items.length - 1));
+              setActive((i) =>
+                Math.min(i + 1, items.length - 1),
+              );
               return;
             }
-            if (e.key === "ArrowUp") {
+            if (e.key === 'ArrowUp') {
               e.preventDefault();
               setActive((i) => Math.max(i - 1, 0));
               return;
             }
-            if (e.key === "Enter" && items[active]) {
+            if (e.key === 'Enter' && items[active]) {
               e.preventDefault();
               onChange(items[active]);
               setOpen(false);
               (
-                inputRef.current?.form as HTMLFormElement | undefined
+                inputRef.current
+                  ?.form as HTMLFormElement | undefined
               )?.requestSubmit();
               return;
             }
-            if (e.key === "Escape") {
+            if (e.key === 'Escape') {
               setOpen(false);
               return;
             }
           }
-          if (e.key === "Enter")
+          if (e.key === 'Enter')
             (
-              inputRef.current?.form as HTMLFormElement | undefined
+              inputRef.current
+                ?.form as HTMLFormElement | undefined
             )?.requestSubmit();
         }}
         className={[
-          "h-11 w-full rounded-lg text-sm text-neutral-900 placeholder:text-neutral-500",
-          "bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/80",
-          "border border-neutral-200 ring-1 ring-transparent",
-          "focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-300",
-          "transition-shadow",
-          "pl-10",
+          'h-11 w-full rounded-lg text-sm text-neutral-900 placeholder:text-neutral-500',
+          'bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/80',
+          'border border-neutral-200 ring-1 ring-transparent',
+          'focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-300',
+          'transition-shadow',
+          'pl-10',
           rightPadClass,
-        ].join(" ")}
+        ].join(' ')}
       />
       {rightAddon && (
         <div className="absolute right-1 top-1/2 z-20 -translate-y-1/2">
-          <div className="flex items-center gap-1">{rightAddon}</div>
+          <div className="flex items-center gap-1">
+            {rightAddon}
+          </div>
         </div>
       )}
       {open &&
@@ -537,24 +577,24 @@ function useDebounced<T>(value: T, delay = 200) {
 }
 
 const DISTANCES = [
-  "5",
-  "10",
-  "15",
-  "20",
-  "25",
-  "30",
-  "35",
-  "40",
-  "45",
-  "50",
+  '5',
+  '10',
+  '15',
+  '20',
+  '25',
+  '30',
+  '35',
+  '40',
+  '45',
+  '50',
 ] as const;
 const PAGE_SIZE = 20;
 
 function jobIdentity(j: JobRow): string {
   const base = j.hashId?.trim() || j.detailUrl?.trim();
   if (base) return base;
-  return `${j.employer ?? ""}|${j.title ?? ""}|${
-    j.location ?? ""
+  return `${j.employer ?? ''}|${j.title ?? ''}|${
+    j.location ?? ''
   }`.toLowerCase();
 }
 function dedupeJobs(list: JobRow[]): JobRow[] {
@@ -577,12 +617,15 @@ function sortStartValue(raw?: string | null): number {
   if (/ab\s*sofort/i.test(trimmed)) return 0;
 
   const d = new Date(trimmed);
-  if (Number.isNaN(d.getTime())) return Number.POSITIVE_INFINITY;
+  if (Number.isNaN(d.getTime()))
+    return Number.POSITIVE_INFINITY;
 
   return d.getTime();
 }
 
-function sortJobsByDistanceThenStart(list: JobRow[]): JobRow[] {
+function sortJobsByDistanceThenStart(
+  list: JobRow[],
+): JobRow[] {
   return [...list].sort((a, b) => {
     const ad = Number.isFinite(a.distanceKm as number)
       ? (a.distanceKm as number)
@@ -603,23 +646,27 @@ function sortJobsByDistanceThenStart(list: JobRow[]): JobRow[] {
 
 export default function OffersPage() {
   const router = useRouter();
-  const [q, setQ] = useState("");
-  const [wo, setWo] = useState("");
-  const [distance, setDistance] = useState<string>(""); // km
-  const [offerType, setOfferType] = useState<string>(""); // UI filter only
+  const [q, setQ] = useState('');
+  const [wo, setWo] = useState('');
+  const [distance, setDistance] = useState<string>(''); // km
+  const [offerType, setOfferType] = useState<string>(''); // UI filter only
   const [offerOpen, setOfferOpen] = useState(false);
   const [distanceOpen, setDistanceOpen] = useState(false);
   const offerBtnRef = useRef<HTMLButtonElement | null>(null);
-  const distanceBtnRef = useRef<HTMLButtonElement | null>(null);
+  const distanceBtnRef =
+    useRef<HTMLButtonElement | null>(null);
 
   const [loadingFirst, setLoadingFirst] = useState(false);
   const [pageLoading, setPageLoading] = useState(false);
   const [allResults, setAllResults] = useState<JobRow[]>([]);
   const [page, setPage] = useState(1);
-  const [totalAvailable, setTotalAvailable] = useState<number | null>(null);
+  const [totalAvailable, setTotalAvailable] =
+    useState<number | null>(null);
 
-  // wishlist ids (for filled hearts)
-  const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
+  // wishlist ids (for filled stars)
+  const [wishlistIds, setWishlistIds] = useState<Set<string>>(
+    new Set(),
+  );
 
   const [kwSugs, setKwSugs] = useState<string[]>([]);
   const [locSugs, setLocSugs] = useState<string[]>([]);
@@ -628,21 +675,23 @@ export default function OffersPage() {
 
   // load wishlist ids on mount
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === 'undefined') return;
     try {
-      const raw = window.localStorage.getItem(WISHLIST_STORAGE_KEY);
+      const raw = window.localStorage.getItem(
+        WISHLIST_STORAGE_KEY,
+      );
       if (!raw) return;
       const parsed = JSON.parse(raw) as WishlistItem[] | null;
       if (!Array.isArray(parsed)) return;
       const ids = new Set<string>();
       for (const item of parsed) {
-        if (item && typeof item.id === "string") {
+        if (item && typeof item.id === 'string') {
           ids.add(item.id);
         }
       }
       setWishlistIds(ids);
     } catch (err) {
-      console.error("Failed to load wishlist", err);
+      console.error('Failed to load wishlist', err);
     }
   }, []);
 
@@ -650,7 +699,7 @@ export default function OffersPage() {
   function toggleWishlist(job: JobRow) {
     const id = jobIdentity(job);
     if (!id) return;
-    if (typeof window === "undefined") return;
+    if (typeof window === 'undefined') return;
 
     setWishlistIds((prev) => {
       const next = new Set(prev);
@@ -663,7 +712,9 @@ export default function OffersPage() {
     });
 
     try {
-      const raw = window.localStorage.getItem(WISHLIST_STORAGE_KEY);
+      const raw = window.localStorage.getItem(
+        WISHLIST_STORAGE_KEY,
+      );
       let items: WishlistItem[] = [];
       if (raw) {
         const parsed = JSON.parse(raw);
@@ -680,21 +731,25 @@ export default function OffersPage() {
         // add (include startDate + offerType now)
         const entry: WishlistItem = {
           id,
-          company: job.employer || "Unbekannter Arbeitgeber",
+          company:
+            job.employer || 'Unbekannter Arbeitgeber',
           role: job.title,
           location: job.location,
           logoUrl: job.logoUrl,
           website: job.detailUrl,
-          notes: "",
+          notes: '',
           startDate: job.startDate ?? null,
           offerType: job.offerType,
         };
         items.push(entry);
       }
 
-      window.localStorage.setItem(WISHLIST_STORAGE_KEY, JSON.stringify(items));
+      window.localStorage.setItem(
+        WISHLIST_STORAGE_KEY,
+        JSON.stringify(items),
+      );
     } catch (err) {
-      console.error("Failed to update wishlist", err);
+      console.error('Failed to update wishlist', err);
     }
   }
 
@@ -708,11 +763,19 @@ export default function OffersPage() {
     (async () => {
       try {
         const r = await fetch(
-          `/api/suggest/keywords?q=${encodeURIComponent(dq)}`,
-          { signal: ac.signal, cache: "no-store" }
+          `/api/suggest/keywords?q=${encodeURIComponent(
+            dq,
+          )}`,
+          { signal: ac.signal, cache: 'no-store' },
         );
-        const j = await r.json().catch(() => ({ suggestions: [] }));
-        setKwSugs(Array.isArray(j?.suggestions) ? j.suggestions : []);
+        const j = await r
+          .json()
+          .catch(() => ({ suggestions: [] }));
+        setKwSugs(
+          Array.isArray(j?.suggestions)
+            ? j.suggestions
+            : [],
+        );
       } catch {
         if (!ac.signal.aborted) setKwSugs([]);
       }
@@ -729,11 +792,19 @@ export default function OffersPage() {
     (async () => {
       try {
         const r = await fetch(
-          `/api/suggest/locations?q=${encodeURIComponent(dwo)}`,
-          { signal: ac.signal, cache: "no-store" }
+          `/api/suggest/locations?q=${encodeURIComponent(
+            dwo,
+          )}`,
+          { signal: ac.signal, cache: 'no-store' },
         );
-        const j = await r.json().catch(() => ({ suggestions: [] }));
-        setLocSugs(Array.isArray(j?.suggestions) ? j.suggestions : []);
+        const j = await r
+          .json()
+          .catch(() => ({ suggestions: [] }));
+        setLocSugs(
+          Array.isArray(j?.suggestions)
+            ? j.suggestions
+            : [],
+        );
       } catch {
         if (!ac.signal.aborted) setLocSugs([]);
       }
@@ -743,11 +814,12 @@ export default function OffersPage() {
 
   function pushUrl(nextUiPage = 1) {
     const params = new URLSearchParams();
-    if (q.trim()) params.set("q", q.trim());
-    if (wo.trim()) params.set("wo", wo.trim());
-    if (distance && wo.trim()) params.set("umkreis", distance);
-    if (offerType) params.set("typ", offerType);
-    params.set("page", String(nextUiPage));
+    if (q.trim()) params.set('q', q.trim());
+    if (wo.trim()) params.set('wo', wo.trim());
+    if (distance && wo.trim())
+      params.set('umkreis', distance);
+    if (offerType) params.set('typ', offerType);
+    params.set('page', String(nextUiPage));
     router.replace(`?${params.toString()}`, {
       scroll: false,
     });
@@ -755,33 +827,38 @@ export default function OffersPage() {
 
   async function fetchPage(pageNum: number) {
     const params = new URLSearchParams();
-    if (q.trim()) params.set("q", q.trim());
+    if (q.trim()) params.set('q', q.trim());
     if (wo.trim()) {
-      params.set("wo", wo.trim());
-      if (distance) params.set("umkreis", distance);
+      params.set('wo', wo.trim());
+      if (distance) params.set('umkreis', distance);
     }
 
     const angebot = angebotToParam(offerType);
-    if (angebot) params.set("angebotsart", angebot);
+    if (angebot) params.set('angebotsart', angebot);
 
     const az = arbeitszeitParam(offerType);
-    if (az) params.set("arbeitszeit", az);
+    if (az) params.set('arbeitszeit', az);
 
     const oneBased = Math.max(1, pageNum);
-    params.set("size", String(PAGE_SIZE));
-    params.set("page", String(oneBased));
+    params.set('size', String(PAGE_SIZE));
+    params.set('page', String(oneBased));
 
-    const res = await fetch(`/api/jobs?${params.toString()}`, {
-      cache: "no-store",
-    });
+    const res = await fetch(
+      `/api/jobs?${params.toString()}`,
+      { cache: 'no-store' },
+    );
     const json = await res.json();
     if (!res.ok) {
       throw new Error(
-        `${json?.error || `HTTP ${res.status}`}\n${json?.forwardedUrl || ""}`
+        `${json?.error || `HTTP ${res.status}`}\n${
+          json?.forwardedUrl || ''
+        }`,
       );
     }
 
-    const batch: JobRow[] = Array.isArray(json?.results) ? json.results : [];
+    const batch: JobRow[] = Array.isArray(json?.results)
+      ? json.results
+      : [];
     const parsedTotal = extractTotal(json);
     return { batch, total: parsedTotal };
   }
@@ -794,35 +871,51 @@ export default function OffersPage() {
     setPage(1);
     pushUrl(1);
     try {
-      const { batch: firstBatch, total } = await fetchPage(1);
+      const { batch: firstBatch, total } =
+        await fetchPage(1);
       setAllResults(dedupeJobs(firstBatch));
       setTotalAvailable(
-        (typeof total === "number" ? total : null) ??
-          (firstBatch.length < PAGE_SIZE ? firstBatch.length : null)
+        (typeof total === 'number' ? total : null) ??
+          (firstBatch.length < PAGE_SIZE
+            ? firstBatch.length
+            : null),
       );
     } finally {
       setLoadingFirst(false);
     }
   }
 
-  const totalKnown = Number.isFinite(totalAvailable as number);
-  const knownTotal = totalKnown ? (totalAvailable as number) : null;
+  const totalKnown = Number.isFinite(
+    totalAvailable as number,
+  );
+  const knownTotal = totalKnown
+    ? (totalAvailable as number)
+    : null;
   const effectiveTotal = knownTotal ?? allResults.length;
   const totalPages =
     (knownTotal != null
-      ? Math.max(1, Math.ceil(knownTotal / PAGE_SIZE))
-      : Math.max(1, Math.ceil(Math.max(1, effectiveTotal) / PAGE_SIZE))) || 1;
+      ? Math.max(
+          1,
+          Math.ceil(knownTotal / PAGE_SIZE),
+        )
+      : Math.max(
+          1,
+          Math.ceil(Math.max(1, effectiveTotal) / PAGE_SIZE),
+        )) || 1;
 
   const canPrev = page > 1;
   const canNext = totalKnown ? page < totalPages : true;
 
   const sortedResults = useMemo(
     () => sortJobsByDistanceThenStart(allResults),
-    [allResults]
+    [allResults],
   );
 
   const startIndex = (page - 1) * PAGE_SIZE;
-  const displayed = sortedResults.slice(startIndex, startIndex + PAGE_SIZE);
+  const displayed = sortedResults.slice(
+    startIndex,
+    startIndex + PAGE_SIZE,
+  );
 
   const handlePrev = () => {
     if (!canPrev) return;
@@ -849,7 +942,9 @@ export default function OffersPage() {
         setTotalAvailable(total as number);
       if (!batch || batch.length === 0) {
         setTotalAvailable((prev) =>
-          Number.isFinite(prev as number) ? (prev as number) : prevLen
+          Number.isFinite(prev as number)
+            ? (prev as number)
+            : prevLen,
         );
         return;
       }
@@ -862,7 +957,8 @@ export default function OffersPage() {
         return;
       }
       if (batch.length < PAGE_SIZE && !totalKnown) {
-        const computed = (next - 1) * PAGE_SIZE + batch.length;
+        const computed =
+          (next - 1) * PAGE_SIZE + batch.length;
         setTotalAvailable(computed);
       }
 
@@ -883,24 +979,26 @@ export default function OffersPage() {
 
   const submitDisabled = !q.trim() || !wo.trim();
   const btnInside = [
-    "h-8 px-2 rounded-md border text-xs font-medium shadow-sm",
-    "border-neutral-200 bg-white/90 hover:bg-white text-neutral-800",
-    "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-0 focus-visible:ring-amber-300",
-    "backdrop-blur",
-  ].join(" ");
+    'h-8 px-2 rounded-md border text-xs font-medium shadow-sm',
+    'border-neutral-200 bg-white/90 hover:bg-white text-neutral-800',
+    'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-0 focus-visible:ring-amber-300',
+    'backdrop-blur',
+  ].join(' ');
 
   return (
     <section
       className={[
-        "relative rounded-2xl border border-neutral-200/70",
-        "bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50",
-        "p-8 shadow-md overflow-hidden",
-      ].join(" ")}
+        'relative rounded-2xl border border-neutral-200/70',
+        'bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50',
+        'p-8 shadow-md overflow-hidden',
+      ].join(' ')}
     >
       <div className="pointer-events-none absolute -top-20 -right-24 h-72 w-72 rounded-full bg-amber-400/20 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-24 -left-28 h-80 w-80 rounded-full bg-orange-400/20 blur-3xl" />
 
-      <h1 className="text-2xl font-semibold text-neutral-900">Offers</h1>
+      <h1 className="text-2xl font-semibold text-neutral-900">
+        Offers
+      </h1>
       <p className="mt-1 text-neutral-700">
         Search offers from Bundesagentur für Arbeit.
       </p>
@@ -927,7 +1025,9 @@ export default function OffersPage() {
                 <button
                   ref={offerBtnRef}
                   type="button"
-                  onClick={() => setOfferOpen((v) => !v)}
+                  onClick={() =>
+                    setOfferOpen((v) => !v)
+                  }
                   aria-haspopup="menu"
                   aria-expanded={offerOpen}
                   className={btnInside}
@@ -935,7 +1035,9 @@ export default function OffersPage() {
                 >
                   <span className="inline-flex items-center gap-1">
                     <Tag className="h-3.5 w-3.5" />
-                    {offerType ? OFFER_LABEL(offerType) : "Offer"}
+                    {offerType
+                      ? OFFER_LABEL(offerType)
+                      : 'Offer'}
                   </span>
                 </button>
                 <FloatingMenu
@@ -949,18 +1051,18 @@ export default function OffersPage() {
                 >
                   {OFFER_OPTIONS.map((o) => (
                     <button
-                      key={o.value || "any"}
+                      key={o.value || 'any'}
                       type="button"
                       onClick={() => {
                         setOfferType(o.value);
                         setOfferOpen(false);
                       }}
                       className={[
-                        "block w-full px-3 py-2 text-left text-sm hover:bg-neutral-50",
+                        'block w-full px-3 py-2 text-left text-sm hover:bg-neutral-50',
                         o.value === offerType
-                          ? "bg-amber-50 text-amber-800"
-                          : "text-neutral-800",
-                      ].join(" ")}
+                          ? 'bg-amber-50 text-amber-800'
+                          : 'text-neutral-800',
+                      ].join(' ')}
                       role="menuitem"
                     >
                       {o.label}
@@ -987,7 +1089,9 @@ export default function OffersPage() {
                 <button
                   ref={distanceBtnRef}
                   type="button"
-                  onClick={() => setDistanceOpen((v) => !v)}
+                  onClick={() =>
+                    setDistanceOpen((v) => !v)
+                  }
                   aria-haspopup="menu"
                   aria-expanded={distanceOpen}
                   className={btnInside}
@@ -995,7 +1099,7 @@ export default function OffersPage() {
                 >
                   <span className="inline-flex items-center gap-1">
                     <Ruler className="h-3.5 w-3.5" />
-                    {distance ? `${distance} km` : "Distance"}
+                    {distance ? `${distance} km` : 'Distance'}
                   </span>
                 </button>
                 <FloatingMenu
@@ -1010,13 +1114,13 @@ export default function OffersPage() {
                   <button
                     type="button"
                     className={[
-                      "block w-full px-3 py-2 text-left text-sm hover:bg-neutral-50",
-                      distance === ""
-                        ? "bg-amber-50 text-amber-800"
-                        : "text-neutral-800",
-                    ].join(" ")}
+                      'block w-full px-3 py-2 text-left text-sm hover:bg-neutral-50',
+                      distance === ''
+                        ? 'bg-amber-50 text-amber-800'
+                        : 'text-neutral-800',
+                    ].join(' ')}
                     onClick={() => {
-                      setDistance("");
+                      setDistance('');
                       setDistanceOpen(false);
                     }}
                     role="menuitem"
@@ -1032,11 +1136,11 @@ export default function OffersPage() {
                         setDistanceOpen(false);
                       }}
                       className={[
-                        "block w-full px-3 py-2 text-left text-sm hover:bg-neutral-50",
+                        'block w-full px-3 py-2 text-left text-sm hover:bg-neutral-50',
                         distance === d
-                          ? "bg-amber-50 text-amber-800"
-                          : "text-neutral-800",
-                      ].join(" ")}
+                          ? 'bg-amber-50 text-amber-800'
+                          : 'text-neutral-800',
+                      ].join(' ')}
                       role="menuitem"
                     >
                       {d} km
@@ -1053,15 +1157,19 @@ export default function OffersPage() {
             type="submit"
             disabled={submitDisabled}
             className={[
-              "inline-flex items-center justify-center gap-1.5 rounded-lg border px-4 text-sm font-medium shadow-sm",
+              'inline-flex items-center justify-center gap-1.5 rounded-lg border px-4 text-sm font-medium shadow-sm',
               submitDisabled
-                ? "cursor-not-allowed border-neutral-200 bg-neutral-100 text-neutral-400"
-                : "border-neutral-200 bg-amber-500/90 text-white hover:bg-amber-500",
-              "h-11 w-full sm:w-auto",
-              "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-300",
-            ].join(" ")}
+                ? 'cursor-not-allowed border-neutral-200 bg-neutral-100 text-neutral-400'
+                : 'border-neutral-200 bg-amber-500/90 text-white hover:bg-amber-500',
+              'h-11 w-full sm:w-auto',
+              'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-300',
+            ].join(' ')}
             aria-label="Search"
-            title={submitDisabled ? "Fill title and location" : "Search"}
+            title={
+              submitDisabled
+                ? 'Fill title and location'
+                : 'Search'
+            }
           >
             <Search className="h-4 w-4" /> Search
           </button>
@@ -1070,47 +1178,62 @@ export default function OffersPage() {
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-3 text-sm text-neutral-700">
         <div>
-          {Number.isFinite(totalAvailable as number) ? (
+          {Number.isFinite(
+            totalAvailable as number,
+          ) ? (
             <>
-              {(totalAvailable as number).toLocaleString()} offers found
+              {(totalAvailable as number).toLocaleString()}{' '}
+              offers found
               {q || wo ? (
                 <>
-                  {" "}
-                  for {q || ""}
-                  {q && wo ? " in " : ""}
-                  {wo || ""}
+                  {' '}
+                  for {q || ''}
+                  {q && wo ? ' in ' : ''}
+                  {wo || ''}
                 </>
               ) : null}
             </>
           ) : allResults.length > 0 ? (
             `${allResults.length.toLocaleString()} offers loaded`
           ) : (
-            ""
+            ''
           )}
         </div>
         <div className="flex items-center gap-2">
           <span>
-            Page <span className="font-semibold">{page}</span> /{" "}
-            <span className="font-semibold">{totalPages}</span>
-            {!Number.isFinite(totalAvailable as number) && allResults.length > 0
-              ? " +"
-              : ""}
+            Page <span className="font-semibold">{page}</span>{' '}
+            /{' '}
+            <span className="font-semibold">
+              {totalPages}
+            </span>
+            {!Number.isFinite(
+              totalAvailable as number,
+            ) && allResults.length > 0
+              ? ' +'
+              : ''}
           </span>
         </div>
       </div>
 
-      <div className="mt-2 grid grid-cols-1 gap-3" aria-live="polite">
+      <div
+        className="mt-2 grid grid-cols-1 gap-3"
+        aria-live="polite"
+      >
         {loadingFirst && (
           <div className="flex items-center gap-2 rounded-xl border border-neutral-200 bg-white/80 p-4">
             <Loader2 className="h-4 w-4 animate-spin" />
-            <span className="text-sm text-neutral-700">Loading…</span>
+            <span className="text-sm text-neutral-700">
+              Loading…
+            </span>
           </div>
         )}
 
         {!loadingFirst && pageLoading && (
           <div className="flex items-center gap-2 rounded-xl border border-neutral-200 bg-white/80 p-4">
             <Loader2 className="h-4 w-4 animate-spin" />
-            <span className="text-sm text-neutral-700">Loading this page…</span>
+            <span className="text-sm text-neutral-700">
+              Loading this page…
+            </span>
           </div>
         )}
 
@@ -1121,27 +1244,32 @@ export default function OffersPage() {
             const idx = startIndex + i + 1;
             const identity = jobIdentity(job);
             const key = identity || `idx-${idx}`;
-            const isWishlisted = identity ? wishlistIds.has(identity) : false;
+            const isWishlisted = identity
+              ? wishlistIds.has(identity)
+              : false;
 
             const apiOfferLabel =
-              job.offerType && job.offerType.trim().length > 0
+              job.offerType &&
+              job.offerType.trim().length > 0
                 ? job.offerType.trim()
-                : "Job";
+                : 'Job';
 
-            const startLabel = formatStartDate(job.startDate ?? null);
+            const startLabel = formatStartDate(
+              job.startDate ?? null,
+            );
 
             return (
               <article
                 key={key}
                 className={[
-                  "relative grid grid-cols-[64px,1fr,auto] items-center gap-4",
-                  "rounded-xl border border-neutral-200/80",
-                  "bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70",
-                  "p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md",
-                  "before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl",
-                  "before:bg-gradient-to-b before:from-amber-500 before:via-orange-500 before:to-yellow-500",
-                  "before:opacity-90",
-                ].join(" ")}
+                  'relative grid grid-cols-[64px,1fr,auto] items-center gap-4',
+                  'rounded-xl border border-neutral-200/80',
+                  'bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70',
+                  'p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md',
+                  'before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl',
+                  'before:bg-gradient-to-b before:from-amber-500 before:via-orange-500 before:to-yellow-500',
+                  'before:opacity-90',
+                ].join(' ')}
               >
                 <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-neutral-200 bg-white ring-1 ring-white/60">
                   <div className="absolute left-1 top-1 rounded-md bg-neutral-900/80 px-1.5 py-0.5 text-[11px] font-semibold text-white">
@@ -1156,11 +1284,14 @@ export default function OffersPage() {
                   {job.logoUrl && (
                     <img
                       src={job.logoUrl}
-                      alt={`${job.employer || "Company"} logo`}
+                      alt={`${
+                        job.employer || 'Company'
+                      } logo`}
                       className="absolute inset-0 h-full w-full object-contain p-1.5"
                       onError={(e) => {
-                        (e.currentTarget as HTMLImageElement).style.display =
-                          "none";
+                        (
+                          e.currentTarget as HTMLImageElement
+                        ).style.display = 'none';
                       }}
                       loading="lazy"
                     />
@@ -1170,7 +1301,8 @@ export default function OffersPage() {
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <h2 className="text-base font-semibold text-neutral-900">
-                      {job.employer || "Unbekannter Arbeitgeber"}
+                      {job.employer ||
+                        'Unbekannter Arbeitgeber'}
                     </h2>
                     <span className="text-sm text-neutral-600">
                       • {job.title}
@@ -1187,13 +1319,18 @@ export default function OffersPage() {
                       </span>
                     )}
 
-                    {Number.isFinite(job.distanceKm as number) && (
+                    {Number.isFinite(
+                      job.distanceKm as number,
+                    ) && (
                       <span className="inline-flex items-center gap-1.5">
                         <MapPin
                           className="h-4 w-4 text-neutral-400"
                           aria-hidden="true"
                         />
-                        {Math.round(job.distanceKm as number)} km
+                        {Math.round(
+                          job.distanceKm as number,
+                        )}{' '}
+                        km
                       </span>
                     )}
 
@@ -1208,35 +1345,40 @@ export default function OffersPage() {
                     )}
 
                     <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-800">
-                      <Tag className="h-3.5 w-3.5" aria-hidden="true" />
+                      <Tag
+                        className="h-3.5 w-3.5"
+                        aria-hidden="true"
+                      />
                       {apiOfferLabel}
                     </span>
                   </div>
                 </div>
 
-                {/* right side: heart LEFT of View button */}
+                {/* right side: STAR + VIEW button */}
                 <div className="flex items-center justify-end gap-2">
                   <button
                     type="button"
                     onClick={() => toggleWishlist(job)}
                     aria-pressed={isWishlisted}
                     aria-label={
-                      isWishlisted ? "Remove from wishlist" : "Add to wishlist"
+                      isWishlisted
+                        ? 'Remove from wishlist'
+                        : 'Add to wishlist'
                     }
                     className={[
-                      "inline-flex items-center justify-center",
-                      "text-sm rounded-full",
-                      "bg-transparent border-0 p-0",
-                      "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-300",
-                    ].join(" ")}
+                      'inline-flex items-center justify-center',
+                      'text-sm rounded-full',
+                      'bg-transparent border-0 p-0',
+                      'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-300',
+                    ].join(' ')}
                   >
-                    <Heart
+                    <Star
                       className={[
-                        "h-5 w-5 transition-colors",
+                        'h-5 w-5 transition-colors',
                         isWishlisted
-                          ? "text-rose-500 fill-rose-500"
-                          : "text-neutral-300 hover:text-rose-300 hover:fill-rose-300",
-                      ].join(" ")}
+                          ? 'text-amber-500 fill-amber-400'
+                          : 'text-neutral-300 hover:text-amber-400 hover:fill-amber-200',
+                      ].join(' ')}
                       aria-hidden="true"
                     />
                   </button>
@@ -1248,7 +1390,10 @@ export default function OffersPage() {
                       rel="noreferrer"
                       className="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white/70 px-2.5 py-1.5 text-sm text-neutral-800 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-300"
                     >
-                      <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                      <ExternalLink
+                        className="h-4 w-4"
+                        aria-hidden="true"
+                      />
                       View
                     </a>
                   )}
@@ -1257,60 +1402,73 @@ export default function OffersPage() {
             );
           })}
 
-        {!loadingFirst && !pageLoading && allResults.length === 0 && (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
-            <div className="mb-2 text-5xl">🔎</div>
-            <p className="text-sm text-neutral-700">
-              Enter a title and a location, then hit{" "}
-              <span className="font-semibold">Search</span>.
-            </p>
-          </div>
-        )}
-
-        {!loadingFirst && (allResults.length > 0 || page > 1) && (
-          <div className="mt-3 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={handlePrev}
-              disabled={!canPrev}
-              aria-label="Previous page"
-              className={[
-                "inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium shadow-sm",
-                canPrev
-                  ? "border-neutral-200 bg-white/80 text-neutral-800 hover:bg-white"
-                  : "cursor-not-allowed border-neutral-200 bg-neutral-100 text-neutral-400",
-                "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-300",
-              ].join(" ")}
-            >
-              <ChevronLeft className="h-4 w-4" /> Previous
-            </button>
-
-            <div className="text-sm text-neutral-700">
-              Page <span className="font-semibold">{page}</span> /{" "}
-              <span className="font-semibold">{totalPages}</span>
-              {!Number.isFinite(totalAvailable as number) &&
-              allResults.length > 0
-                ? " +"
-                : ""}
+        {!loadingFirst &&
+          !pageLoading &&
+          allResults.length === 0 && (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
+              <div className="mb-2 text-5xl">🔎</div>
+              <p className="text-sm text-neutral-700">
+                Enter a title and a location, then hit{' '}
+                <span className="font-semibold">
+                  Search
+                </span>
+                .
+              </p>
             </div>
+          )}
 
-            <button
-              type="button"
-              onClick={handleNext}
-              disabled={!canNext}
-              aria-label="Next page"
-              className={[
-                "inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium shadow-sm",
-                canNext
-                  ? "border-neutral-200 bg-white/80 text-neutral-800 hover:bg-white"
-                  : "cursor-not-allowed border-neutral-200 bg-neutral-100 text-neutral-400",
-                "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-300",
-              ].join(" ")}
-            >
-              Next <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-        )}
+        {!loadingFirst &&
+          (allResults.length > 0 || page > 1) && (
+            <div className="mt-3 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={handlePrev}
+                disabled={!canPrev}
+                aria-label="Previous page"
+                className={[
+                  'inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium shadow-sm',
+                  canPrev
+                    ? 'border-neutral-200 bg-white/80 text-neutral-800 hover:bg-white'
+                    : 'cursor-not-allowed border-neutral-200 bg-neutral-100 text-neutral-400',
+                  'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-300',
+                ].join(' ')}
+              >
+                <ChevronLeft className="h-4 w-4" /> Previous
+              </button>
+
+              <div className="text-sm text-neutral-700">
+                Page{' '}
+                <span className="font-semibold">
+                  {page}
+                </span>{' '}
+                /{' '}
+                <span className="font-semibold">
+                  {totalPages}
+                </span>
+                {!Number.isFinite(
+                  totalAvailable as number,
+                ) && allResults.length > 0
+                  ? ' +'
+                  : ''}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleNext}
+                disabled={!canNext}
+                aria-label="Next page"
+                className={[
+                  'inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium shadow-sm',
+                  canNext
+                    ? 'border-neutral-200 bg-white/80 text-neutral-800 hover:bg-white'
+                    : 'cursor-not-allowed border-neutral-200 bg-neutral-100 text-neutral-400',
+                  'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-300',
+                ].join(' ')}
+              >
+                Next <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
       </div>
     </section>
   );

@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from 'react';
 import {
   Search,
   Plus,
@@ -19,19 +19,18 @@ import {
   ChefHat,
   Building2,
   Briefcase,
-  Heart,
   CalendarDays,
   Tag,
-} from "lucide-react";
+} from 'lucide-react';
 
-const WISHLIST_STORAGE_KEY = "job-wishlist-v1";
+const WISHLIST_STORAGE_KEY = 'job-wishlist-v1';
 
 type WishlistItem = {
   id: string;
   company: string;
   role?: string;
   location?: string;
-  priority?: "Dream" | "High" | "Medium" | "Low";
+  priority?: 'Dream' | 'High' | 'Medium' | 'Low';
   logoUrl?: string;
   website?: string;
   notes?: string;
@@ -39,18 +38,18 @@ type WishlistItem = {
   offerType?: string;
 };
 
-function priorityClasses(priority?: WishlistItem["priority"]) {
+function priorityClasses(priority?: WishlistItem['priority']) {
   switch (priority) {
-    case "Dream":
-      return "bg-violet-100 text-violet-800 ring-1 ring-inset ring-violet-300";
-    case "High":
-      return "bg-amber-100 text-amber-800 ring-1 ring-inset ring-amber-300";
-    case "Medium":
-      return "bg-sky-100 text-sky-800 ring-1 ring-inset ring-sky-300";
-    case "Low":
-      return "bg-slate-100 text-slate-800 ring-1 ring-inset ring-slate-300";
+    case 'Dream':
+      return 'bg-violet-100 text-violet-800 ring-1 ring-inset ring-violet-300';
+    case 'High':
+      return 'bg-amber-100 text-amber-800 ring-1 ring-inset ring-amber-300';
+    case 'Medium':
+      return 'bg-sky-100 text-sky-800 ring-1 ring-inset ring-sky-300';
+    case 'Low':
+      return 'bg-slate-100 text-slate-800 ring-1 ring-inset ring-slate-300';
     default:
-      return "bg-neutral-100 text-neutral-800 ring-1 ring-inset ring-neutral-300";
+      return 'bg-neutral-100 text-neutral-800 ring-1 ring-inset ring-neutral-300';
   }
 }
 
@@ -58,45 +57,59 @@ function pickJobIcon(title: string) {
   const t = title.toLowerCase();
   if (
     /(dev|software|frontend|backend|full[- ]?stack|react|angular|vue|typescript|engineer|programm)/.test(
-      t
+      t,
     )
   )
     return Code2;
   if (
     /(data|ml|ai|cloud|devops|kubernetes|docker|sysadmin|sre|platform|server)/.test(
-      t
+      t,
     )
   )
     return Server;
-  if (/(nurse|pfleg|arzt|ärzt|medizin|therap|apothe|health|care)/.test(t))
+  if (
+    /(nurse|pfleg|arzt|ärzt|medizin|therap|apothe|health|care)/.test(t)
+  )
     return Stethoscope;
   if (
     /(mechanic|mechatron|installat|wartung|techniker|elektrik|elektron|service)/.test(
-      t
+      t,
     )
   )
     return Wrench;
-  if (/(bau|construction|maurer|zimmerer|tiefbau|hochbau|handwerk)/.test(t))
+  if (
+    /(bau|construction|maurer|zimmerer|tiefbau|hochbau|handwerk)/.test(
+      t,
+    )
+  )
     return Hammer;
-  if (/(driver|fahrer|logistik|liefer|kurier|transport|truck|flotte)/.test(t))
+  if (
+    /(driver|fahrer|logistik|liefer|kurier|transport|truck|flotte)/.test(t)
+  )
     return Truck;
   if (
-    /(koch|küche|chef|gastronomie|restaurant|küchenhilfe|kitchen|cook)/.test(t)
+    /(koch|küche|chef|gastronomie|restaurant|küchenhilfe|kitchen|cook)/.test(
+      t,
+    )
   )
     return ChefHat;
   if (/(design|ux|ui|grafik|creative|art|produktdesign)/.test(t))
     return Palette;
   if (
     /(teacher|ausbilder|trainer|schule|bildung|dozent|professor|ausbildung)/.test(
-      t
+      t,
     )
   )
     return GraduationCap;
   if (
-    /(factory|produktion|fertigung|betrieb|warehouse|lager|industrie)/.test(t)
+    /(factory|produktion|fertigung|betrieb|warehouse|lager|industrie)/.test(
+      t,
+    )
   )
     return Building2;
-  if (/(sales|vertrieb|account|customer|kunden|business|consult)/.test(t))
+  if (
+    /(sales|vertrieb|account|customer|kunden|business|consult)/.test(t)
+  )
     return Briefcase;
   return Briefcase;
 }
@@ -107,7 +120,7 @@ function formatStartDate(raw?: string | null): string | null {
   if (!trimmed) return null;
 
   if (/ab\s*sofort/i.test(trimmed)) {
-    return "ab sofort";
+    return 'ab sofort';
   }
 
   const d = new Date(trimmed);
@@ -121,25 +134,27 @@ function formatStartDate(raw?: string | null): string | null {
   start.setHours(0, 0, 0, 0);
 
   if (start <= today) {
-    return "ab sofort";
+    return 'ab sofort';
   }
 
-  return start.toLocaleDateString("de-DE", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
+  return start.toLocaleDateString('de-DE', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
   });
 }
 
 export default function WishlistPage() {
   const [items, setItems] = useState<WishlistItem[]>([]);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState('');
 
   // Load wishlist items from localStorage (no demo data)
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === 'undefined') return;
     try {
-      const raw = window.localStorage.getItem(WISHLIST_STORAGE_KEY);
+      const raw = window.localStorage.getItem(
+        WISHLIST_STORAGE_KEY,
+      );
       if (!raw) {
         setItems([]);
         return;
@@ -151,7 +166,7 @@ export default function WishlistPage() {
         setItems([]);
       }
     } catch (err) {
-      console.error("Failed to load wishlist", err);
+      console.error('Failed to load wishlist', err);
       setItems([]);
     }
   }, []);
@@ -162,22 +177,26 @@ export default function WishlistPage() {
     return items.filter((w) =>
       [w.company, w.role, w.location, w.priority]
         .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(q))
+        .some((v) =>
+          String(v)
+            .toLowerCase()
+            .includes(q),
+        ),
     );
   }, [query, items]);
 
-  // Delete from wishlist via heart
+  // Delete from wishlist via star
   function handleDelete(id: string) {
     setItems((prev) => {
       const next = prev.filter((item) => item.id !== id);
-      if (typeof window !== "undefined") {
+      if (typeof window !== 'undefined') {
         try {
           window.localStorage.setItem(
             WISHLIST_STORAGE_KEY,
-            JSON.stringify(next)
+            JSON.stringify(next),
           );
         } catch (err) {
-          console.error("Failed to update wishlist", err);
+          console.error('Failed to update wishlist', err);
         }
       }
       return next;
@@ -187,16 +206,18 @@ export default function WishlistPage() {
   return (
     <section
       className={[
-        "relative rounded-2xl border border-neutral-200/70",
-        "bg-gradient-to-br from-amber-50 via-white to-yellow-50",
-        "p-8 shadow-md overflow-hidden",
-      ].join(" ")}
+        'relative rounded-2xl border border-neutral-200/70',
+        'bg-gradient-to-br from-amber-50 via-white to-yellow-50',
+        'p-8 shadow-md overflow-hidden',
+      ].join(' ')}
     >
       {/* soft accent blobs */}
       <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-amber-400/20 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-orange-400/20 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-amber-400/20 blur-3xl" />
 
-      <h1 className="text-2xl font-semibold text-neutral-900">Wishlist</h1>
+      <h1 className="text-2xl font-semibold text-neutral-900">
+        Wishlist
+      </h1>
       <p className="mt-1 text-neutral-700">
         Offers you starred from the Offers page.
       </p>
@@ -216,14 +237,14 @@ export default function WishlistPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className={[
-              "h-11 w-full rounded-lg pl-10 pr-3 text-sm text-neutral-900 placeholder:text-neutral-500",
-              "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
-              "border border-neutral-200 shadow-sm",
-              "hover:bg-white focus:bg-white",
-              "ring-1 ring-transparent",
-              "focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-300",
-              "transition-shadow",
-            ].join(" ")}
+              'h-11 w-full rounded-lg pl-10 pr-3 text-sm text-neutral-900 placeholder:text-neutral-500',
+              'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
+              'border border-neutral-200 shadow-sm',
+              'hover:bg-white focus:bg-white',
+              'ring-1 ring-transparent',
+              'focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-300',
+              'transition-shadow',
+            ].join(' ')}
           />
         </div>
 
@@ -231,11 +252,11 @@ export default function WishlistPage() {
         <button
           type="button"
           className={[
-            "inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800",
-            "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
-            "border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50",
-            "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-300",
-          ].join(" ")}
+            'inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800',
+            'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
+            'border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-300',
+          ].join(' ')}
         >
           <Plus className="h-4 w-4" aria-hidden="true" />
           Add
@@ -245,23 +266,27 @@ export default function WishlistPage() {
         <button
           type="button"
           className={[
-            "inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800",
-            "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
-            "border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50",
-            "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-300",
-          ].join(" ")}
+            'inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800',
+            'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
+            'border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-300',
+          ].join(' ')}
         >
           <Filter className="h-4 w-4" aria-hidden="true" />
           Filter
         </button>
       </div>
 
-      {/* Results grid – same card design as Offers, with heart acting as delete */}
+      {/* Results grid – same card design as Offers, star acts as delete */}
       <div className="mt-5 grid grid-cols-1 gap-3">
         {filtered.map((item, i) => {
-          const Icon = pickJobIcon(item.role || item.company);
+          const Icon = pickJobIcon(
+            item.role || item.company,
+          );
           const idx = i + 1;
-          const startLabel = formatStartDate(item.startDate ?? null);
+          const startLabel = formatStartDate(
+            item.startDate ?? null,
+          );
           const offerLabel =
             item.offerType && item.offerType.trim().length > 0
               ? item.offerType.trim()
@@ -271,14 +296,14 @@ export default function WishlistPage() {
             <article
               key={item.id}
               className={[
-                "relative grid grid-cols-[64px,1fr,auto] items-center gap-4",
-                "rounded-xl border border-neutral-200/80",
-                "bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70",
-                "p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md",
-                "before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl",
-                "before:bg-gradient-to-b before:from-amber-500 before:via-orange-500 before:to-yellow-500",
-                "before:opacity-90",
-              ].join(" ")}
+                'relative grid grid-cols-[64px,1fr,auto] items-center gap-4',
+                'rounded-xl border border-neutral-200/80',
+                'bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70',
+                'p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md',
+                'before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl',
+                'before:bg-gradient-to-b before:from-amber-500 before:via-orange-500 before:to-yellow-500',
+                'before:opacity-90',
+              ].join(' ')}
             >
               {/* same logo square as Offers */}
               <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-neutral-200 bg-white ring-1 ring-white/60">
@@ -286,7 +311,10 @@ export default function WishlistPage() {
                   {idx}
                 </div>
                 <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50">
-                  <Icon className="h-7 w-7 text-amber-700" aria-hidden="true" />
+                  <Icon
+                    className="h-7 w-7 text-amber-700"
+                    aria-hidden="true"
+                  />
                 </div>
                 {item.logoUrl && (
                   <img
@@ -294,8 +322,9 @@ export default function WishlistPage() {
                     alt={`${item.company} logo`}
                     className="absolute inset-0 h-full w-full object-contain p-1.5"
                     onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).style.display =
-                        "none";
+                      (
+                        e.currentTarget as HTMLImageElement
+                      ).style.display = 'none';
                     }}
                   />
                 )}
@@ -315,9 +344,9 @@ export default function WishlistPage() {
                   {item.priority && (
                     <span
                       className={[
-                        "ml-2 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+                        'ml-2 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
                         priorityClasses(item.priority),
-                      ].join(" ")}
+                      ].join(' ')}
                     >
                       <Star
                         className="mr-1 h-3.5 w-3.5 text-amber-500"
@@ -351,28 +380,31 @@ export default function WishlistPage() {
 
                   {offerLabel && (
                     <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-800">
-                      <Tag className="h-3.5 w-3.5" aria-hidden="true" />
+                      <Tag
+                        className="h-3.5 w-3.5"
+                        aria-hidden="true"
+                      />
                       {offerLabel}
                     </span>
                   )}
                 </div>
               </div>
 
-              {/* Right side: heart + View row like Offers, but heart == delete */}
+              {/* Right side: STAR (delete) + View (if website) */}
               <div className="flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => handleDelete(item.id)}
                   aria-label="Remove from wishlist"
                   className={[
-                    "inline-flex items-center justify-center",
-                    "text-sm rounded-full",
-                    "bg-transparent border-0 p-0",
-                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-300",
-                  ].join(" ")}
+                    'inline-flex items-center justify-center',
+                    'text-sm rounded-full',
+                    'bg-transparent border-0 p-0',
+                    'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-300',
+                  ].join(' ')}
                 >
-                  <Heart
-                    className="h-5 w-5 transition-colors text-rose-500 fill-rose-500 hover:text-rose-400 hover:fill-rose-400"
+                  <Star
+                    className="h-5 w-5 transition-colors text-amber-500 fill-amber-400 hover:text-amber-600 hover:fill-amber-500"
                     aria-hidden="true"
                   />
                 </button>
@@ -384,7 +416,10 @@ export default function WishlistPage() {
                     rel="noreferrer"
                     className="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white/70 px-2.5 py-1.5 text-sm text-neutral-800 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-300"
                   >
-                    <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                    <ExternalLink
+                      className="h-4 w-4"
+                      aria-hidden="true"
+                    />
                     View
                   </a>
                 )}
@@ -398,8 +433,8 @@ export default function WishlistPage() {
             <div className="mb-2 text-5xl">🌟</div>
             <p className="text-sm text-neutral-700">
               {query.trim()
-                ? "No wishlist items match your search."
-                : "Your wishlist is currently empty. Star some offers first."}
+                ? 'No wishlist items match your search.'
+                : 'Your wishlist is currently empty. Star some offers first.'}
             </p>
           </div>
         )}
