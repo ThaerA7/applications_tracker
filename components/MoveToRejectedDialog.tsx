@@ -246,7 +246,7 @@ export default function MoveToRejectedDialog({
         aria-modal="true"
         aria-labelledby="move-to-rejected-title"
         className={[
-          "relative z-10 w-full max-w-xl overflow-hidden rounded-2xl border border-neutral-200/70",
+          "relative z-10 w-full max-w-2xl overflow-hidden rounded-2xl border border-neutral-200/80",
           "bg-gradient-to-br from-rose-50 via-white to-pink-50 shadow-md",
         ].join(" ")}
         onClick={(e) => e.stopPropagation()}
