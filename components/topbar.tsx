@@ -1,29 +1,26 @@
 // components/topbar.tsx
 "use client";
 
-import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { LogOut } from "lucide-react";
+import { LogOut, Menu } from "lucide-react";
 
 type RouteMeta = {
   title: string;
-  icon: string; // path under /public
 };
 
 const ROUTES: Record<string, RouteMeta> = {
-  "/": { title: "Overview", icon: "/icons/home.png" },
-  "/applied": { title: "Applied", icon: "/icons/checklist.png" },
-  "/interviews": { title: "Interviews", icon: "/icons/interview.png" },
-  "/offers": { title: "Offers", icon: "/icons/briefcase.png" },
-  "/rejected": { title: "Rejected", icon: "/icons/cancel.png" },
-  "/withdrawn": { title: "Withdrawn", icon: "/icons/withdrawn.png" }, // ⬅️ new
-  "/wishlist": { title: "Wishlist", icon: "/icons/star.png" },
-  "/calendar": { title: "Calendar", icon: "/icons/calendar.png" },
-  "/notes": { title: "Notes", icon: "/icons/note.png" },
-  "/settings": { title: "Settings", icon: "/icons/settings.png" },
+  "/": { title: "Overview" },
+  "/applied": { title: "Applied" },
+  "/interviews": { title: "Interviews" },
+  "/offers": { title: "Offers" },
+  "/rejected": { title: "Rejected" },
+  "/withdrawn": { title: "Withdrawn" },
+  "/wishlist": { title: "Wishlist" },
+  "/calendar": { title: "Calendar" },
+  "/notes": { title: "Notes" },
+  "/settings": { title: "Settings" },
 };
 
-// Per-route accent
 type Accent = {
   washFrom: string;
   barFrom: string;
@@ -94,7 +91,12 @@ const ACCENTS: Record<string, Accent> = {
   },
 };
 
-export default function TopBar() {
+type TopBarProps = {
+  collapsed: boolean;
+  onToggleSidebar: () => void;
+};
+
+export default function TopBar({ collapsed, onToggleSidebar }: TopBarProps) {
   const pathname = usePathname();
 
   const activeKey =
@@ -102,7 +104,7 @@ export default function TopBar() {
       .sort((a, b) => b.length - a.length)
       .find((key) => pathname.startsWith(key)) || "/";
 
-  const { title, icon } = ROUTES[activeKey];
+  const { title } = ROUTES[activeKey];
   const accent = ACCENTS[activeKey];
 
   return (
@@ -114,18 +116,27 @@ export default function TopBar() {
         accent.washFrom,
       ].join(" ")}
     >
-      <div className="w-full h-14 px-10 flex items-center justify-between">
-        {/* Left: colorful icon + page title */}
-        <div className="flex items-center gap-2">
-          <Image
-            src={icon}
-            alt=""
-            width={35}
-            height={35}
-            aria-hidden="true"
-            className="shrink-0 select-none"
-          />
-          <h1 className="text-lg font-semibold text-neutral-900">{title}</h1>
+      {/* keep 5px padding left/right */}
+      <div className="w-full h-14 pl-[15px] pr-[15px] flex items-center justify-between">
+        {/* Left: collapse icon + title */}
+        <div className="flex items-center gap-2 sm:gap-2">
+          <button
+            type="button"
+            onClick={onToggleSidebar}
+            className={[
+              // 🔹 no bg / border / shadow, just the icon
+              "inline-flex items-center justify-center p-1.5",
+              "text-neutral-700 hover:text-neutral-900",
+              "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-300",
+            ].join(" ")}
+            aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
+          >
+            <Menu className="h-6 w-6" aria-hidden="true" />
+          </button>
+
+          <h1 className="text-lg font-semibold text-neutral-900">
+            {title}
+          </h1>
         </div>
 
         {/* Right: avatar + logout */}

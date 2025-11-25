@@ -15,7 +15,7 @@ import {
   X,
   Palette,
 } from "lucide-react";
-
+import Image from 'next/image';
 type ColorKey =
   | "gray"
   | "blue"
@@ -260,7 +260,17 @@ export default function NotesPage() {
       <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-fuchsia-400/20 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-violet-400/20 blur-3xl" />
 
-      <h1 className="text-2xl font-semibold text-neutral-900">Notes</h1>
+      <div className="flex items-center gap-1">
+                <Image
+                  src="/icons/note.png" // same icon you used for Applied
+                  alt=""
+                  width={36}
+                  height={36}
+                  aria-hidden="true"
+                  className="shrink-0 -mt-1"
+                />
+                <h1 className="text-2xl font-semibold text-neutral-900">Notes</h1>
+              </div>
       <p className="mt-1 text-neutral-700">
         Quick research, interview prep, and reminders.
       </p>

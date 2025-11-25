@@ -17,21 +17,36 @@ const items: Item[] = [
   { href: '/applied',    label: 'Applied',   icon: '/icons/checklist.png' },
   { href: '/interviews', label: 'Interviews',icon: '/icons/interview.png' },
   { href: '/rejected',   label: 'Rejected',  icon: '/icons/cancel.png' },
-  { href: '/withdrawn',  label: 'Withdrawn', icon: '/icons/withdrawn.png' }, // ⬅️ new
+  { href: '/withdrawn',  label: 'Withdrawn', icon: '/icons/withdrawn.png' },
   { href: '/wishlist',   label: 'Wishlist',  icon: '/icons/star.png' },
   { href: '/calendar',   label: 'Calendar',  icon: '/icons/calendar.png' },
   { href: '/notes',      label: 'Notes',     icon: '/icons/note.png' },
   { href: '/settings',   label: 'Settings',  icon: '/icons/settings.png' },
 ];
 
-export default function Sidebar() {
+type SidebarProps = {
+  collapsed: boolean;
+};
+
+export default function Sidebar({ collapsed }: SidebarProps) {
   const pathname = usePathname();
+  const widthClass = collapsed ? 'w-20' : 'w-64';
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-50 w-64 border-r border-neutral-800 bg-black shadow-2xl shadow-black/40">
+    <aside
+      className={[
+        'fixed inset-y-0 left-0 z-50 border-r border-neutral-800 bg-black shadow-2xl shadow-black/40',
+        'transition-[width] duration-200 ease-out',
+        widthClass,
+      ].join(' ')}
+    >
       {/* Brand */}
       <div className="flex items-center justify-center border-b border-neutral-800 overflow-visible px-4 py-2">
-        <Link href="/" aria-label="Application Tracker" className="group inline-flex items-center gap-2">
+        <Link
+          href="/"
+          aria-label="Application Tracker"
+          className="group inline-flex items-center gap-2"
+        >
           <Image
             src="/icons/site_logo.png"
             alt="Application Tracker logo"
@@ -40,10 +55,16 @@ export default function Sidebar() {
             priority
             className="block shrink-0 rounded-md transition-transform group-hover:scale-105"
           />
-          <span className="leading-tight text-white font-bold">
-            <span className="block uppercase tracking-widest">Application</span>
-            <span className="block uppercase tracking-widest">Tracker</span>
-          </span>
+          {!collapsed && (
+            <span className="leading-tight text-white font-bold">
+              <span className="block uppercase tracking-widest">
+                Application
+              </span>
+              <span className="block uppercase tracking-widest">
+                Tracker
+              </span>
+            </span>
+          )}
         </Link>
       </div>
 
@@ -57,8 +78,14 @@ export default function Sidebar() {
                 <Link
                   href={href}
                   aria-current={active ? 'page' : undefined}
-                  className={`group flex items-center gap-3 rounded-md px-3 py-2 text-[1.09375rem] transition
-                    ${active ? 'bg-white text-black' : 'text-zinc-300 hover:bg-white/10 hover:text-white'}`}
+                  title={collapsed ? label : undefined}
+                  className={[
+                    'group flex items-center rounded-md px-3 py-2 text-[1.09375rem] transition',
+                    collapsed ? 'justify-center' : 'gap-3',
+                    active
+                      ? 'bg-white text-black'
+                      : 'text-zinc-300 hover:bg-white/10 hover:text-white',
+                  ].join(' ')}
                 >
                   <Image
                     src={icon}
@@ -68,7 +95,9 @@ export default function Sidebar() {
                     aria-hidden="true"
                     className="shrink-0 transition-transform group-hover:scale-110"
                   />
-                  <span className="font-medium">{label}</span>
+                  {!collapsed && (
+                    <span className="font-medium">{label}</span>
+                  )}
                 </Link>
               </li>
             );
@@ -76,8 +105,9 @@ export default function Sidebar() {
         </ul>
       </nav>
 
+      {/* Footer: only the version, no collapse button */}
       <div className="absolute bottom-0 w-full border-t border-neutral-800 p-3 text-[0.9375rem] text-zinc-500">
-        v0.1
+        {!collapsed && <span>v0.1</span>}
       </div>
     </aside>
   );

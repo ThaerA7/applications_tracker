@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Search, Filter, Plus } from "lucide-react";
-
+import Image from 'next/image';
 import WithdrawnCard, { type WithdrawnRecord } from "./WithdrawnCard";
 import type { InterviewType } from "@/components/ScheduleInterviewDialog";
 import MoveToWithdrawnDialog, {
@@ -224,7 +224,17 @@ export default function WithdrawnPage() {
         <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-amber-400/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-rose-400/20 blur-3xl" />
 
-        <h1 className="text-2xl font-semibold text-neutral-900">Withdrawn</h1>
+        <div className="flex items-center gap-1">
+          <Image
+            src="/icons/withdrawn.png" // same icon you used for Applied
+            alt=""
+            width={36}
+            height={36}
+            aria-hidden="true"
+            className="shrink-0 -mt-1"
+          />
+          <h1 className="text-2xl font-semibold text-neutral-900">Withdrwan</h1>
+        </div>
         <p className="mt-1 text-neutral-700">
           Applications you chose to step away from.
         </p>

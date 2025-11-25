@@ -3,7 +3,7 @@
 
 import { useMemo, useState } from 'react';
 import { Search, Plus, Filter } from 'lucide-react';
-
+import Image from 'next/image';
 import { animateCardExit } from '../../components/cardExitAnimation';
 
 import AddApplicationDialog, {
@@ -288,10 +288,21 @@ export default function AppliedPage() {
       <div className="pointer-events-none absolute -top-20 -right-24 h-72 w-72 rounded-full bg-sky-400/20 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-24 -left-28 h-80 w-80 rounded-full bg-fuchsia-400/20 blur-3xl" />
 
-      <h1 className="text-2xl font-semibold text-neutral-900">Applied</h1>
-      <p className="mt-1 text-neutral-700">
-        List of your submitted applications.
-      </p>
+      <div className="flex items-center gap-1">
+  <Image
+    src="/icons/checklist.png" // same icon you used for Applied
+    alt=""
+    width={36}
+    height={36}
+    aria-hidden="true"
+    className="shrink-0"
+  />
+  <h1 className="text-2xl font-semibold text-neutral-900">Applied</h1>
+</div>
+<p className="mt-1 text-neutral-700">
+  List of your submitted applications.
+</p>
+
 
       {/* Toolbar */}
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">

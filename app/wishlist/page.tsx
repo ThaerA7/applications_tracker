@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useState, useRef, FormEvent } from "react";
 import { createPortal } from "react-dom";
+import Image from 'next/image';
 import {
   Search,
   Plus,
@@ -584,7 +585,17 @@ export default function WishlistPage() {
       <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-yellow-300/20 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-amber-300/20 blur-3xl" />
 
-      <h1 className="text-2xl font-semibold text-neutral-900">Wishlist</h1>
+      <div className="flex items-center gap-1">
+                <Image
+                  src="/icons/star.png" // same icon you used for Applied
+                  alt=""
+                  width={36}
+                  height={36}
+                  aria-hidden="true"
+                  className="shrink-0 -mt-1"
+                />
+                <h1 className="text-2xl font-semibold text-neutral-900">Wishlist</h1>
+              </div>
       <p className="mt-1 text-neutral-700">
         Offers you starred from the Offers page or saved manually.
       </p>

@@ -9,6 +9,7 @@ import {
   ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import {
   Search,
@@ -996,9 +997,17 @@ export default function OffersPage() {
       <div className="pointer-events-none absolute -top-20 -right-24 h-72 w-72 rounded-full bg-amber-400/20 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-24 -left-28 h-80 w-80 rounded-full bg-orange-400/20 blur-3xl" />
 
-      <h1 className="text-2xl font-semibold text-neutral-900">
-        Offers
-      </h1>
+      <div className="flex items-center gap-1">
+                      <Image
+                        src="/icons/briefcase.png" // same icon you used for Applied
+                        alt=""
+                        width={36}
+                        height={36}
+                        aria-hidden="true"
+                        className="shrink-0 -mt-1"
+                      />
+                      <h1 className="text-2xl font-semibold text-neutral-900">Offers</h1>
+                    </div>
       <p className="mt-1 text-neutral-700">
         Search offers from Bundesagentur für Arbeit.
       </p>

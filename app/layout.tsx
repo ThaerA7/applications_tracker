@@ -1,9 +1,8 @@
 // app/layout.tsx
 import './globals.css';
 import type { Metadata } from 'next';
-import Sidebar from '@/components/sidebar';
-import TopBar from '@/components/topbar'; // ⬅️ add this
 import { Merriweather } from 'next/font/google';
+import AppShell from '@/components/AppShell';
 
 export const metadata: Metadata = {
   title: 'Application Tracker',
@@ -20,15 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`h-full text-[115%] ${merriweather.variable}`}>
       <body className="h-full bg-neutral-100 text-neutral-900 antialiased font-display">
-        <Sidebar />
-        <div className="min-h-screen pl-64">
-          <TopBar />
-          <main className="min-h-screen bg-white">
-            <div className="w-full px-5 py-5">
-              {children}
-            </div>
-          </main>
-        </div>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );
