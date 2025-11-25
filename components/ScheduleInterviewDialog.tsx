@@ -20,6 +20,41 @@ import {
 
 const INTERVIEWS_STORAGE_KEY = "job-tracker:interviews";
 
+const INTERVIEWS_ACTIVITY_STORAGE_KEY =
+  "job-tracker:interviews-activity";
+
+type InterviewActivityItem = {
+  id: string;
+  appId: string;
+  type: "added" | "edited";
+  timestamp: string;
+  company: string;
+  role?: string;
+  location?: string;
+  appliedOn?: string;
+  note?: string;
+};
+
+function appendInterviewActivity(item: InterviewActivityItem) {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = window.localStorage.getItem(
+      INTERVIEWS_ACTIVITY_STORAGE_KEY
+    );
+    const parsed = raw ? JSON.parse(raw) : [];
+    const prev: InterviewActivityItem[] = Array.isArray(parsed)
+      ? parsed
+      : [];
+    const next = [item, ...prev].slice(0, 100);
+    window.localStorage.setItem(
+      INTERVIEWS_ACTIVITY_STORAGE_KEY,
+      JSON.stringify(next)
+    );
+  } catch (err) {
+    console.error("Failed to persist interview activity", err);
+  }
+}
+
 export type InterviewType = "phone" | "video" | "in-person";
 
 export type Interview = {
@@ -246,6 +281,26 @@ export default function ScheduleInterviewDialog({
       console.error("Failed to persist interview to localStorage", err);
     }
 
+    // If coming from the Applications page, also log activity
+    if (effectiveMode === "schedule") {
+      const activityId =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}`;
+
+      appendInterviewActivity({
+        id: activityId,
+        appId: interview.id,
+        type: "added",
+        timestamp: new Date().toISOString(),
+        company: interview.company,
+        role: interview.role,
+        location: interview.location,
+        appliedOn: interview.appliedOn,
+        note: "Interview scheduled from application",
+      });
+    }
+
     onInterviewCreated?.(interview);
     onClose();
   };
@@ -260,10 +315,7 @@ export default function ScheduleInterviewDialog({
     form.time.trim().length > 0;
 
   const dialog = (
-  <div
-    className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[12500] flex items-center justify-center px-4 py-8"
-  >
-
+    <div className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[12500] flex items-center justify-center px-4 py-8">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-emerald-950/40"

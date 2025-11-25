@@ -8,8 +8,16 @@ import {
   type ComponentType,
   type ComponentProps,
 } from "react";
-import { Search, Plus, Filter, PhoneCall, Video, Users } from "lucide-react";
-import Image from 'next/image';
+import {
+  Search,
+  Plus,
+  Filter,
+  PhoneCall,
+  Video,
+  Users,
+  History,
+} from "lucide-react";
+import Image from "next/image";
 import ScheduleInterviewDialog, {
   type Interview,
   type InterviewType,
@@ -20,9 +28,16 @@ import type { WithdrawnDetails } from "../../components/MoveToWithdrawnDialog";
 import InterviewCard from "./InterviewCard";
 import { animateCardExit } from "../../components/cardExitAnimation";
 
+import InterviewsActivityLogSidebar, {
+  type ActivityItem,
+  type ActivityType,
+} from "./InterviewsActivityLogSidebar";
+
 const INTERVIEWS_STORAGE_KEY = "job-tracker:interviews";
 const REJECTIONS_STORAGE_KEY = "job-tracker:rejected";
 const WITHDRAWN_STORAGE_KEY = "job-tracker:withdrawn";
+const INTERVIEWS_ACTIVITY_STORAGE_KEY =
+  "job-tracker:interviews-activity";
 
 type ApplicationLike = ComponentProps<
   typeof ScheduleInterviewDialog
@@ -257,6 +272,53 @@ export default function InterviewsPage() {
   const [moveTargetInterview, setMoveTargetInterview] =
     useState<Interview | null>(null);
 
+  // Activity log state for interviews
+  const [activityOpen, setActivityOpen] = useState(false);
+  const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
+
+  // Helper to log interview activity (also persists to localStorage)
+  const logActivity = (
+    type: ActivityType,
+    interview: Interview | null,
+    extras?: Partial<ActivityItem>
+  ) => {
+    if (!interview) return;
+
+    const id =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2);
+
+    const timestamp = new Date().toISOString();
+
+    const base: ActivityItem = {
+      id,
+      appId: interview.id,
+      type,
+      timestamp,
+      company: interview.company,
+      role: interview.role,
+      location: interview.location,
+      appliedOn: interview.appliedOn,
+      ...extras,
+    };
+
+    setActivityItems((prev) => {
+      const next = [base, ...prev].slice(0, 100);
+      if (typeof window !== "undefined") {
+        try {
+          window.localStorage.setItem(
+            INTERVIEWS_ACTIVITY_STORAGE_KEY,
+            JSON.stringify(next)
+          );
+        } catch (err) {
+          console.error("Failed to persist interview activity log", err);
+        }
+      }
+      return next;
+    });
+  };
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     setNow(Date.now());
@@ -266,7 +328,7 @@ export default function InterviewsPage() {
     return () => window.clearInterval(id);
   }, []);
 
-  // Load from localStorage on mount
+  // Load interviews + activity log from localStorage on mount
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -276,19 +338,33 @@ export default function InterviewsPage() {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
           setItems(parsed);
-          return;
+        } else {
+          setItems(DEMO_INTERVIEWS);
         }
+      } else {
+        window.localStorage.setItem(
+          INTERVIEWS_STORAGE_KEY,
+          JSON.stringify(DEMO_INTERVIEWS)
+        );
+        setItems(DEMO_INTERVIEWS);
       }
-
-      // If nothing in storage, seed with demo data
-      window.localStorage.setItem(
-        INTERVIEWS_STORAGE_KEY,
-        JSON.stringify(DEMO_INTERVIEWS)
-      );
-      setItems(DEMO_INTERVIEWS);
     } catch (err) {
       console.error("Failed to load interviews from localStorage", err);
       setItems(DEMO_INTERVIEWS);
+    }
+
+    try {
+      const rawActivity = window.localStorage.getItem(
+        INTERVIEWS_ACTIVITY_STORAGE_KEY
+      );
+      if (rawActivity) {
+        const parsed = JSON.parse(rawActivity);
+        if (Array.isArray(parsed)) {
+          setActivityItems(parsed);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load interview activity log", err);
     }
   }, []);
 
@@ -353,6 +429,13 @@ export default function InterviewsPage() {
 
   const handleConfirmDelete = () => {
     if (!deleteTarget) return;
+
+    // log before removing
+    logActivity("deleted", deleteTarget, {
+      fromStatus: "Interview",
+      note: "Interview deleted",
+    });
+
     const id = deleteTarget.id;
     const elementId = `interview-card-${id}`;
 
@@ -413,6 +496,13 @@ export default function InterviewsPage() {
       return next;
     });
 
+    // activity
+    if (editingInterview) {
+      logActivity("edited", created, { note: "Interview updated" });
+    } else {
+      logActivity("added", created, { note: "Interview scheduled" });
+    }
+
     setDialogOpen(false);
     setEditingInterview(null);
     setDialogApplication(null);
@@ -444,6 +534,15 @@ export default function InterviewsPage() {
           err
         );
       }
+    }
+
+    // log move
+    if (source) {
+      logActivity("moved_to_rejected", source, {
+        fromStatus: "Interview",
+        toStatus: "Rejected",
+        note: (details as any).reason || "Moved to rejected",
+      });
     }
 
     // 2) Remove from interviews with animation
@@ -524,6 +623,13 @@ export default function InterviewsPage() {
       }
     }
 
+    // log move
+    logActivity("moved_to_withdrawn", source, {
+      fromStatus: "Interview",
+      toStatus: "Withdrawn",
+      note: details.reason || "Moved to withdrawn",
+    });
+
     // 2) Remove from interviews with animation
     const sourceId = source.id;
     const elementId = `interview-card-${sourceId}`;
@@ -583,6 +689,14 @@ export default function InterviewsPage() {
 
   return (
     <>
+      {/* Interview activity sidebar */}
+      <InterviewsActivityLogSidebar
+        open={activityOpen}
+        onClose={() => setActivityOpen(false)}
+        items={activityItems}
+        statusClasses={statusClasses}
+      />
+
       {/* Dialog shared for Add + Edit */}
       <ScheduleInterviewDialog
         open={dialogOpen}
@@ -609,10 +723,7 @@ export default function InterviewsPage() {
 
       {/* Delete confirmation dialog */}
       {deleteTarget && (
-  <div
-    className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[13000] flex items-center justify-center px-4 py-8"
-  >
-
+        <div className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[13000] flex items-center justify-center px-4 py-8">
           {/* Backdrop */}
           <div
             className="absolute inset-0 bg-neutral-900/40"
@@ -670,17 +781,42 @@ export default function InterviewsPage() {
         <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-emerald-400/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-teal-400/20 blur-3xl" />
 
-        <div className="flex items-center gap-1">
-          <Image
-            src="/icons/interview.png" // same icon you used for Applied
-            alt=""
-            width={37}
-            height={37}
-            aria-hidden="true"
-            className="shrink-0 -mt-1"
-          />
-          <h1 className="text-2xl font-semibold text-neutral-900">Interviews</h1>
+        {/* header row with activity button */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-1">
+            <Image
+              src="/icons/interview.png"
+              alt=""
+              width={37}
+              height={37}
+              aria-hidden="true"
+              className="shrink-0 -mt-1"
+            />
+            <h1 className="text-2xl font-semibold text-neutral-900">
+              Interviews
+            </h1>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setActivityOpen(true)}
+            className={[
+              "inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-neutral-800",
+              "bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70",
+              "border border-neutral-200 shadow-sm hover:bg-white",
+              "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-300",
+            ].join(" ")}
+          >
+            <History className="h-4 w-4 text-emerald-600" aria-hidden="true" />
+            <span>Activity log</span>
+            {activityItems.length > 0 && (
+              <span className="ml-1 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-semibold text-neutral-700">
+                {activityItems.length}
+              </span>
+            )}
+          </button>
         </div>
+
         <p className="mt-1 text-neutral-700">
           Track upcoming and past interviews, outcomes, and notes.
         </p>
