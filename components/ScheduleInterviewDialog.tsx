@@ -1,13 +1,8 @@
 // components/ScheduleInterviewDialog.tsx
-'use client';
+"use client";
 
-import {
-  useEffect,
-  useState,
-  type ChangeEvent,
-  type FormEvent,
-} from 'react';
-import { createPortal } from 'react-dom';
+import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import {
   CalendarDays,
   Clock,
@@ -21,11 +16,11 @@ import {
   Briefcase,
   Building2,
   FileText,
-} from 'lucide-react';
+} from "lucide-react";
 
-const INTERVIEWS_STORAGE_KEY = 'job-tracker:interviews';
+const INTERVIEWS_STORAGE_KEY = "job-tracker:interviews";
 
-export type InterviewType = 'phone' | 'video' | 'in-person';
+export type InterviewType = "phone" | "video" | "in-person";
 
 export type Interview = {
   id: string;
@@ -45,22 +40,20 @@ export type Interview = {
 type ScheduleInterviewDialogProps = {
   open: boolean;
   onClose: () => void;
-  application:
-    | {
-        id: string;
-        company: string;
-        role?: string;
-        location?: string;
-        contactPerson?: string;
-        contactEmail?: string;
-        contactPhone?: string;
-        offerUrl?: string;
-        logoUrl?: string;
-        appliedOn?: string;
-        employmentType?: string;
-        notes?: string;
-      }
-    | null;
+  application: {
+    id: string;
+    company: string;
+    role?: string;
+    location?: string;
+    contactPerson?: string;
+    contactEmail?: string;
+    contactPhone?: string;
+    offerUrl?: string;
+    logoUrl?: string;
+    appliedOn?: string;
+    employmentType?: string;
+    notes?: string;
+  } | null;
   /**
    * Called after the interview has been persisted.
    */
@@ -71,7 +64,7 @@ type ScheduleInterviewDialogProps = {
    * - "add": add new interview on /interviews
    * - "edit": edit existing interview on /interviews
    */
-  mode?: 'schedule' | 'add' | 'edit';
+  mode?: "schedule" | "add" | "edit";
 };
 
 type FormState = {
@@ -91,42 +84,42 @@ type FormState = {
 };
 
 const EMPLOYMENT_OPTIONS: string[] = [
-  'Full-time',
-  'Part-time',
-  'Internship',
-  'Working student',
-  'Contract',
-  'Temporary',
-  'Mini-job',
-  'Freelance',
+  "Full-time",
+  "Part-time",
+  "Internship",
+  "Working student",
+  "Contract",
+  "Temporary",
+  "Mini-job",
+  "Freelance",
 ];
 
 function makeInitialForm(
-  app: ScheduleInterviewDialogProps['application'],
+  app: ScheduleInterviewDialogProps["application"]
 ): FormState {
   const now = new Date();
   const yyyy = now.getFullYear();
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  const dd = String(now.getDate()).padStart(2, '0');
-  const hh = String(now.getHours()).padStart(2, '0');
-  const min = String(now.getMinutes()).padStart(2, '0');
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  const hh = String(now.getHours()).padStart(2, "0");
+  const min = String(now.getMinutes()).padStart(2, "0");
 
   const today = `${yyyy}-${mm}-${dd}`;
 
   return {
-    company: app?.company ?? '',
-    role: app?.role ?? '',
+    company: app?.company ?? "",
+    role: app?.role ?? "",
     date: today,
     time: `${hh}:${min}`,
-    type: 'phone',
-    location: app?.location ?? '',
-    contactName: app?.contactPerson ?? '',
-    contactEmail: app?.contactEmail ?? '',
-    contactPhone: app?.contactPhone ?? '',
-    url: app?.offerUrl ?? '',
+    type: "phone",
+    location: app?.location ?? "",
+    contactName: app?.contactPerson ?? "",
+    contactEmail: app?.contactEmail ?? "",
+    contactPhone: app?.contactPhone ?? "",
+    url: app?.offerUrl ?? "",
     appliedDate: app?.appliedOn ?? today,
-    employmentType: app?.employmentType ?? '',
-    notes: app?.notes ?? '',
+    employmentType: app?.employmentType ?? "",
+    notes: app?.notes ?? "",
   };
 }
 
@@ -135,32 +128,32 @@ export default function ScheduleInterviewDialog({
   onClose,
   application,
   onInterviewCreated,
-  mode = 'schedule',
+  mode = "schedule",
 }: ScheduleInterviewDialogProps) {
   const [form, setForm] = useState<FormState>(() => makeInitialForm(null));
 
-  const effectiveMode = mode ?? 'schedule';
+  const effectiveMode = mode ?? "schedule";
 
   const title =
-    effectiveMode === 'edit'
-      ? 'Edit interview'
-      : effectiveMode === 'add'
-      ? 'Add interview'
-      : 'Schedule interview';
+    effectiveMode === "edit"
+      ? "Edit interview"
+      : effectiveMode === "add"
+      ? "Add interview"
+      : "Schedule interview";
 
   const description =
-    effectiveMode === 'edit'
-      ? 'Update the interview details and save your changes.'
-      : effectiveMode === 'add'
-      ? 'Fill in the details to add a new interview.'
-      : 'Confirm the details before moving this application to the interviews section.';
+    effectiveMode === "edit"
+      ? "Update the interview details and save your changes."
+      : effectiveMode === "add"
+      ? "Fill in the details to add a new interview."
+      : "Confirm the details before moving this application to the interviews section.";
 
   const submitLabel =
-    effectiveMode === 'edit'
-      ? 'Save changes'
-      : effectiveMode === 'add'
-      ? 'Add interview'
-      : 'Save & move to interviews';
+    effectiveMode === "edit"
+      ? "Save changes"
+      : effectiveMode === "add"
+      ? "Add interview"
+      : "Save & move to interviews";
 
   // Reset form whenever dialog opens or application changes
   useEffect(() => {
@@ -170,7 +163,9 @@ export default function ScheduleInterviewDialog({
 
   const handleChange =
     (field: keyof FormState) =>
-    (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    (
+      e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+    ) => {
       const { value } = e.target;
       setForm((prev) => ({ ...prev, [field]: value }));
     };
@@ -194,9 +189,9 @@ export default function ScheduleInterviewDialog({
     const notes = form.notes.trim();
 
     const id =
-      effectiveMode === 'edit' && application?.id
+      effectiveMode === "edit" && application?.id
         ? application.id
-        : typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        : typeof crypto !== "undefined" && "randomUUID" in crypto
         ? crypto.randomUUID()
         : `${Date.now()}`;
 
@@ -224,7 +219,7 @@ export default function ScheduleInterviewDialog({
 
     // Persist to localStorage so /interviews page can read it
     try {
-      if (typeof window !== 'undefined') {
+      if (typeof window !== "undefined") {
         const raw = window.localStorage.getItem(INTERVIEWS_STORAGE_KEY);
         let existing: Interview[] = [];
         if (raw) {
@@ -244,11 +239,11 @@ export default function ScheduleInterviewDialog({
         }
         window.localStorage.setItem(
           INTERVIEWS_STORAGE_KEY,
-          JSON.stringify(next),
+          JSON.stringify(next)
         );
       }
     } catch (err) {
-      console.error('Failed to persist interview to localStorage', err);
+      console.error("Failed to persist interview to localStorage", err);
     }
 
     onInterviewCreated?.(interview);
@@ -256,7 +251,7 @@ export default function ScheduleInterviewDialog({
   };
 
   if (!open) return null;
-  if (typeof document === 'undefined') return null;
+  if (typeof document === "undefined") return null;
 
   const canSubmit =
     form.company.trim().length > 0 &&
@@ -268,7 +263,7 @@ export default function ScheduleInterviewDialog({
     <div className="fixed inset-y-0 right-0 left-64 z-[12000] flex items-center justify-center px-4 py-8">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-neutral-900/40"
+        className="absolute inset-0 bg-emerald-950/40"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -279,13 +274,17 @@ export default function ScheduleInterviewDialog({
         aria-modal="true"
         aria-labelledby="schedule-interview-title"
         className={[
-          'relative z-10 w-full max-w-xl overflow-hidden rounded-2xl border border-neutral-200/80',
-          'bg-gradient-to-br from-emerald-50 via-white to-teal-50 shadow-2xl',
-        ].join(' ')}
+          "relative z-10 w-full max-w-xl overflow-hidden rounded-2xl border border-neutral-200/70",
+          "bg-gradient-to-br from-emerald-50 via-white to-teal-50 shadow-md",
+        ].join(" ")}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* soft emerald/teal blobs like on the page */}
+        <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-emerald-400/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-teal-400/20 blur-3xl" />
+
         {/* Header */}
-        <div className="flex items-start justify-between border-b border-neutral-200/70 px-5 py-4">
+        <div className="relative z-10 flex items-start justify-between border-b border-neutral-200/70 px-5 py-4">
           <div className="flex items-center gap-2">
             <img
               src="/icons/calendar.png"
@@ -306,7 +305,13 @@ export default function ScheduleInterviewDialog({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 bg-white/80 text-neutral-500 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+            className={[
+              "inline-flex h-8 w-8 items-center justify-center rounded-full",
+              "border border-neutral-200",
+              "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
+              "text-neutral-500 shadow-sm hover:bg-white",
+              "focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300",
+            ].join(" ")}
             aria-label="Close schedule interview dialog"
           >
             <X className="h-4 w-4" aria-hidden="true" />
@@ -315,16 +320,16 @@ export default function ScheduleInterviewDialog({
 
         {/* Application summary (optional) */}
         {application && (
-          <div className="px-5 pt-4">
-            <div className="rounded-xl border border-neutral-200/80 bg-white/90 p-3 text-xs text-neutral-800 shadow-sm">
+          <div className="relative z-10 px-5 pt-4">
+            <div className="rounded-xl border border-emerald-100/80 bg-white/80 p-3 text-xs text-neutral-800 shadow-sm">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-start gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50 text-emerald-600">
                     <Building2 className="h-4 w-4" aria-hidden="true" />
                   </div>
                   <div>
                     <div className="font-medium text-neutral-900">
-                      {application.role || 'Role not set'}
+                      {application.role || "Role not set"}
                     </div>
                     <div className="text-neutral-600">
                       {application.company}
@@ -362,7 +367,7 @@ export default function ScheduleInterviewDialog({
         {/* Form */}
         <form
           onSubmit={handleSubmit}
-          className="max-h-[70vh] space-y-4 overflow-y-auto px-5 py-4"
+          className="relative z-10 max-h-[70vh] space-y-4 overflow-y-auto px-5 py-4"
         >
           <div className="grid gap-4 md:grid-cols-2">
             <label className="space-y-1 text-sm md:col-span-2">
@@ -377,7 +382,7 @@ export default function ScheduleInterviewDialog({
                 <input
                   type="text"
                   value={form.company}
-                  onChange={handleChange('company')}
+                  onChange={handleChange("company")}
                   placeholder="Acme GmbH"
                   className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
                   required
@@ -392,7 +397,7 @@ export default function ScheduleInterviewDialog({
               <input
                 type="text"
                 value={form.role}
-                onChange={handleChange('role')}
+                onChange={handleChange("role")}
                 placeholder="Frontend Engineer"
                 className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 px-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
                 required
@@ -411,7 +416,7 @@ export default function ScheduleInterviewDialog({
                 <input
                   type="date"
                   value={form.date}
-                  onChange={handleChange('date')}
+                  onChange={handleChange("date")}
                   className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
                   required
                 />
@@ -430,7 +435,7 @@ export default function ScheduleInterviewDialog({
                 <input
                   type="time"
                   value={form.time}
-                  onChange={handleChange('time')}
+                  onChange={handleChange("time")}
                   className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
                   required
                 />
@@ -448,7 +453,7 @@ export default function ScheduleInterviewDialog({
                 <input
                   type="date"
                   value={form.appliedDate}
-                  onChange={handleChange('appliedDate')}
+                  onChange={handleChange("appliedDate")}
                   className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
                 />
               </div>
@@ -461,7 +466,7 @@ export default function ScheduleInterviewDialog({
               <div className="relative">
                 <select
                   value={form.type}
-                  onChange={handleChange('type')}
+                  onChange={handleChange("type")}
                   className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 px-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
                   required
                 >
@@ -484,7 +489,7 @@ export default function ScheduleInterviewDialog({
                 />
                 <select
                   value={form.employmentType}
-                  onChange={handleChange('employmentType')}
+                  onChange={handleChange("employmentType")}
                   className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
                 >
                   <option value="">Select type…</option>
@@ -507,7 +512,7 @@ export default function ScheduleInterviewDialog({
                 <input
                   type="text"
                   value={form.location}
-                  onChange={handleChange('location')}
+                  onChange={handleChange("location")}
                   placeholder="Berlin HQ / Remote"
                   className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
                 />
@@ -524,7 +529,7 @@ export default function ScheduleInterviewDialog({
                 <input
                   type="text"
                   value={form.contactName}
-                  onChange={handleChange('contactName')}
+                  onChange={handleChange("contactName")}
                   placeholder="Julia Meyer"
                   className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
                 />
@@ -532,7 +537,9 @@ export default function ScheduleInterviewDialog({
             </label>
 
             <label className="space-y-1 text-sm">
-              <span className="font-medium text-neutral-800">Contact email</span>
+              <span className="font-medium text-neutral-800">
+                Contact email
+              </span>
               <div className="relative">
                 <Mail
                   className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
@@ -541,7 +548,7 @@ export default function ScheduleInterviewDialog({
                 <input
                   type="email"
                   value={form.contactEmail}
-                  onChange={handleChange('contactEmail')}
+                  onChange={handleChange("contactEmail")}
                   placeholder="recruiting@example.com"
                   className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
                 />
@@ -549,7 +556,9 @@ export default function ScheduleInterviewDialog({
             </label>
 
             <label className="space-y-1 text-sm">
-              <span className="font-medium text-neutral-800">Contact phone</span>
+              <span className="font-medium text-neutral-800">
+                Contact phone
+              </span>
               <div className="relative">
                 <Phone
                   className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
@@ -558,7 +567,7 @@ export default function ScheduleInterviewDialog({
                 <input
                   type="tel"
                   value={form.contactPhone}
-                  onChange={handleChange('contactPhone')}
+                  onChange={handleChange("contactPhone")}
                   placeholder="+49 30 123456"
                   className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
                 />
@@ -577,7 +586,7 @@ export default function ScheduleInterviewDialog({
                 <input
                   type="url"
                   value={form.url}
-                  onChange={handleChange('url')}
+                  onChange={handleChange("url")}
                   placeholder="https://jobs.example.com/frontend-engineer"
                   className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
                 />
@@ -594,7 +603,7 @@ export default function ScheduleInterviewDialog({
                 />
                 <textarea
                   value={form.notes}
-                  onChange={handleChange('notes')}
+                  onChange={handleChange("notes")}
                   rows={3}
                   placeholder="Anything you want to remember for this interview (agenda, prep tasks, who will be there, etc.)"
                   className="w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 pt-2 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
@@ -608,7 +617,12 @@ export default function ScheduleInterviewDialog({
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex items-center justify-center rounded-lg border border-neutral-200 bg-white/80 px-4 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-300"
+              className={[
+                "inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium text-neutral-800",
+                "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
+                "border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50",
+                "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-300",
+              ].join(" ")}
             >
               Cancel
             </button>
@@ -616,12 +630,12 @@ export default function ScheduleInterviewDialog({
               type="submit"
               disabled={!canSubmit}
               className={[
-                'inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium shadow-sm',
+                "inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium shadow-sm",
                 canSubmit
-                  ? 'bg-emerald-600 text-white hover:bg-emerald-500 focus-visible:ring-emerald-300'
-                  : 'cursor-not-allowed bg-neutral-200 text-neutral-500',
-                'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
-              ].join(' ')}
+                  ? "bg-emerald-600 text-white hover:bg-emerald-500 focus-visible:ring-emerald-300"
+                  : "cursor-not-allowed bg-emerald-500/60 text-white/70",
+                "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-300",
+              ].join(" ")}
             >
               {submitLabel}
             </button>

@@ -1,12 +1,7 @@
-'use client';
+"use client";
 
-import {
-  useEffect,
-  useState,
-  type ChangeEvent,
-  type FormEvent,
-} from 'react';
-import { createPortal } from 'react-dom';
+import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import {
   CalendarDays,
   MapPin,
@@ -19,13 +14,13 @@ import {
   Building2,
   AlertCircle,
   FileText,
-} from 'lucide-react';
+} from "lucide-react";
 
 export type RejectionType =
-  | 'no-interview'
-  | 'after-phone-screening'
-  | 'after-first-interview'
-  | 'after-second-interview';
+  | "no-interview"
+  | "after-phone-screening"
+  | "after-first-interview"
+  | "after-second-interview";
 
 export type RejectionDetails = {
   company: string;
@@ -49,23 +44,21 @@ export type RejectionDetails = {
 type MoveToRejectedDialogProps = {
   open: boolean;
   onClose: () => void;
-  application?:
-    | {
-        id: string;
-        company: string;
-        role?: string;
-        location?: string;
-        status?: string;
-        appliedOn?: string;
-        employmentType?: string;
-        contactPerson?: string;
-        contactEmail?: string;
-        contactPhone?: string;
-        offerUrl?: string;
-        logoUrl?: string;
-        notes?: string;
-      }
-    | null;
+  application?: {
+    id: string;
+    company: string;
+    role?: string;
+    location?: string;
+    status?: string;
+    appliedOn?: string;
+    employmentType?: string;
+    contactPerson?: string;
+    contactEmail?: string;
+    contactPhone?: string;
+    offerUrl?: string;
+    logoUrl?: string;
+    notes?: string;
+  } | null;
   /**
    * Called when the user submits the rejection form.
    * You can persist this data and/or move the application to /rejected.
@@ -97,67 +90,67 @@ const REJECTION_OPTIONS: {
   description: string;
 }[] = [
   {
-    value: 'no-interview',
-    label: 'No interview',
-    description: 'Rejected after application without any interview.',
+    value: "no-interview",
+    label: "No interview",
+    description: "Rejected after application without any interview.",
   },
   {
-    value: 'after-phone-screening',
-    label: 'After phone screening',
-    description: 'Rejected after an initial phone screening.',
+    value: "after-phone-screening",
+    label: "After phone screening",
+    description: "Rejected after an initial phone screening.",
   },
   {
-    value: 'after-first-interview',
-    label: 'After first interview',
-    description: 'Rejected after the first main interview round.',
+    value: "after-first-interview",
+    label: "After first interview",
+    description: "Rejected after the first main interview round.",
   },
   {
-    value: 'after-second-interview',
-    label: 'After 2nd interview',
-    description: 'Rejected after the second interview round.',
+    value: "after-second-interview",
+    label: "After 2nd interview",
+    description: "Rejected after the second interview round.",
   },
 ];
 
 const EMPLOYMENT_OPTIONS: string[] = [
-  'Full-time',
-  'Part-time',
-  'Internship',
-  'Working student',
-  'Contract',
-  'Temporary',
-  'Mini-job',
-  'Freelance',
+  "Full-time",
+  "Part-time",
+  "Internship",
+  "Working student",
+  "Contract",
+  "Temporary",
+  "Mini-job",
+  "Freelance",
 ];
 
 function todayISO() {
   const now = new Date();
   const yyyy = now.getFullYear();
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  const dd = String(now.getDate()).padStart(2, '0');
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
 }
 
 function makeInitialForm(
-  app: MoveToRejectedDialogProps['application'],
+  app: MoveToRejectedDialogProps["application"]
 ): FormState {
   const today = todayISO();
 
   return {
-    company: app?.company ?? '',
-    role: app?.role ?? '',
+    company: app?.company ?? "",
+    role: app?.role ?? "",
     appliedDate: app?.appliedOn ?? today,
     decisionDate: today,
-    rejectionType: 'no-interview',
-    phoneScreenDate: '',
-    firstInterviewDate: '',
-    secondInterviewDate: '',
-    employmentType: app?.employmentType ?? '',
-    location: app?.location ?? '',
-    contactName: app?.contactPerson ?? '',
-    contactEmail: app?.contactEmail ?? '',
-    contactPhone: app?.contactPhone ?? '',
-    url: app?.offerUrl ?? '',
-    notes: app?.notes ?? '',
+    rejectionType: "no-interview",
+    phoneScreenDate: "",
+    firstInterviewDate: "",
+    secondInterviewDate: "",
+    employmentType: app?.employmentType ?? "",
+    location: app?.location ?? "",
+    contactName: app?.contactPerson ?? "",
+    contactEmail: app?.contactEmail ?? "",
+    contactPhone: app?.contactPhone ?? "",
+    url: app?.offerUrl ?? "",
+    notes: app?.notes ?? "",
   };
 }
 
@@ -176,7 +169,9 @@ export default function MoveToRejectedDialog({
 
   const handleChange =
     (field: keyof FormState) =>
-    (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    (
+      e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+    ) => {
       const { value } = e.target;
       setForm((prev) => ({ ...prev, [field]: value }));
     };
@@ -229,7 +224,7 @@ export default function MoveToRejectedDialog({
   };
 
   if (!open) return null;
-  if (typeof document === 'undefined') return null;
+  if (typeof document === "undefined") return null;
 
   const canSubmit =
     form.company.trim().length > 0 &&
@@ -238,9 +233,9 @@ export default function MoveToRejectedDialog({
 
   const dialog = (
     <div className="fixed inset-y-0 right-0 left-64 z-[12500] flex items-center justify-center px-4 py-8">
-      {/* Backdrop */}
+      {/* Backdrop with rose tint */}
       <div
-        className="absolute inset-0 bg-neutral-900/40"
+        className="absolute inset-0 bg-rose-950/40"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -251,13 +246,17 @@ export default function MoveToRejectedDialog({
         aria-modal="true"
         aria-labelledby="move-to-rejected-title"
         className={[
-          'relative z-10 w-full max-w-xl overflow-hidden rounded-2xl border border-neutral-200/80',
-          'bg-gradient-to-br from-rose-50 via-white to-amber-50 shadow-2xl',
-        ].join(' ')}
+          "relative z-10 w-full max-w-xl overflow-hidden rounded-2xl border border-neutral-200/70",
+          "bg-gradient-to-br from-rose-50 via-white to-pink-50 shadow-md",
+        ].join(" ")}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* soft rose/pink blobs like the page */}
+        <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-rose-400/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-pink-400/20 blur-3xl" />
+
         {/* Header */}
-        <div className="flex items-start justify-between border-b border-neutral-200/70 px-5 py-4">
+        <div className="relative z-10 flex items-start justify-between border-b border-neutral-200/70 px-5 py-4">
           <div className="flex items-center gap-2">
             {/* Title icon without background container */}
             <img
@@ -282,7 +281,13 @@ export default function MoveToRejectedDialog({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 bg-white/80 text-neutral-500 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
+            className={[
+              "inline-flex h-8 w-8 items-center justify-center rounded-full",
+              "border border-neutral-200",
+              "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
+              "text-neutral-500 shadow-sm hover:bg-white",
+              "focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300",
+            ].join(" ")}
             aria-label="Close rejected dialog"
           >
             <X className="h-4 w-4" aria-hidden="true" />
@@ -291,11 +296,11 @@ export default function MoveToRejectedDialog({
 
         {/* Application summary (optional) */}
         {application && (
-          <div className="px-5 pt-4">
-            <div className="rounded-xl border border-neutral-200/80 bg-white/90 p-3 text-xs text-neutral-800 shadow-sm">
+          <div className="relative z-10 px-5 pt-4">
+            <div className="rounded-xl border border-rose-100/80 bg-white/80 p-3 text-xs text-neutral-800 shadow-sm">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-start gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 overflow-hidden">
+                  <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg border border-rose-100 bg-rose-50 text-rose-600">
                     {application.logoUrl ? (
                       <img
                         src={application.logoUrl}
@@ -308,7 +313,7 @@ export default function MoveToRejectedDialog({
                   </div>
                   <div>
                     <div className="font-medium text-neutral-900">
-                      {application.role || 'Role not set'}
+                      {application.role || "Role not set"}
                     </div>
                     <div className="text-neutral-600">
                       {application.company}
@@ -346,7 +351,7 @@ export default function MoveToRejectedDialog({
         {/* Form */}
         <form
           onSubmit={handleSubmit}
-          className="max-h-[70vh] space-y-4 overflow-y-auto px-5 py-4"
+          className="relative z-10 max-h-[70vh] space-y-4 overflow-y-auto px-5 py-4"
         >
           {/* Basic job info */}
           <div className="grid gap-4 md:grid-cols-2">
@@ -362,7 +367,7 @@ export default function MoveToRejectedDialog({
                 <input
                   type="text"
                   value={form.company}
-                  onChange={handleChange('company')}
+                  onChange={handleChange("company")}
                   placeholder="Acme GmbH"
                   className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-300"
                   required
@@ -377,7 +382,7 @@ export default function MoveToRejectedDialog({
               <input
                 type="text"
                 value={form.role}
-                onChange={handleChange('role')}
+                onChange={handleChange("role")}
                 placeholder="Frontend Engineer"
                 className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 px-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-300"
                 required
@@ -394,7 +399,7 @@ export default function MoveToRejectedDialog({
                 <input
                   type="date"
                   value={form.appliedDate}
-                  onChange={handleChange('appliedDate')}
+                  onChange={handleChange("appliedDate")}
                   className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-300"
                 />
               </div>
@@ -412,7 +417,7 @@ export default function MoveToRejectedDialog({
                 <input
                   type="date"
                   value={form.decisionDate}
-                  onChange={handleChange('decisionDate')}
+                  onChange={handleChange("decisionDate")}
                   className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-300"
                   required
                 />
@@ -430,7 +435,7 @@ export default function MoveToRejectedDialog({
                 />
                 <select
                   value={form.employmentType}
-                  onChange={handleChange('employmentType')}
+                  onChange={handleChange("employmentType")}
                   className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-300"
                 >
                   <option value="">Select type…</option>
@@ -453,7 +458,7 @@ export default function MoveToRejectedDialog({
                 <input
                   type="text"
                   value={form.location}
-                  onChange={handleChange('location')}
+                  onChange={handleChange("location")}
                   placeholder="Berlin HQ / Remote"
                   className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-300"
                 />
@@ -462,7 +467,7 @@ export default function MoveToRejectedDialog({
           </div>
 
           {/* Rejection details & timeline */}
-          <div className="space-y-3 rounded-xl border border-neutral-200/80 bg-white/85 p-4">
+          <div className="space-y-3 rounded-xl border border-neutral-200/80 bg-white/80 p-4">
             <div className="flex items-center gap-2">
               <AlertCircle
                 className="h-4 w-4 text-rose-500"
@@ -481,7 +486,7 @@ export default function MoveToRejectedDialog({
                 <div className="relative">
                   <select
                     value={form.rejectionType}
-                    onChange={handleChange('rejectionType')}
+                    onChange={handleChange("rejectionType")}
                     className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 px-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-300"
                     required
                   >
@@ -509,7 +514,7 @@ export default function MoveToRejectedDialog({
                   <input
                     type="date"
                     value={form.phoneScreenDate}
-                    onChange={handleChange('phoneScreenDate')}
+                    onChange={handleChange("phoneScreenDate")}
                     className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-300"
                   />
                 </div>
@@ -527,7 +532,7 @@ export default function MoveToRejectedDialog({
                   <input
                     type="date"
                     value={form.firstInterviewDate}
-                    onChange={handleChange('firstInterviewDate')}
+                    onChange={handleChange("firstInterviewDate")}
                     className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-300"
                   />
                 </div>
@@ -545,7 +550,7 @@ export default function MoveToRejectedDialog({
                   <input
                     type="date"
                     value={form.secondInterviewDate}
-                    onChange={handleChange('secondInterviewDate')}
+                    onChange={handleChange("secondInterviewDate")}
                     className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-300"
                   />
                 </div>
@@ -554,7 +559,7 @@ export default function MoveToRejectedDialog({
           </div>
 
           {/* Contact & job posting */}
-          <div className="space-y-3 rounded-xl border border-neutral-200/80 bg-white/85 p-4">
+          <div className="space-y-3 rounded-xl border border-neutral-200/80 bg-white/80 p-4">
             <div className="text-sm font-medium text-neutral-900">
               Contact & job posting
             </div>
@@ -572,7 +577,7 @@ export default function MoveToRejectedDialog({
                   <input
                     type="text"
                     value={form.contactName}
-                    onChange={handleChange('contactName')}
+                    onChange={handleChange("contactName")}
                     placeholder="Julia Meyer"
                     className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-300"
                   />
@@ -591,7 +596,7 @@ export default function MoveToRejectedDialog({
                   <input
                     type="email"
                     value={form.contactEmail}
-                    onChange={handleChange('contactEmail')}
+                    onChange={handleChange("contactEmail")}
                     placeholder="recruiting@example.com"
                     className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-300"
                   />
@@ -610,7 +615,7 @@ export default function MoveToRejectedDialog({
                   <input
                     type="tel"
                     value={form.contactPhone}
-                    onChange={handleChange('contactPhone')}
+                    onChange={handleChange("contactPhone")}
                     placeholder="+49 30 123456"
                     className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-300"
                   />
@@ -629,7 +634,7 @@ export default function MoveToRejectedDialog({
                   <input
                     type="url"
                     value={form.url}
-                    onChange={handleChange('url')}
+                    onChange={handleChange("url")}
                     placeholder="https://jobs.example.com/frontend-engineer"
                     className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-300"
                   />
@@ -637,9 +642,7 @@ export default function MoveToRejectedDialog({
               </label>
 
               <label className="space-y-1 text-sm md:col-span-2">
-                <span className="font-medium text-neutral-800">
-                  Notes
-                </span>
+                <span className="font-medium text-neutral-800">Notes</span>
                 <div className="relative">
                   <FileText
                     className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-neutral-400"
@@ -647,7 +650,7 @@ export default function MoveToRejectedDialog({
                   />
                   <textarea
                     value={form.notes}
-                    onChange={handleChange('notes')}
+                    onChange={handleChange("notes")}
                     rows={3}
                     placeholder="Anything you want to remember about this rejection (feedback, feelings, lessons, etc.)"
                     className="w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 pt-2 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-300"
@@ -665,7 +668,12 @@ export default function MoveToRejectedDialog({
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex items-center justify-center rounded-lg border border-neutral-200 bg-white/80 px-4 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-rose-300"
+              className={[
+                "inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium text-neutral-800",
+                "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
+                "border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50",
+                "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-rose-300",
+              ].join(" ")}
             >
               Cancel
             </button>
@@ -673,12 +681,12 @@ export default function MoveToRejectedDialog({
               type="submit"
               disabled={!canSubmit}
               className={[
-                'inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium shadow-sm',
+                "inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium shadow-sm",
                 canSubmit
-                  ? 'bg-rose-600 text-white hover:bg-rose-500 focus-visible:ring-rose-300'
-                  : 'cursor-not-allowed bg-neutral-200 text-neutral-500',
-                'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
-              ].join(' ')}
+                  ? "bg-rose-600 text-white hover:bg-rose-500 focus-visible:ring-rose-300"
+                  : "cursor-not-allowed bg-rose-500/60 text-white/70",
+                "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+              ].join(" ")}
             >
               Save &amp; move to rejected
             </button>
