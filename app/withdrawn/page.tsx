@@ -169,7 +169,10 @@ export default function WithdrawnPage() {
     <>
       {/* Delete confirmation dialog */}
       {deleteTarget && (
-        <div className="fixed inset-y-0 right-0 left-64 z-[13000] flex items-center justify-center px-4 py-8">
+  <div
+    className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[13000] flex items-center justify-center px-4 py-8"
+  >
+
           <div
             className="absolute inset-0 bg-neutral-900/40"
             aria-hidden="true"

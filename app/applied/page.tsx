@@ -1,4 +1,3 @@
-// app/applied/page.tsx
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -82,6 +81,9 @@ export default function AppliedPage() {
     null,
   );
 
+  // Delete confirmation state
+  const [deleteTarget, setDeleteTarget] = useState<Application | null>(null);
+
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
     if (!q) return applications;
@@ -130,7 +132,18 @@ export default function AppliedPage() {
     setEditingApp(null);
   };
 
-  const handleDelete = (id: string) => {
+  // Delete dialog helpers
+  const openDeleteDialog = (app: Application) => {
+    setDeleteTarget(app);
+  };
+
+  const handleCancelDelete = () => {
+    setDeleteTarget(null);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deleteTarget) return;
+    const id = deleteTarget.id;
     const elementId = `application-card-${id}`;
 
     animateCardExit(elementId, 'delete', () => {
@@ -147,6 +160,8 @@ export default function AppliedPage() {
         setEditingApp(null);
         setDialogOpen(false);
       }
+
+      setDeleteTarget(null);
     });
   };
 
@@ -277,161 +292,217 @@ export default function AppliedPage() {
   };
 
   return (
-    <section
-      className={[
-        'relative rounded-2xl border border-neutral-200/70',
-        'bg-gradient-to-br from-sky-50 via-fuchsia-50 to-amber-50',
-        'p-8 shadow-md overflow-hidden',
-      ].join(' ')}
-    >
-      {/* soft color blobs */}
-      <div className="pointer-events-none absolute -top-20 -right-24 h-72 w-72 rounded-full bg-sky-400/20 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-24 -left-28 h-80 w-80 rounded-full bg-fuchsia-400/20 blur-3xl" />
-
-      <div className="flex items-center gap-1">
-  <Image
-    src="/icons/checklist.png" // same icon you used for Applied
-    alt=""
-    width={37}
-    height={37}
-    aria-hidden="true"
-    className="shrink-0"
-  />
-  <h1 className="text-2xl font-semibold text-neutral-900">Applied</h1>
-</div>
-<p className="mt-1 text-neutral-700">
-  List of your submitted applications.
-</p>
-
-
-      {/* Toolbar */}
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-        {/* Search */}
-        <div className="relative flex-1">
-          <Search
-            className="pointer-events-none absolute left-3 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-neutral-400"
+    <>
+      {deleteTarget && (
+        <div
+          className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[13000] flex items-center justify-center px-4 py-8"
+        >
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-neutral-900/40"
             aria-hidden="true"
+            onClick={handleCancelDelete}
           />
-          <input
-            type="search"
-            placeholder="Search company, role, location, status…"
-            aria-label="Search applications"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
+
+          {/* Panel */}
+          <div
             className={[
-              'h-11 w-full rounded-lg pl-9 pr-3 text-sm text-neutral-900 placeholder:text-neutral-500',
-              'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
-              'border border-neutral-200 shadow-sm',
-              'hover:bg-white focus:bg-white',
-              'ring-1 ring-transparent',
-              'focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-sky-300',
-              'transition-shadow',
+              'relative z-10 w-full max-w-sm rounded-2xl border border-neutral-200/80',
+              'bg-white shadow-2xl p-5',
             ].join(' ')}
-          />
+          >
+            <h2 className="text-sm font-semibold text-neutral-900">
+              Delete application?
+            </h2>
+            <p className="mt-2 text-sm text-neutral-700">
+              This will permanently remove your application to{' '}
+              <span className="font-medium">
+                {deleteTarget.company}
+              </span>{' '}
+              for the role{' '}
+              <span className="font-medium">
+                {deleteTarget.role}
+              </span>.
+            </p>
+            <p className="mt-1 text-xs text-neutral-500">
+              This action cannot be undone.
+            </p>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={handleCancelDelete}
+                className="inline-flex items-center justify-center rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 shadow-sm hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="inline-flex items-center justify-center rounded-lg border border-rose-500 bg-rose-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-rose-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-rose-400"
+              >
+                Delete application
+              </button>
+            </div>
+          </div>
         </div>
+      )}
 
-        {/* Add */}
-        <button
-          type="button"
-          onClick={() => {
-            setEditingApp(null);
-            setDialogOpen(true);
-          }}
-          className={[
-            'inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800',
-            'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
-            'border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50',
-            'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-300',
-          ].join(' ')}
-        >
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          Add
-        </button>
+      <section
+        className={[
+          'relative rounded-2xl border border-neutral-200/70',
+          'bg-gradient-to-br from-sky-50 via-fuchsia-50 to-amber-50',
+          'p-8 shadow-md overflow-hidden',
+        ].join(' ')}
+      >
+        {/* soft color blobs */}
+        <div className="pointer-events-none absolute -top-20 -right-24 h-72 w-72 rounded-full bg-sky-400/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 -left-28 h-80 w-80 rounded-full bg-fuchsia-400/20 blur-3xl" />
 
-        {/* Filter (placeholder) */}
-        <button
-          type="button"
-          className={[
-            'inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800',
-            'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
-            'border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50',
-            'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-300',
-          ].join(' ')}
-        >
-          <Filter className="h-4 w-4" aria-hidden="true" />
-          Filter
-        </button>
-      </div>
+        <div className="flex items-center gap-1">
+          <Image
+            src="/icons/checklist.png" // same icon you used for Applied
+            alt=""
+            width={37}
+            height={37}
+            aria-hidden="true"
+            className="shrink-0"
+          />
+          <h1 className="text-2xl font-semibold text-neutral-900">Applied</h1>
+        </div>
+        <p className="mt-1 text-neutral-700">
+          List of your submitted applications.
+        </p>
 
-      {/* Results grid */}
-      <div className="mt-5 grid grid-cols-1 gap-3">
-        {filtered.map((app) => (
-          <ApplicationCard
-            key={app.id}
-            app={app}
-            isExpanded={!!expanded[app.id]}
-            onToggle={() => toggle(app.id)}
-            onEdit={(a) => {
-              setEditingApp(a);
+        {/* Toolbar */}
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+          {/* Search */}
+          <div className="relative flex-1">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-neutral-400"
+              aria-hidden="true"
+            />
+            <input
+              type="search"
+              placeholder="Search company, role, location, status…"
+              aria-label="Search applications"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className={[
+                'h-11 w-full rounded-lg pl-9 pr-3 text-sm text-neutral-900 placeholder:text-neutral-500',
+                'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
+                'border border-neutral-200 shadow-sm',
+                'hover:bg-white focus:bg-white',
+                'ring-1 ring-transparent',
+                'focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-sky-300',
+                'transition-shadow',
+              ].join(' ')}
+            />
+          </div>
+
+          {/* Add */}
+          <button
+            type="button"
+            onClick={() => {
+              setEditingApp(null);
               setDialogOpen(true);
             }}
-            onMove={openMoveDialog}
-            onDelete={handleDelete}
-            fmtDate={fmtDate}
-            statusClasses={statusClasses}
-          />
-        ))}
+            className={[
+              'inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800',
+              'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
+              'border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50',
+              'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-300',
+            ].join(' ')}
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Add
+          </button>
 
-        {filtered.length === 0 && (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
-            <div className="mb-2 text-5xl">🔎</div>
-            <p className="text-sm text-neutral-700">
-              {applications.length === 0
-                ? 'No applications yet. Click “Add” to create your first one.'
-                : 'No applications match your search.'}
-            </p>
-          </div>
-        )}
-      </div>
+          {/* Filter (placeholder) */}
+          <button
+            type="button"
+            className={[
+              'inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800',
+              'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
+              'border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50',
+              'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-300',
+            ].join(' ')}
+          >
+            <Filter className="h-4 w-4" aria-hidden="true" />
+            Filter
+          </button>
+        </div>
 
-      {/* Move dialog */}
-      <MoveApplicationDialog
-        open={moveDialogOpen}
-        application={
-          appBeingMoved && {
-            id: appBeingMoved.id,
-            company: appBeingMoved.company,
-            role: appBeingMoved.role,
-            location: appBeingMoved.location,
-            status: appBeingMoved.status,
-            appliedOn: appBeingMoved.appliedOn,
-            contactPerson: appBeingMoved.contactPerson,
-            contactEmail: appBeingMoved.contactEmail,
-            contactPhone: appBeingMoved.contactPhone,
-            offerUrl: appBeingMoved.offerUrl,
-            logoUrl: appBeingMoved.logoUrl,
-            employmentType: appBeingMoved.employmentType,
-            notes: appBeingMoved.notes,
+        {/* Results grid */}
+        <div className="mt-5 grid grid-cols-1 gap-3">
+          {filtered.map((app) => (
+            <ApplicationCard
+              key={app.id}
+              app={app}
+              isExpanded={!!expanded[app.id]}
+              onToggle={() => toggle(app.id)}
+              onEdit={(a) => {
+                setEditingApp(a);
+                setDialogOpen(true);
+              }}
+              onMove={openMoveDialog}
+              onDelete={openDeleteDialog}
+              fmtDate={fmtDate}
+              statusClasses={statusClasses}
+            />
+          ))}
+
+          {filtered.length === 0 && (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
+              <div className="mb-2 text-5xl">🔎</div>
+              <p className="text-sm text-neutral-700">
+                {applications.length === 0
+                  ? 'No applications yet. Click “Add” to create your first one.'
+                  : 'No applications match your search.'}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Move dialog */}
+        <MoveApplicationDialog
+          open={moveDialogOpen}
+          application={
+            appBeingMoved && {
+              id: appBeingMoved.id,
+              company: appBeingMoved.company,
+              role: appBeingMoved.role,
+              location: appBeingMoved.location,
+              status: appBeingMoved.status,
+              appliedOn: appBeingMoved.appliedOn,
+              contactPerson: appBeingMoved.contactPerson,
+              contactEmail: appBeingMoved.contactEmail,
+              contactPhone: appBeingMoved.contactPhone,
+              offerUrl: appBeingMoved.offerUrl,
+              logoUrl: appBeingMoved.logoUrl,
+              employmentType: appBeingMoved.employmentType,
+              notes: appBeingMoved.notes,
+            }
           }
-        }
-        onClose={closeMoveDialog}
-        onMoveToInterviews={moveToInterviews}
-        onMoveToRejected={moveToRejected}
-        onMoveToWithdrawn={moveToWithdrawn}
-        fmtDate={fmtDate}
-        statusClasses={statusClasses}
-      />
+          onClose={closeMoveDialog}
+          onMoveToInterviews={moveToInterviews}
+          onMoveToRejected={moveToRejected}
+          onMoveToWithdrawn={moveToWithdrawn}
+          fmtDate={fmtDate}
+          statusClasses={statusClasses}
+        />
 
-      {/* Add / edit dialog */}
-      <AddApplicationDialog
-        open={dialogOpen}
-        onClose={() => {
-          setDialogOpen(false);
-          setEditingApp(null);
-        }}
-        initialData={editingApp ? appToForm(editingApp) : undefined}
-        onSave={handleSave}
-      />
-    </section>
+        {/* Add / edit dialog */}
+        <AddApplicationDialog
+          open={dialogOpen}
+          onClose={() => {
+            setDialogOpen(false);
+            setEditingApp(null);
+          }}
+          initialData={editingApp ? appToForm(editingApp) : undefined}
+          onSave={handleSave}
+        />
+      </section>
+    </>
   );
 }

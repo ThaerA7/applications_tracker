@@ -51,7 +51,7 @@ type ApplicationCardProps = {
   onToggle: () => void;
   onEdit: (app: Application) => void;
   onMove: (app: Application) => void;
-  onDelete: (id: string) => void;
+  onDelete: (app: Application) => void; // changed to pass full app
   fmtDate: (d: string) => string;
   statusClasses: (s: string) => string;
 };
@@ -209,7 +209,7 @@ export default function ApplicationCard({
 
         <button
           type="button"
-          onClick={() => onDelete(app.id)}
+          onClick={() => onDelete(app)} // open confirmation in parent
           className={[
             'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium',
             'text-rose-700',

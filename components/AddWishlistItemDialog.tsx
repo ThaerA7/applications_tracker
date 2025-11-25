@@ -133,25 +133,27 @@ export default function AddWishlistItemDialog({
   if (typeof document === "undefined") return null;
 
   const dialog = (
-    <div className="fixed inset-y-0 right-0 left-64 z-[10000] flex items-center justify-center px-4 py-8">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-neutral-900/40"
-        onClick={onClose}
-        aria-hidden="true"
-      />
+  <div
+    className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[10000] flex items-center justify-center px-4 py-8"
+  >
+    {/* Backdrop */}
+    <div
+      className="absolute inset-0 bg-neutral-900/40"
+      onClick={onClose}
+      aria-hidden="true"
+    />
 
-      {/* Panel */}
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="add-wishlist-item-title"
-        className={[
-          "relative z-10 max-h-full w-full max-w-2xl overflow-hidden rounded-2xl border border-neutral-200/80",
-          "bg-gradient-to-br from-amber-50 via-white to-yellow-50 shadow-xl",
-        ].join(" ")}
-        onClick={(e) => e.stopPropagation()}
-      >
+    {/* Panel */}
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="add-wishlist-item-title"
+      className={[
+        "relative z-10 max-h-full w-full max-w-2xl overflow-hidden rounded-2xl border border-neutral-200/80",
+        "bg-gradient-to-br from-amber-50 via-white to-yellow-50 shadow-xl",
+      ].join(" ")}
+      onClick={(e) => e.stopPropagation()}
+    >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-neutral-200/70 px-5 py-3">
           <div className="flex items-center gap-2">

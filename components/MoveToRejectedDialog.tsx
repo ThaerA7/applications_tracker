@@ -232,7 +232,10 @@ export default function MoveToRejectedDialog({
     form.decisionDate.trim().length > 0;
 
   const dialog = (
-    <div className="fixed inset-y-0 right-0 left-64 z-[12500] flex items-center justify-center px-4 py-8">
+  <div
+    className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[12500] flex items-center justify-center px-4 py-8"
+  >
+
       {/* Backdrop with rose tint */}
       <div
         className="absolute inset-0 bg-rose-950/40"
