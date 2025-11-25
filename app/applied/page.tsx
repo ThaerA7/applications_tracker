@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Search, Plus, Filter } from 'lucide-react';
+import { Search, Plus, Filter, History } from 'lucide-react';
 import Image from 'next/image';
 import { animateCardExit } from '../../components/cardExitAnimation';
 
@@ -11,9 +11,14 @@ import AddApplicationDialog, {
 import MoveApplicationDialog from '../../components/MoveApplicationDialog';
 import type { RejectionDetails } from '../../components/MoveToRejectedDialog';
 import type { WithdrawnDetails } from '../../components/MoveToWithdrawnDialog';
+import type { Interview } from '../../components/ScheduleInterviewDialog';
 import ApplicationCard, {
   type Application,
 } from './ApplicationCard';
+import ActivityLogSidebar, {
+  type ActivityItem,
+  type ActivityType,
+} from './ActivityLogSidebar';
 
 type StoredRejection = RejectionDetails & { id: string };
 
@@ -84,13 +89,48 @@ export default function AppliedPage() {
   // Delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState<Application | null>(null);
 
+  // Activity sidebar / log state
+  const [activityOpen, setActivityOpen] = useState(false);
+  const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
+
+  const logActivity = (
+  type: ActivityType,
+  app: Application | null,
+  extras?: Partial<ActivityItem>,
+) => {
+  if (!app) return;
+
+  const id =
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2);
+
+  const timestamp = new Date().toISOString();
+
+  const base: ActivityItem = {
+    id,
+    appId: app.id,
+    type,
+    timestamp,
+    company: app.company,
+    role: app.role,
+    location: app.location,
+    appliedOn: app.appliedOn, // 🔥 this line makes "Applied on" work
+    ...extras,
+  };
+
+  // newest first, keep last 100
+  setActivityItems((prev) => [base, ...prev].slice(0, 100));
+};
+
+
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
     if (!q) return applications;
     return applications.filter((a) =>
       [a.company, a.role, a.location, a.status]
         .filter(Boolean)
-        .some((v) => v.toLowerCase().includes(q)),
+        .some((v) => v!.toLowerCase().includes(q)),
     );
   }, [applications, query]);
 
@@ -109,17 +149,26 @@ export default function AppliedPage() {
     };
 
     setApplications((prev) => [newApp, ...prev]);
+
+    logActivity('added', newApp, {
+      toStatus: newApp.status,
+      note: 'Application created',
+    });
   };
 
   const handleUpdate = (data: NewApplicationForm) => {
     if (!editingApp) return;
+
+    const updatedApp: Application = { ...editingApp, ...data };
+
     setApplications((prev) =>
-      prev.map((app) =>
-        app.id === editingApp.id
-          ? { ...app, ...data } // keep id & website from old
-          : app,
-      ),
+      prev.map((app) => (app.id === editingApp.id ? updatedApp : app)),
     );
+
+    logActivity('edited', updatedApp, {
+      fromStatus: editingApp.status,
+      toStatus: data.status,
+    });
   };
 
   const handleSave = (data: NewApplicationForm) => {
@@ -145,6 +194,12 @@ export default function AppliedPage() {
     if (!deleteTarget) return;
     const id = deleteTarget.id;
     const elementId = `application-card-${id}`;
+
+    // log before removing
+    logActivity('deleted', deleteTarget, {
+      fromStatus: deleteTarget.status,
+      note: 'Application removed from Applied list',
+    });
 
     animateCardExit(elementId, 'delete', () => {
       // actually remove from state AFTER animation
@@ -201,8 +256,17 @@ export default function AppliedPage() {
     });
   };
 
-  const moveToInterviews = () => {
-    // you can also trigger any global/state updates here if needed
+  const moveToInterviews = (_interview: Interview) => {
+    if (!appBeingMoved) {
+      moveOutOfApplied();
+      return;
+    }
+
+    logActivity('moved_to_interviews', appBeingMoved, {
+      fromStatus: appBeingMoved.status,
+      toStatus: 'Interview',
+    });
+
     moveOutOfApplied();
   };
 
@@ -235,6 +299,15 @@ export default function AppliedPage() {
       } catch (err) {
         console.error('Failed to persist rejected application', err);
       }
+    }
+
+    if (appBeingMoved) {
+      logActivity('moved_to_rejected', appBeingMoved, {
+        fromStatus: appBeingMoved.status,
+        toStatus: 'Rejected',
+        // RejectionDetails doesn't have `reason` in your types, so keep this generic
+        note: 'Marked as rejected',
+      });
     }
 
     moveOutOfApplied();
@@ -288,11 +361,18 @@ export default function AppliedPage() {
       }
     }
 
+    logActivity('moved_to_withdrawn', source, {
+      fromStatus: source.status,
+      toStatus: 'Withdrawn',
+      note: details.reason || undefined,
+    });
+
     moveOutOfApplied();
   };
 
   return (
     <>
+      {/* Delete confirmation dialog */}
       {deleteTarget && (
         <div
           className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[13000] flex items-center justify-center px-4 py-8"
@@ -322,7 +402,8 @@ export default function AppliedPage() {
               for the role{' '}
               <span className="font-medium">
                 {deleteTarget.role}
-              </span>.
+              </span>
+              .
             </p>
             <p className="mt-1 text-xs text-neutral-500">
               This action cannot be undone.
@@ -348,6 +429,14 @@ export default function AppliedPage() {
         </div>
       )}
 
+      {/* Activity sidebar (slides in from the right) */}
+      <ActivityLogSidebar
+        open={activityOpen}
+        onClose={() => setActivityOpen(false)}
+        items={activityItems}
+        statusClasses={statusClasses}
+      />
+
       <section
         className={[
           'relative rounded-2xl border border-neutral-200/70',
@@ -359,17 +448,42 @@ export default function AppliedPage() {
         <div className="pointer-events-none absolute -top-20 -right-24 h-72 w-72 rounded-full bg-sky-400/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 -left-28 h-80 w-80 rounded-full bg-fuchsia-400/20 blur-3xl" />
 
-        <div className="flex items-center gap-1">
-          <Image
-            src="/icons/checklist.png" // same icon you used for Applied
-            alt=""
-            width={37}
-            height={37}
-            aria-hidden="true"
-            className="shrink-0"
-          />
-          <h1 className="text-2xl font-semibold text-neutral-900">Applied</h1>
+        {/* header row with activity button on the right */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-1">
+            <Image
+              src="/icons/checklist.png" // same icon you used for Applied
+              alt=""
+              width={37}
+              height={37}
+              aria-hidden="true"
+              className="shrink-0"
+            />
+            <h1 className="text-2xl font-semibold text-neutral-900">
+              Applied
+            </h1>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setActivityOpen(true)}
+            className={[
+              'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-neutral-800',
+              'bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70',
+              'border border-neutral-200 shadow-sm hover:bg-white',
+              'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-300',
+            ].join(' ')}
+          >
+            <History className="h-4 w-4 text-sky-600" aria-hidden="true" />
+            <span>Activity log</span>
+            {activityItems.length > 0 && (
+              <span className="ml-1 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-semibold text-neutral-700">
+                {activityItems.length}
+              </span>
+            )}
+          </button>
         </div>
+
         <p className="mt-1 text-neutral-700">
           List of your submitted applications.
         </p>
