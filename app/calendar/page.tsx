@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ComponentType } from "react";
 import Image from "next/image";
 import {
   ChevronLeft,
@@ -11,8 +11,9 @@ import {
   Undo2,
   Sparkles,
 } from "lucide-react";
-
-
+import CalendarDaySidebar, {
+  type CalendarDayEvent,
+} from "./CalendarDaySidebar";
 
 type ActivityKind =
   | "applied"
@@ -27,6 +28,10 @@ type CalendarEvent = {
   kind: ActivityKind;
   title: string;
   subtitle?: string;
+  /** Optional HH:MM (from original ISO) */
+  time?: string;
+  /** Optional full datetime ISO used for countdowns */
+  dateTime?: string;
 };
 
 const MONTH_NAMES = [
@@ -77,6 +82,40 @@ const KIND_META: Record<
   },
 };
 
+type KindIconMeta = {
+  Icon: ComponentType<any>;
+  iconBg: string;
+  iconColor: string;
+};
+
+const KIND_ICON_META: Record<ActivityKind, KindIconMeta> = {
+  applied: {
+    Icon: Briefcase,
+    iconBg: "bg-sky-50",
+    iconColor: "text-sky-600",
+  },
+  interview: {
+    Icon: PhoneCall,
+    iconBg: "bg-emerald-50",
+    iconColor: "text-emerald-600",
+  },
+  rejected: {
+    Icon: XCircle,
+    iconBg: "bg-rose-50",
+    iconColor: "text-rose-600",
+  },
+  withdrawn: {
+    Icon: Undo2,
+    iconBg: "bg-amber-50",
+    iconColor: "text-amber-600",
+  },
+  offer: {
+    Icon: Sparkles,
+    iconBg: "bg-fuchsia-50",
+    iconColor: "text-fuchsia-600",
+  },
+};
+
 type GridDay = {
   date: Date;
   iso: string;
@@ -106,6 +145,16 @@ function normalizeDate(value: unknown): string | null {
   return `${year}-${month}-${day}`;
 }
 
+function extractTime(value: unknown): string | null {
+  if (!value || typeof value !== "string") return null;
+  const trimmed = value.trim();
+  const [, timePartRaw] = trimmed.split("T");
+  if (!timePartRaw) return null;
+  const [hh, mm] = timePartRaw.split(":");
+  if (!hh || !mm) return null;
+  return `${hh.padStart(2, "0")}:${mm.padStart(2, "0")}`;
+}
+
 function buildMonthGrid(year: number, month: number): GridDay[] {
   // month: 0–11, Monday-first grid
   const firstOfMonth = new Date(year, month, 1);
@@ -132,7 +181,7 @@ function formatHumanDate(iso: string): string {
   if (!y || !m || !d) return iso;
   const asDate = new Date(Number(y), Number(m) - 1, Number(d));
   try {
-    return asDate.toLocaleDateString("en-DE", {
+    return asDate.toLocaleDateString("de-DE", {
       weekday: "short",
       day: "2-digit",
       month: "short",
@@ -143,9 +192,42 @@ function formatHumanDate(iso: string): string {
   }
 }
 
+function formatHumanDateTime(date: string, time?: string): string {
+  const base = formatHumanDate(date);
+  if (time) return `${base} · ${time}`;
+  return base;
+}
+
+function getCountdownLabel(ev: CalendarEvent, now: Date): string | null {
+  const baseIso =
+    ev.dateTime ?? (ev.time ? `${ev.date}T${ev.time}` : `${ev.date}T00:00:00`);
+
+  const target = new Date(baseIso);
+  if (Number.isNaN(target.getTime())) return null;
+
+  const diffMs = target.getTime() - now.getTime();
+  const future = diffMs >= 0;
+  const abs = Math.abs(diffMs);
+
+  const totalMinutes = Math.round(abs / 60000);
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+  const minutes = totalMinutes % 60;
+
+  const parts: string[] = [];
+  if (days) parts.push(`${days} day${days === 1 ? "" : "s"}`);
+  if (hours) parts.push(`${hours} h`);
+  if (!days && minutes) parts.push(`${minutes} min`);
+
+  if (!parts.length) return future ? "in a few moments" : "just now";
+  const text = parts.join(", ");
+  return future ? `in ${text}` : `${text} ago`;
+}
+
 export default function CalendarPage() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [monthState, setMonthState] = useState(() => {
     const base = new Date();
@@ -153,6 +235,16 @@ export default function CalendarPage() {
   });
 
   const todayIso = useMemo(() => toIsoDate(new Date()), []);
+
+  // For live-ish countdowns
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => {
+    setNow(new Date());
+    const id = window.setInterval(() => {
+      setNow(new Date());
+    }, 60_000); // update every minute
+    return () => window.clearInterval(id);
+  }, []);
 
   // Load all activity from localStorage
   useEffect(() => {
@@ -179,14 +271,18 @@ export default function CalendarPage() {
     // --- Interviews ---
     const interviews = parseArray("job-tracker:interviews");
     interviews.forEach((item: any) => {
-      const date = normalizeDate(item.date);
-      if (!date) return;
+      const dateOnly = normalizeDate(item.date);
+      if (!dateOnly) return;
+      const time = extractTime(item.date);
+
       addEvent({
-        id: `interview-${item.id ?? date}`,
-        date,
+        id: `interview-${item.id ?? item.date ?? dateOnly}`,
+        date: dateOnly,
         kind: "interview",
         title: item.company || "Interview",
         subtitle: item.role,
+        time: time || undefined,
+        dateTime: typeof item.date === "string" ? item.date : undefined,
       });
     });
 
@@ -231,14 +327,22 @@ export default function CalendarPage() {
         });
       }
 
-      const interviewDate = normalizeDate(item.interviewDate);
-      if (interviewDate) {
+      const interviewDateOnly = normalizeDate(item.interviewDate);
+      if (interviewDateOnly) {
+        const time = extractTime(item.interviewDate);
         addEvent({
-          id: `interview-from-withdrawn-${item.id ?? interviewDate}`,
-          date: interviewDate,
+          id: `interview-from-withdrawn-${
+            item.id ?? item.interviewDate ?? interviewDateOnly
+          }`,
+          date: interviewDateOnly,
           kind: "interview",
           title: item.company || "Interview",
           subtitle: item.role,
+          time: time || undefined,
+          dateTime:
+            typeof item.interviewDate === "string"
+              ? item.interviewDate
+              : undefined,
         });
       }
 
@@ -294,7 +398,9 @@ export default function CalendarPage() {
     // Deduplicate by (kind, date, title, subtitle)
     const map = new Map<string, CalendarEvent>();
     for (const ev of collected) {
-      const key = `${ev.kind}-${ev.date}-${ev.title}-${ev.subtitle ?? ""}`;
+      const key = `${ev.kind}-${ev.date}-${ev.title}-${ev.subtitle ?? ""}-${
+        ev.time ?? ""
+      }`;
       if (!map.has(key)) {
         map.set(key, ev);
       }
@@ -317,7 +423,6 @@ export default function CalendarPage() {
       grouped[ev.date].push(ev);
     }
 
-    // small, but sort per day for nicer display
     Object.values(grouped).forEach((list) =>
       list.sort((a, b) => a.kind.localeCompare(b.kind))
     );
@@ -330,10 +435,12 @@ export default function CalendarPage() {
     [monthState]
   );
 
-  const selectedEvents =
+  const selectedEvents: CalendarDayEvent[] =
     selectedDate && eventsByDate[selectedDate]
-      ? eventsByDate[selectedDate]
+      ? (eventsByDate[selectedDate] as CalendarDayEvent[])
       : [];
+
+  const selectedDateLabel = selectedDate ? formatHumanDate(selectedDate) : "";
 
   const handlePrevMonth = () => {
     setMonthState((prev) => {
@@ -356,269 +463,409 @@ export default function CalendarPage() {
   };
 
   const handleToday = () => {
-    const now = new Date();
-    const iso = toIsoDate(now);
-    setMonthState({ year: now.getFullYear(), month: now.getMonth() });
+    const nowDate = new Date();
+    const iso = toIsoDate(nowDate);
+    setMonthState({ year: nowDate.getFullYear(), month: nowDate.getMonth() });
     setSelectedDate(iso);
+    setSidebarOpen(true);
   };
 
+  const handleDayClick = (iso: string) => {
+    setSelectedDate(iso);
+    setSidebarOpen(true);
+  };
+
+  // Month-level stats
+  const monthStats = useMemo(() => {
+    const monthEvents = events.filter((ev) => {
+      const [y, m] = ev.date.split("-");
+      if (!y || !m) return false;
+      return (
+        Number(y) === monthState.year && Number(m) === monthState.month + 1
+      );
+    });
+
+    const countByKind: Record<ActivityKind, number> = {
+      applied: 0,
+      interview: 0,
+      rejected: 0,
+      withdrawn: 0,
+      offer: 0,
+    };
+
+    monthEvents.forEach((ev) => {
+      countByKind[ev.kind] += 1;
+    });
+
+    const outcomes =
+      countByKind.rejected + countByKind.withdrawn + countByKind.offer;
+
+    return {
+      total: monthEvents.length,
+      byKind: countByKind,
+      outcomes,
+    };
+  }, [events, monthState]);
+
+  // Upcoming interviews (from now onwards, considering time if available)
+  const upcomingInterviews = useMemo(() => {
+    const nowMs = Date.now();
+    return events
+      .filter((ev) => ev.kind === "interview")
+      .filter((ev) => {
+        const dateTimeStr =
+          ev.dateTime ??
+          (ev.time ? `${ev.date}T${ev.time}` : `${ev.date}T23:59:59`);
+        const dt = new Date(dateTimeStr);
+        if (Number.isNaN(dt.getTime())) return false;
+        return dt.getTime() >= nowMs;
+      })
+      .sort((a, b) => {
+        const aStr =
+          a.dateTime ?? (a.time ? `${a.date}T${a.time}` : `${a.date}T23:59:59`);
+        const bStr =
+          b.dateTime ?? (b.time ? `${b.date}T${b.time}` : `${b.date}T23:59:59`);
+        return aStr.localeCompare(bStr);
+      })
+      .slice(0, 5);
+  }, [events]);
+
   return (
-    <section
-      className={[
-        "relative rounded-2xl border border-neutral-200/70",
-        "bg-gradient-to-br from-indigo-50 via-white to-sky-50",
-        "p-8 shadow-md overflow-hidden",
-      ].join(" ")}
-    >
-      {/* soft blobs */}
-      <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-indigo-400/20 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-sky-400/20 blur-3xl" />
+    <>
+      <section
+        className={[
+          "relative rounded-2xl border border-neutral-200/70",
+          "bg-gradient-to-br from-indigo-50 via-white to-sky-50",
+          "p-6 sm:p-8 shadow-md overflow-hidden",
+        ].join(" ")}
+      >
+        {/* soft blobs */}
+        <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-indigo-400/15 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-sky-400/15 blur-3xl" />
 
-      <div className="relative z-10">
-        {/* Header */}
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <div className="flex items-center gap-1">
-              <Image
-                src="/icons/calendar.png" // your calendar icon
-                alt=""
-                width={37}
-                height={37}
-                aria-hidden="true"
-                className="shrink-0 -mt-1"
-              />
-              <h1 className="text-2xl font-semibold text-neutral-900">
-                Activity calendar
-              </h1>
-            </div>
-            <p className="mt-1 text-sm text-neutral-700">
-              A big overview of when you applied, interviewed, got rejected or
-              withdrew.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-1 rounded-xl border border-neutral-200 bg-white/80 px-2 py-1.5 shadow-sm">
-              <button
-                type="button"
-                onClick={handlePrevMonth}
-                className="inline-flex h-7 w-7 items-center justify-center rounded-lg hover:bg-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
-                aria-label="Previous month"
-              >
-                <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-              </button>
-              <div className="px-1 text-sm font-medium text-neutral-900">
-                {MONTH_NAMES[monthState.month]} {monthState.year}
+        <div className="relative z-10">
+          {/* Header */}
+          <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <Image
+                  src="/icons/calendar.png"
+                  alt=""
+                  width={40}
+                  height={40}
+                  aria-hidden="true"
+                  className="shrink-0"
+                />
+                <div>
+                  <h1 className="text-xl sm:text-2xl font-semibold text-neutral-900">
+                    Activity calendar
+                  </h1>
+                  <p className="mt-1 text-xs sm:text-sm text-neutral-600">
+                    See when you applied, interviewed, got responses, or
+                    withdrew — all in one clean view.
+                  </p>
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={handleNextMonth}
-                className="inline-flex h-7 w-7 items-center justify-center rounded-lg hover:bg-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
-                aria-label="Next month"
-              >
-                <ChevronRight className="h-4 w-4" aria-hidden="true" />
-              </button>
             </div>
-            <button
-              type="button"
-              onClick={handleToday}
-              className="inline-flex items-center gap-1 rounded-lg border border-neutral-200 bg-white/80 px-3 py-1.5 text-xs font-medium text-neutral-800 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
-            >
-              Today
-            </button>
-          </div>
-        </header>
 
-        {/* Legend */}
-        <div className="mt-4 flex flex-wrap gap-2 text-xs">
-          <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white/80 px-2.5 py-1 shadow-sm">
-            <Briefcase
-              className="h-3.5 w-3.5 text-sky-600"
-              aria-hidden="true"
-            />
-            <span className="text-[11px] font-medium text-neutral-900">
-              {KIND_META.applied.label}
-            </span>
-          </div>
-
-          <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white/80 px-2.5 py-1 shadow-sm">
-            <PhoneCall
-              className="h-3.5 w-3.5 text-emerald-600"
-              aria-hidden="true"
-            />
-            <span className="text-[11px] font-medium text-neutral-900">
-              {KIND_META.interview.label}
-            </span>
-          </div>
-
-          <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white/80 px-2.5 py-1 shadow-sm">
-            <XCircle className="h-3.5 w-3.5 text-rose-600" aria-hidden="true" />
-            <span className="text-[11px] font-medium text-neutral-900">
-              {KIND_META.rejected.label}
-            </span>
-          </div>
-
-          <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white/80 px-2.5 py-1 shadow-sm">
-            <Undo2 className="h-3.5 w-3.5 text-amber-600" aria-hidden="true" />
-            <span className="text-[11px] font-medium text-neutral-900">
-              {KIND_META.withdrawn.label}
-            </span>
-          </div>
-
-          <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white/80 px-2.5 py-1 shadow-sm">
-            <Sparkles
-              className="h-3.5 w-3.5 text-fuchsia-600"
-              aria-hidden="true"
-            />
-            <span className="text-[11px] font-medium text-neutral-900">
-              {KIND_META.offer.label}
-            </span>
-          </div>
-        </div>
-
-        {/* Calendar grid */}
-        <div className="mt-6 rounded-2xl border border-neutral-200/80 bg-white/80 p-4 shadow-sm backdrop-blur">
-          {/* Weekday header */}
-          <div className="grid grid-cols-7 text-center text-xs font-medium text-neutral-500">
-            {WEEKDAYS.map((d) => (
-              <div key={d} className="h-8 leading-8">
-                {d}
-              </div>
-            ))}
-          </div>
-
-          {/* Days */}
-          <div className="mt-1 grid grid-cols-7 gap-1 text-xs">
-            {grid.map((day) => {
-              const dayEvents = eventsByDate[day.iso] ?? [];
-              const hasEvents = dayEvents.length > 0;
-              const isToday = day.iso === todayIso;
-
-              const classes = [
-                "relative flex flex-col rounded-xl border p-1.5 min-h-[80px] text-left transition",
-                day.inCurrentMonth
-                  ? "bg-white/90 text-neutral-900"
-                  : "bg-neutral-50/70 text-neutral-400",
-                hasEvents
-                  ? "border-emerald-200 shadow-sm"
-                  : "border-neutral-100",
-                isToday ? "ring-2 ring-emerald-400 ring-offset-1" : "",
-                "hover:bg-neutral-50",
-              ]
-                .filter(Boolean)
-                .join(" ");
-
-              return (
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <div className="flex items-center gap-1 rounded-xl border border-neutral-200 bg-white/80 px-2 py-1.5 shadow-sm">
                 <button
-                  key={day.iso}
                   type="button"
-                  onClick={() => setSelectedDate(day.iso)}
-                  className={classes}
+                  onClick={handlePrevMonth}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-lg hover:bg-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+                  aria-label="Previous month"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-semibold">
-                      {day.date.getDate()}
+                  <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                </button>
+                <div className="px-1 text-sm font-medium text-neutral-900">
+                  {MONTH_NAMES[monthState.month]} {monthState.year}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleNextMonth}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-lg hover:bg-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+                  aria-label="Next month"
+                >
+                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={handleToday}
+                className="inline-flex items-center gap-1 rounded-lg border border-neutral-200 bg-white/80 px-3 py-1.5 text-xs font-medium text-neutral-800 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+              >
+                Today
+              </button>
+            </div>
+          </header>
+
+          {/* Month stats */}
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-neutral-200 bg-white/80 p-3 shadow-sm">
+              <div className="text-[11px] font-medium uppercase tracking-wide text-neutral-500">
+                This month
+              </div>
+              <div className="mt-1 flex items-baseline gap-1">
+                <span className="text-lg font-semibold text-neutral-900">
+                  {monthStats.total}
+                </span>
+                <span className="text-xs text-neutral-500">total events</span>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-neutral-200 bg-white/80 p-3 shadow-sm flex items-center justify-between gap-2">
+              <div>
+                <div className="text-[11px] font-medium uppercase tracking-wide text-neutral-500">
+                  Applications
+                </div>
+                <div className="mt-1 text-lg font-semibold text-neutral-900">
+                  {monthStats.byKind.applied}
+                </div>
+              </div>
+              <div className="flex -space-x-1">
+                <span className="h-2 w-2 rounded-full bg-sky-500" />
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-neutral-200 bg-white/80 p-3 shadow-sm flex items-center justify-between gap-2">
+              <div>
+                <div className="text-[11px] font-medium uppercase tracking-wide text-neutral-500">
+                  Outcomes
+                </div>
+                <div className="mt-1 text-lg font-semibold text-neutral-900">
+                  {monthStats.outcomes}
+                </div>
+              </div>
+              <div className="flex -space-x-1">
+                <span className="h-2 w-2 rounded-full bg-rose-500" />
+                <span className="h-2 w-2 rounded-full bg-amber-500" />
+                <span className="h-2 w-2 rounded-full bg-fuchsia-500" />
+              </div>
+            </div>
+          </div>
+
+          {/* Main layout: calendar + upcoming */}
+          <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)]">
+            {/* Left: calendar */}
+            <div className="flex flex-col">
+              <div className="rounded-2xl border border-neutral-200/80 bg-white/85 p-4 shadow-sm backdrop-blur">
+                {/* Legend */}
+                <div className="mb-4 flex flex-wrap gap-2 text-[11px]">
+                  <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white px-2.5 py-1 shadow-sm">
+                    <Briefcase className="h-3.5 w-3.5 text-sky-600" />
+                    <span className="font-medium text-neutral-900">
+                      {KIND_META.applied.label}
                     </span>
-                    {hasEvents && (
-                      <span className="inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                    )}
+                  </div>
+                  <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white px-2.5 py-1 shadow-sm">
+                    <PhoneCall className="h-3.5 w-3.5 text-emerald-600" />
+                    <span className="font-medium text-neutral-900">
+                      {KIND_META.interview.label}
+                    </span>
+                  </div>
+                  <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white px-2.5 py-1 shadow-sm">
+                    <XCircle className="h-3.5 w-3.5 text-rose-600" />
+                    <span className="font-medium text-neutral-900">
+                      {KIND_META.rejected.label}
+                    </span>
+                  </div>
+                  <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white px-2.5 py-1 shadow-sm">
+                    <Undo2 className="h-3.5 w-3.5 text-amber-600" />
+                    <span className="font-medium text-neutral-900">
+                      {KIND_META.withdrawn.label}
+                    </span>
+                  </div>
+                  <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white px-2.5 py-1 shadow-sm">
+                    <Sparkles className="h-3.5 w-3.5 text-fuchsia-600" />
+                    <span className="font-medium text-neutral-900">
+                      {KIND_META.offer.label}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Weekday header */}
+                <div className="grid grid-cols-7 text-center text-[11px] font-medium text-neutral-500">
+                  {WEEKDAYS.map((d) => (
+                    <div key={d} className="h-8 leading-8">
+                      {d}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Days */}
+                <div className="mt-1 grid grid-cols-7 gap-1 text-xs">
+                  {grid.map((day) => {
+                    const dayEvents = eventsByDate[day.iso] ?? [];
+                    const hasEvents = dayEvents.length > 0;
+                    const isToday = day.iso === todayIso;
+                    const isSelected = day.iso === selectedDate;
+
+                    const uniqueKinds = Array.from(
+                      new Set<ActivityKind>(dayEvents.map((e) => e.kind))
+                    ).slice(0, 4);
+
+                    const baseClasses =
+                      "relative flex flex-col rounded-xl border p-1.5 min-h-[72px] text-left transition";
+
+                    const classes = [
+                      baseClasses,
+                      day.inCurrentMonth
+                        ? "bg-white/95 text-neutral-900"
+                        : "bg-neutral-50/80 text-neutral-400",
+                      hasEvents ? "border-neutral-200" : "border-neutral-100",
+                      isToday
+                        ? "ring-1 ring-emerald-400 ring-offset-[1px]"
+                        : "",
+                      isSelected ? "border-indigo-400 shadow-sm" : "",
+                      "hover:bg-neutral-50",
+                    ]
+                      .filter(Boolean)
+                      .join(" ");
+
+                    return (
+                      <button
+                        key={day.iso}
+                        type="button"
+                        onClick={() => handleDayClick(day.iso)}
+                        className={classes}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-semibold">
+                            {day.date.getDate()}
+                          </span>
+                          {isToday && (
+                            <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-medium text-emerald-700">
+                              Today
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="mt-auto flex items-center justify-between pt-2">
+                          <div className="flex -space-x-1">
+                            {uniqueKinds.map((kind) => (
+                              <span
+                                key={kind}
+                                className={`h-1.5 w-1.5 rounded-full border border-white ${KIND_META[kind].accentDot}`}
+                              />
+                            ))}
+                          </div>
+                          {hasEvents && (
+                            <span className="text-[10px] text-neutral-500">
+                              {dayEvents.length}{" "}
+                              {dayEvents.length === 1 ? "event" : "events"}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Right: upcoming interviews + hint */}
+            <div className="flex flex-col gap-4">
+              {/* Upcoming interviews */}
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-3 shadow-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100">
+                      <PhoneCall className="h-3.5 w-3.5 text-emerald-700" />
+                    </div>
+                    <div>
+                      <h2 className="text-xs font-semibold text-emerald-900">
+                        Upcoming interviews
+                      </h2>
+                      <p className="text-[11px] text-emerald-800/80">
+                        {upcomingInterviews.length > 0
+                          ? "Your next scheduled interview dates."
+                          : "No upcoming interviews found."}
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="mt-1 space-y-0.5">
-                    {dayEvents.slice(0, 3).map((ev) => {
-                      const meta = KIND_META[ev.kind];
+                  {upcomingInterviews.length > 0 && (
+                    <span className="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-medium text-emerald-800">
+                      {upcomingInterviews.length} upcoming
+                    </span>
+                  )}
+                </div>
+
+                {upcomingInterviews.length > 0 && (
+                  <ul className="mt-3 space-y-1.5 text-xs">
+                    {upcomingInterviews.map((ev) => {
+                      const countdown =
+                        now != null ? getCountdownLabel(ev, now) : null;
+
                       return (
-                        <div
+                        <li
                           key={ev.id}
-                          className={[
-                            "flex items-center gap-1 truncate rounded-full px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset",
-                            meta.badge,
-                          ].join(" ")}
+                          className="flex items-start gap-2 rounded-lg border border-emerald-100 bg-white/80 px-2.5 py-1.5 cursor-pointer"
+                          onClick={() => {
+                            setSelectedDate(ev.date);
+                            setSidebarOpen(true);
+                          }}
                         >
-                          <span
-                            className={`h-1.5 w-1.5 rounded-full ${meta.accentDot}`}
-                          />
-                          <span className="truncate">
-                            {meta.label}
-                            {ev.subtitle ? ` · ${ev.subtitle}` : ""}
-                          </span>
-                        </div>
+                          <span className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                          <div className="flex-1">
+                            <div className="flex flex-wrap items-center gap-1">
+                              <span className="font-medium text-neutral-900">
+                                {ev.title}
+                              </span>
+                              {ev.subtitle && (
+                                <span className="text-[11px] text-neutral-600">
+                                  · {ev.subtitle}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-emerald-700">
+                              {formatHumanDateTime(ev.date, ev.time)}
+                            </div>
+                            {countdown && (
+                              <div className="text-[10px] text-emerald-800/80">
+                                {countdown}
+                              </div>
+                            )}
+                          </div>
+                        </li>
                       );
                     })}
-                    {dayEvents.length > 3 && (
-                      <div className="text-[10px] text-neutral-500">
-                        +{dayEvents.length - 3} more
-                      </div>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+                  </ul>
+                )}
+              </div>
 
-        {/* Selected day details */}
-        <div className="mt-6 rounded-2xl border border-neutral-200 bg-white/85 p-4 shadow-sm backdrop-blur">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-semibold text-neutral-900">
-                {selectedDate
-                  ? `Activity on ${formatHumanDate(selectedDate)}`
-                  : "Day activity"}
-              </h2>
-              <p className="mt-1 text-xs text-neutral-600">
-                {selectedDate
-                  ? selectedEvents.length > 0
-                    ? "Everything that happened on this date."
-                    : "No recorded activity on this date."
-                  : "Click any day in the big calendar above to see what happened."}
-              </p>
+              {/* Small hint card */}
+              <div className="rounded-2xl border border-dashed border-neutral-200 bg-white/70 p-3 text-[11px] text-neutral-600">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-indigo-50 text-indigo-500">
+                    <Sparkles className="h-3.5 w-3.5" />
+                  </span>
+                  <div>
+                    <p className="font-medium text-neutral-900">
+                      Use this to spot patterns.
+                    </p>
+                    <p className="mt-0.5">
+                      For example, see which weeks you apply the most, or how
+                      long it usually takes to get interviews or responses.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-
-          <div className="mt-3 space-y-2 text-sm">
-            {selectedDate && selectedEvents.length > 0 && (
-              <ul className="space-y-2">
-                {selectedEvents.map((ev) => {
-                  const meta = KIND_META[ev.kind];
-                  return (
-                    <li
-                      key={ev.id}
-                      className="flex items-start gap-2 rounded-lg border border-neutral-200 bg-neutral-50/80 px-3 py-2"
-                    >
-                      <span
-                        className={`mt-1 h-2 w-2 rounded-full ${meta.accentDot}`}
-                      />
-                      <div className="flex-1">
-                        <div className="text-xs font-semibold text-neutral-900">
-                          {meta.label}
-                        </div>
-                        <div className="text-xs text-neutral-700">
-                          {ev.title}
-                          {ev.subtitle ? ` · ${ev.subtitle}` : ""}
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-
-            {selectedDate && selectedEvents.length === 0 && (
-              <p className="text-xs text-neutral-600">
-                Nothing recorded for this date yet.
-              </p>
-            )}
-
-            {!selectedDate && (
-              <p className="text-xs text-neutral-600">
-                No day selected. Pick a date in the calendar to inspect all
-                events on that day.
-              </p>
-            )}
-          </div>
         </div>
-      </div>
-    </section>
+      </section>
+
+      {/* 🔥 Day activity sidebar – OUTSIDE the section, like ActivityLogSidebar */}
+      <CalendarDaySidebar
+        open={sidebarOpen && !!selectedDate}
+        onClose={() => setSidebarOpen(false)}
+        dateIso={selectedDate}
+        dateLabel={selectedDateLabel}
+        events={selectedEvents}
+      />
+    </>
   );
 }
