@@ -787,7 +787,7 @@ export default function CalendarPage() {
                   >
                     {/* Date pill */}
                     <div className="flex flex-col items-center justify-center rounded-lg bg-emerald-50 px-2.5 py-1.5 text-emerald-900">
-                      <span className="text-lg font-semibold leading-none">
+                      <span className="text-base font-semibold leading-none">
                         {new Date(nextInterview.date).getDate()}
                       </span>
                       <span className="text-[10px] font-medium uppercase tracking-wide">
@@ -799,20 +799,20 @@ export default function CalendarPage() {
 
                     {/* Info + countdown */}
                     <div className="flex flex-1 items-center justify-between gap-3">
-                      {/* Bigger, vertically centered text block */}
+                      {/* Main upcoming interview text (slightly reduced) */}
                       <div className="flex flex-col justify-center space-y-0.5">
                         <div className="flex flex-wrap items-center gap-1">
-                          <span className="text-sm sm:text-base font-semibold text-neutral-900">
+                          <span className="text-sm sm:text-[15px] font-semibold text-neutral-900">
                             {nextInterview.title}
                           </span>
                           {nextInterview.subtitle && (
-                            <span className="text-xs sm:text-sm text-neutral-600">
+                            <span className="text-[11px] sm:text-sm text-neutral-600">
                               · {nextInterview.subtitle}
                             </span>
                           )}
                         </div>
 
-                        <div className="text-xs sm:text-sm text-emerald-700 font-medium">
+                        <div className="text-[11px] sm:text-sm text-emerald-700 font-medium">
                           {formatHumanDateTime(
                             nextInterview.date,
                             nextInterview.time
@@ -820,7 +820,7 @@ export default function CalendarPage() {
                         </div>
                       </div>
 
-                      {/* Bigger countdown, stacked + centered (days:hours:mins:secs) */}
+                      {/* Countdown: "Days: XX" then "HHh MMm SSs" */}
                       {(() => {
                         const parts = getCountdownParts(nextInterview, now);
                         if (!parts) return null;
@@ -828,12 +828,9 @@ export default function CalendarPage() {
 
                         return (
                           <div className="ml-auto flex h-full min-w-[110px] flex-col items-center justify-center rounded-xl bg-emerald-50 px-3 py-2 text-center text-[11px] sm:text-[12px] font-semibold text-emerald-900">
-                            {/* Line 1: Days: XX */}
                             <span className="leading-tight">
                               Days: {pad(days)}
                             </span>
-
-                            {/* Line 2: HHh MMm SSs */}
                             <span className="mt-0.5 text-[10px] sm:text-[11px] font-medium leading-tight">
                               {pad(hours)}h {pad(minutes)}m {pad(seconds)}s
                             </span>
@@ -859,6 +856,12 @@ export default function CalendarPage() {
                         {laterInterviews.map((ev) => {
                           const parts = getCountdownParts(ev, now);
 
+                          const evDate = new Date(ev.date);
+                          const dayNum = evDate.getDate();
+                          const monthLabel = MONTH_NAMES[
+                            evDate.getMonth()
+                          ].slice(0, 3);
+
                           return (
                             <li
                               key={ev.id}
@@ -868,35 +871,40 @@ export default function CalendarPage() {
                                 setSidebarOpen(true);
                               }}
                             >
-                              <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                              {/* Date pill on the left */}
+                              <div className="flex flex-col items-center justify-center rounded-md bg-emerald-50 px-2 py-1 text-emerald-900">
+                                <span className="text-[13px] font-semibold leading-none">
+                                  {dayNum}
+                                </span>
+                                <span className="text-[9px] font-medium uppercase tracking-wide">
+                                  {monthLabel}
+                                </span>
+                              </div>
 
                               <div className="flex flex-1 items-center justify-between gap-2 min-w-0">
-                                {/* Bigger, vertically centered text */}
+                                {/* LATER INTERVIEWS: smaller text than nextInterview */}
                                 <div className="flex flex-col justify-center min-w-0">
                                   <div className="flex flex-wrap items-center gap-1">
-                                    <span className="truncate text-[13px] sm:text-sm font-semibold text-neutral-900">
+                                    <span className="truncate text-xs sm:text-sm font-semibold text-neutral-900">
                                       {ev.title}
                                     </span>
                                     {ev.subtitle && (
-                                      <span className="truncate text-[11px] sm:text-xs text-neutral-600">
+                                      <span className="truncate text-[10px] sm:text-[11px] text-neutral-600">
                                         · {ev.subtitle}
                                       </span>
                                     )}
                                   </div>
-                                  <div className="text-xs sm:text-[13px] text-emerald-700 font-medium">
+                                  <div className="text-[10px] sm:text-[11px] text-emerald-700 font-medium">
                                     {formatHumanDateTime(ev.date, ev.time)}
                                   </div>
                                 </div>
 
-                                {/* Right-side stacked countdown (days:hours:mins:secs) */}
+                                {/* Right-side countdown: "Days: XX" then "HHh MMm SSs" */}
                                 {parts && (
                                   <div className="flex h-full min-w-[95px] flex-col items-center justify-center rounded-lg bg-emerald-50 px-2 py-1.5 text-[9px] sm:text-[10px] font-semibold text-emerald-900 text-center">
-                                    {/* Line 1: Days: XX */}
                                     <span className="leading-tight">
                                       Days: {pad(parts.days)}
                                     </span>
-
-                                    {/* Line 2: HHh MMm SSs */}
                                     <span className="mt-0.5 text-[9px] sm:text-[10px] font-medium leading-tight">
                                       {pad(parts.hours)}h {pad(parts.minutes)}m{" "}
                                       {pad(parts.seconds)}s
