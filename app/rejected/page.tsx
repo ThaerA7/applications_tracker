@@ -1,52 +1,94 @@
-'use client';
+"use client";
 
-import type React from 'react';
-import Image from 'next/image';
-import { useEffect, useMemo, useState } from 'react';
+import type React from "react";
+import Image from "next/image";
+import { useEffect, useMemo, useState } from "react";
 import MoveToRejectedDialog, {
   type RejectionDetails,
-} from '@/components/MoveToRejectedDialog';
-import RejectedCard, {
-  type Rejection,
-} from './RejectedCard';
-import { Search, Plus, Filter } from 'lucide-react';
-import { animateCardExit } from '@/components/cardExitAnimation';
+} from "@/components/MoveToRejectedDialog";
+import RejectedCard, { type Rejection } from "./RejectedCard";
+import { Search, Plus, Filter, History } from "lucide-react";
+import { animateCardExit } from "@/components/cardExitAnimation";
+import RejectedActivityLogSidebar, {
+  type RejectedActivityItem,
+} from "./RejectedActivityLogSidebar";
 
-const REJECTIONS_STORAGE_KEY = 'job-tracker:rejected';
+const REJECTIONS_STORAGE_KEY = "job-tracker:rejected";
+const REJECTIONS_ACTIVITY_STORAGE_KEY = "job-tracker:rejected-activity";
 
-type ApplicationLike =
-  React.ComponentProps<typeof MoveToRejectedDialog>['application'];
+type ApplicationLike = React.ComponentProps<
+  typeof MoveToRejectedDialog
+>["application"];
 
 export default function RejectedPage() {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [rejected, setRejected] = useState<Rejection[]>([]);
 
   const [dialogApplication, setDialogApplication] =
     useState<ApplicationLike>(null);
-  const [editingRejection, setEditingRejection] =
-    useState<Rejection | null>(null);
+  const [editingRejection, setEditingRejection] = useState<Rejection | null>(
+    null
+  );
 
   // Delete confirmation dialog target
-  const [deleteTarget, setDeleteTarget] = useState<Rejection | null>(
-    null,
+  const [deleteTarget, setDeleteTarget] = useState<Rejection | null>(null);
+
+  // Activity log sidebar & data
+  const [activityOpen, setActivityOpen] = useState(false);
+  const [activityItems, setActivityItems] = useState<RejectedActivityItem[]>(
+    []
   );
+
+  // helper to append to activity log (and persist)
+  const appendActivity = (entry: RejectedActivityItem) => {
+    setActivityItems((prev) => {
+      const next = [entry, ...prev].slice(0, 100);
+      if (typeof window !== "undefined") {
+        try {
+          window.localStorage.setItem(
+            REJECTIONS_ACTIVITY_STORAGE_KEY,
+            JSON.stringify(next)
+          );
+        } catch (err) {
+          console.error(
+            "Failed to persist rejected activity to localStorage",
+            err
+          );
+        }
+      }
+      return next;
+    });
+  };
 
   // Load from localStorage on mount
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
 
     try {
+      // rejected cards
       const raw = window.localStorage.getItem(REJECTIONS_STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        setRejected(parsed);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          setRejected(parsed);
+        }
+      }
+
+      // rejected activity log
+      const rawActivity = window.localStorage.getItem(
+        REJECTIONS_ACTIVITY_STORAGE_KEY
+      );
+      if (rawActivity) {
+        const parsedActivity = JSON.parse(rawActivity);
+        if (Array.isArray(parsedActivity)) {
+          setActivityItems(parsedActivity);
+        }
       }
     } catch (err) {
       console.error(
-        'Failed to load rejected applications from localStorage',
-        err,
+        "Failed to load rejected applications or activity from localStorage",
+        err
       );
     }
   }, []);
@@ -85,28 +127,47 @@ export default function RejectedPage() {
 
   const handleConfirmDelete = () => {
     if (!deleteTarget) return;
-    const id = deleteTarget.id;
+    const target = deleteTarget;
+    const id = target.id;
     const elementId = `rejected-card-${id}`;
 
-    animateCardExit(elementId, 'delete', () => {
+    animateCardExit(elementId, "delete", () => {
       setRejected((prev) => {
         const next = prev.filter((i) => i.id !== id);
 
-        if (typeof window !== 'undefined') {
+        if (typeof window !== "undefined") {
           try {
             window.localStorage.setItem(
               REJECTIONS_STORAGE_KEY,
-              JSON.stringify(next),
+              JSON.stringify(next)
             );
           } catch (err) {
             console.error(
-              'Failed to persist rejected applications after delete',
-              err,
+              "Failed to persist rejected applications after delete",
+              err
             );
           }
         }
 
         return next;
+      });
+
+      // log delete activity
+      const activityId =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-delete`;
+
+      appendActivity({
+        id: activityId,
+        appId: target.id,
+        type: "deleted",
+        timestamp: new Date().toISOString(),
+        company: target.company,
+        role: target.role,
+        location: target.location,
+        appliedOn: target.appliedDate,
+        note: target.notes,
       });
 
       setDeleteTarget(null);
@@ -125,41 +186,64 @@ export default function RejectedPage() {
 
   // Use dialog output to create or update cards
   const handleRejectionCreated = (details: RejectionDetails) => {
-    setRejected((prev) => {
-      let next: Rejection[];
+    let next: Rejection[];
+    let target: Rejection;
 
-      if (editingRejection) {
-        next = prev.map((item) =>
-          item.id === editingRejection.id
-            ? { ...item, ...details }
-            : item,
+    if (editingRejection) {
+      // update existing
+      target = {
+        ...editingRejection,
+        ...details,
+      };
+      next = rejected.map((item) =>
+        item.id === editingRejection.id ? target : item
+      );
+    } else {
+      // create new
+      const newId =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${rejected.length}`;
+
+      target = {
+        id: newId,
+        ...details,
+      };
+      next = [...rejected, target];
+    }
+
+    setRejected(next);
+
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(
+          REJECTIONS_STORAGE_KEY,
+          JSON.stringify(next)
         );
-      } else {
-        const newItem: Rejection = {
-          id:
-            typeof crypto !== 'undefined' && 'randomUUID' in crypto
-              ? crypto.randomUUID()
-              : `${Date.now()}-${prev.length}`,
-          ...details,
-        };
-        next = [...prev, newItem];
+      } catch (err) {
+        console.error(
+          "Failed to persist rejected applications to localStorage",
+          err
+        );
       }
+    }
 
-      if (typeof window !== 'undefined') {
-        try {
-          window.localStorage.setItem(
-            REJECTIONS_STORAGE_KEY,
-            JSON.stringify(next),
-          );
-        } catch (err) {
-          console.error(
-            'Failed to persist rejected applications to localStorage',
-            err,
-          );
-        }
-      }
+    // log add / edit activity
+    const activityId =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-activity`;
 
-      return next;
+    appendActivity({
+      id: activityId,
+      appId: target.id,
+      type: editingRejection ? "edited" : "added",
+      timestamp: new Date().toISOString(),
+      company: target.company,
+      role: target.role,
+      location: target.location,
+      appliedOn: target.appliedDate,
+      note: target.notes,
     });
 
     setDialogOpen(false);
@@ -179,25 +263,18 @@ export default function RejectedPage() {
         item.contactName,
         item.contactEmail,
         item.notes,
-        item.rejectionType === 'no-interview'
-          ? 'no interview'
-          : 'interview',
+        item.rejectionType === "no-interview" ? "no interview" : "interview",
       ]
         .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(q)),
+        .some((v) => String(v).toLowerCase().includes(q))
     );
   }, [query, rejected]);
-
-  const hasSearchOrFilters = query.trim().length > 0;
 
   return (
     <>
       {/* Delete confirmation overlay (same style as Interviews page) */}
       {deleteTarget && (
-  <div
-    className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[13000] flex items-center justify-center px-4 py-8"
-  >
-
+        <div className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[13000] flex items-center justify-center px-4 py-8">
           <div
             className="absolute inset-0 bg-neutral-900/40"
             aria-hidden="true"
@@ -205,20 +282,17 @@ export default function RejectedPage() {
           />
           <div
             className={[
-              'relative z-10 w-full max-w-sm rounded-2xl border border-neutral-200/80',
-              'bg-white shadow-2xl p-5',
-            ].join(' ')}
+              "relative z-10 w-full max-w-sm rounded-2xl border border-neutral-200/80",
+              "bg-white shadow-2xl p-5",
+            ].join(" ")}
           >
             <h2 className="text-sm font-semibold text-neutral-900">
               Delete rejected application?
             </h2>
             <p className="mt-2 text-sm text-neutral-700">
-              This will permanently remove the rejected application at{' '}
-              <span className="font-medium">
-                {deleteTarget.company}
-              </span>{' '}
-              for the role{' '}
-              <span className="font-medium">{deleteTarget.role}</span>.
+              This will permanently remove the rejected application at{" "}
+              <span className="font-medium">{deleteTarget.company}</span> for
+              the role <span className="font-medium">{deleteTarget.role}</span>.
             </p>
             <p className="mt-1 text-xs text-neutral-500">
               This action cannot be undone.
@@ -246,26 +320,51 @@ export default function RejectedPage() {
 
       <section
         className={[
-          'relative rounded-2xl border border-neutral-200/70',
-          'bg-gradient-to-br from-rose-50 via-white to-pink-50',
-          'p-8 shadow-md overflow-hidden',
-        ].join(' ')}
+          "relative rounded-2xl border border-neutral-200/70",
+          "bg-gradient-to-br from-rose-50 via-white to-pink-50",
+          "p-8 shadow-md overflow-hidden",
+        ].join(" ")}
       >
         {/* soft rose/pink blobs */}
         <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-rose-400/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-pink-400/20 blur-3xl" />
 
-        <div className="flex items-center gap-1">
-                              <Image
-                                src="/icons/cancel.png" // same icon you used for Applied
-                                alt=""
-                                width={37}
-                                height={37}
-                                aria-hidden="true"
-                                className="shrink-0 -mt-1"
-                              />
-                              <h1 className="text-2xl font-semibold text-neutral-900">Rejected</h1>
-                            </div>
+        {/* header row with activity button (matching Interviews page layout) */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-1">
+            <Image
+              src="/icons/cancel.png"
+              alt=""
+              width={37}
+              height={37}
+              aria-hidden="true"
+              className="shrink-0 -mt-1"
+            />
+            <h1 className="text-2xl font-semibold text-neutral-900">
+              Rejected
+            </h1>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setActivityOpen(true)}
+            className={[
+              "inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-neutral-800",
+              "bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70",
+              "border border-neutral-200 shadow-sm hover:bg-white",
+              "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-rose-300",
+            ].join(" ")}
+          >
+            <History className="h-4 w-4 text-rose-600" aria-hidden="true" />
+            <span>Activity log</span>
+            {activityItems.length > 0 && (
+              <span className="ml-1 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-semibold text-neutral-700">
+                {activityItems.length}
+              </span>
+            )}
+          </button>
+        </div>
+
         <p className="mt-1 text-neutral-700">
           Applications that didn’t work out.
         </p>
@@ -285,14 +384,14 @@ export default function RejectedPage() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className={[
-                'h-11 w-full rounded-lg pl-10 pr-3 text-sm text-neutral-900 placeholder:text-neutral-500',
-                'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
-                'border border-neutral-200 shadow-sm',
-                'hover:bg-white focus:bg-white',
-                'ring-1 ring-transparent',
-                'focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-300',
-                'transition-shadow',
-              ].join(' ')}
+                "h-11 w-full rounded-lg pl-10 pr-3 text-sm text-neutral-900 placeholder:text-neutral-500",
+                "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
+                "border border-neutral-200 shadow-sm",
+                "hover:bg-white focus:bg-white",
+                "ring-1 ring-transparent",
+                "focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-300",
+                "transition-shadow",
+              ].join(" ")}
             />
           </div>
 
@@ -301,11 +400,11 @@ export default function RejectedPage() {
             type="button"
             onClick={handleAdd}
             className={[
-              'inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800',
-              'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
-              'border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50',
-              'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-300',
-            ].join(' ')}
+              "inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800",
+              "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
+              "border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50",
+              "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-300",
+            ].join(" ")}
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
             Add
@@ -315,11 +414,11 @@ export default function RejectedPage() {
           <button
             type="button"
             className={[
-              'inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800',
-              'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
-              'border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50',
-              'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-300',
-            ].join(' ')}
+              "inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800",
+              "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
+              "border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50",
+              "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-300",
+            ].join(" ")}
           >
             <Filter className="h-4 w-4" aria-hidden="true" />
             Filter
@@ -347,8 +446,8 @@ export default function RejectedPage() {
                     You don&apos;t have any rejected applications yet.
                   </p>
                   <p className="mt-1 text-xs text-neutral-500">
-                    Once you mark an application as rejected, it will show
-                    up here.
+                    Once you mark an application as rejected, it will show up
+                    here.
                   </p>
                 </>
               ) : (
@@ -368,6 +467,13 @@ export default function RejectedPage() {
           />
         </div>
       </section>
+
+      {/* Activity log sidebar */}
+      <RejectedActivityLogSidebar
+        open={activityOpen}
+        onClose={() => setActivityOpen(false)}
+        items={activityItems}
+      />
     </>
   );
 }
