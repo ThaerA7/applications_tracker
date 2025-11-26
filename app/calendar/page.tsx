@@ -32,7 +32,11 @@ type CalendarEvent = {
   time?: string;
   /** Optional full datetime ISO used for countdowns */
   dateTime?: string;
+  /** NEW: used in CalendarDaySidebar under the title */
+  location?: string;
+  employmentType?: string;
 };
+
 
 const MONTH_NAMES = [
   "January",
@@ -245,6 +249,8 @@ export default function CalendarPage() {
         subtitle: item.role,
         time: time || undefined,
         dateTime: typeof item.date === "string" ? item.date : undefined,
+        location: item.location,
+        employmentType: item.employmentType,
       });
     });
 
@@ -259,6 +265,8 @@ export default function CalendarPage() {
           kind: "applied",
           title: item.company || "Applied",
           subtitle: item.role,
+          location: item.location,
+          employmentType: item.employmentType,
         });
       }
 
@@ -270,6 +278,8 @@ export default function CalendarPage() {
           kind: "rejected",
           title: item.company || "Rejected",
           subtitle: item.role,
+          location: item.location,
+          employmentType: item.employmentType,
         });
       }
     });
@@ -286,6 +296,8 @@ export default function CalendarPage() {
           kind: "applied",
           title: item.company || "Applied",
           subtitle: item.role,
+          location: item.location,
+          employmentType: item.employmentType,
         });
       }
 
@@ -293,9 +305,8 @@ export default function CalendarPage() {
       if (interviewDateOnly) {
         const time = extractTime(item.interviewDate);
         addEvent({
-          id: `interview-from-withdrawn-${
-            item.id ?? item.interviewDate ?? interviewDateOnly
-          }`,
+          id: `interview-from-withdrawn-${item.id ?? item.interviewDate ?? interviewDateOnly
+            }`,
           date: interviewDateOnly,
           kind: "interview",
           title: item.company || "Interview",
@@ -305,6 +316,8 @@ export default function CalendarPage() {
             typeof item.interviewDate === "string"
               ? item.interviewDate
               : undefined,
+          location: item.location,
+          employmentType: item.employmentType,
         });
       }
 
@@ -316,6 +329,8 @@ export default function CalendarPage() {
           kind: "withdrawn",
           title: item.company || "Withdrawn",
           subtitle: item.role,
+          location: item.location,
+          employmentType: item.employmentType,
         });
       }
     });
@@ -336,6 +351,8 @@ export default function CalendarPage() {
           kind: "applied",
           title: item.company || "Applied",
           subtitle: item.role,
+          location: item.location,
+          employmentType: item.employmentType,
         });
       });
     });
@@ -354,15 +371,16 @@ export default function CalendarPage() {
         kind: "offer",
         title: item.company || "Offer",
         subtitle: item.role,
+        location: item.location,
+        employmentType: item.employmentType,
       });
     });
 
     // Deduplicate by (kind, date, title, subtitle, time)
     const map = new Map<string, CalendarEvent>();
     for (const ev of collected) {
-      const key = `${ev.kind}-${ev.date}-${ev.title}-${ev.subtitle ?? ""}-${
-        ev.time ?? ""
-      }`;
+      const key = `${ev.kind}-${ev.date}-${ev.title}-${ev.subtitle ?? ""}-${ev.time ?? ""
+        }`;
       if (!map.has(key)) {
         map.set(key, ev);
       }
