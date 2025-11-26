@@ -2,22 +2,31 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Search, Filter, Plus } from "lucide-react";
-import Image from 'next/image';
+import { Search, Filter, Plus, History } from "lucide-react";
+import Image from "next/image";
 import WithdrawnCard, { type WithdrawnRecord } from "./WithdrawnCard";
 import type { InterviewType } from "@/components/ScheduleInterviewDialog";
 import MoveToWithdrawnDialog, {
   type WithdrawnDetails,
 } from "@/components/MoveToWithdrawnDialog";
 import { animateCardExit } from "@/components/cardExitAnimation";
+import ActivityLogSidebar, {
+  type ActivityItem,
+} from "@/components/ActivityLogSidebar";
 
 const WITHDRAWN_STORAGE_KEY = "job-tracker:withdrawn";
+const WITHDRAWN_ACTIVITY_STORAGE_KEY = "job-tracker:withdrawn-activity";
 
 const INTERVIEW_TYPE_LABEL: Record<InterviewType, string> = {
   phone: "Phone screening",
   video: "Video call",
   "in-person": "In person",
 };
+
+const makeId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 export default function WithdrawnPage() {
   const [withdrawn, setWithdrawn] = useState<WithdrawnRecord[]>([]);
@@ -29,22 +38,62 @@ export default function WithdrawnPage() {
   // Add dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
 
+  // Activity log sidebar & data
+  const [activityOpen, setActivityOpen] = useState(false);
+  const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
+
+  // helper to append to activity log (and persist)
+  const appendActivity = (entry: ActivityItem) => {
+    setActivityItems((prev) => {
+      const next = [entry, ...prev].slice(0, 100);
+      if (typeof window !== "undefined") {
+        try {
+          window.localStorage.setItem(
+            WITHDRAWN_ACTIVITY_STORAGE_KEY,
+            JSON.stringify(next)
+          );
+        } catch (err) {
+          console.error(
+            "Failed to persist withdrawn activity to localStorage",
+            err
+          );
+        }
+      }
+      return next;
+    });
+  };
+
   // Load from localStorage on mount
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     try {
       const raw = window.localStorage.getItem(WITHDRAWN_STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        setWithdrawn(parsed);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          setWithdrawn(parsed);
+        }
       }
     } catch (err) {
       console.error(
         "Failed to load withdrawn applications from localStorage",
         err
       );
+    }
+
+    try {
+      const rawActivity = window.localStorage.getItem(
+        WITHDRAWN_ACTIVITY_STORAGE_KEY
+      );
+      if (rawActivity) {
+        const parsedActivity = JSON.parse(rawActivity);
+        if (Array.isArray(parsedActivity)) {
+          setActivityItems(parsedActivity);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load withdrawn activity from localStorage", err);
     }
   }, []);
 
@@ -76,7 +125,8 @@ export default function WithdrawnPage() {
 
   const handleConfirmDelete = () => {
     if (!deleteTarget) return;
-    const id = deleteTarget.id;
+    const target = deleteTarget;
+    const id = target.id;
     const elementId = `withdrawn-card-${id}`;
 
     animateCardExit(elementId, "delete", () => {
@@ -100,6 +150,20 @@ export default function WithdrawnPage() {
         return next;
       });
 
+      // log delete activity
+      const activityId = makeId();
+      appendActivity({
+        id: activityId,
+        appId: target.id,
+        type: "deleted",
+        timestamp: new Date().toISOString(),
+        company: target.company,
+        role: target.role,
+        location: target.location,
+        appliedOn: target.appliedOn,
+        note: target.notes,
+      });
+
       setDeleteTarget(null);
     });
   };
@@ -119,30 +183,25 @@ export default function WithdrawnPage() {
   };
 
   const handleSaveWithdrawn = (details: WithdrawnDetails) => {
+    const newItem: WithdrawnRecord = {
+      id: makeId(),
+      company: details.company,
+      role: details.role,
+      location: details.location,
+      appliedOn: details.appliedDate,
+      withdrawnDate: details.withdrawnDate,
+      withdrawnReason: details.reason,
+      employmentType: details.employmentType,
+      contactName: details.contactName,
+      contactEmail: details.contactEmail,
+      contactPhone: details.contactPhone,
+      url: details.url,
+      logoUrl: details.logoUrl,
+      notes: details.notes,
+      // interviewDate / interviewType left empty here (withdrawn before interview)
+    };
+
     setWithdrawn((prev) => {
-      const id =
-        typeof crypto !== "undefined" && "randomUUID" in crypto
-          ? crypto.randomUUID()
-          : `${Date.now()}-${prev.length}`;
-
-      const newItem: WithdrawnRecord = {
-        id,
-        company: details.company,
-        role: details.role,
-        location: details.location,
-        appliedOn: details.appliedDate,
-        withdrawnDate: details.withdrawnDate,
-        withdrawnReason: details.reason,
-        employmentType: details.employmentType,
-        contactName: details.contactName,
-        contactEmail: details.contactEmail,
-        contactPhone: details.contactPhone,
-        url: details.url,
-        logoUrl: details.logoUrl,
-        notes: details.notes,
-        // interviewDate / interviewType left empty here (withdrawn before interview)
-      };
-
       const next = [...prev, newItem];
 
       if (typeof window !== "undefined") {
@@ -162,17 +221,36 @@ export default function WithdrawnPage() {
       return next;
     });
 
+    // log add activity
+    const activityId = makeId();
+    appendActivity({
+      id: activityId,
+      appId: newItem.id,
+      type: "added",
+      timestamp: new Date().toISOString(),
+      company: newItem.company,
+      role: newItem.role,
+      location: newItem.location,
+      appliedOn: newItem.appliedOn,
+      note: newItem.notes,
+    });
+
     setDialogOpen(false);
   };
 
   return (
     <>
+      {/* Withdrawn activity sidebar */}
+      <ActivityLogSidebar
+        variant="withdrawn"
+        open={activityOpen}
+        onClose={() => setActivityOpen(false)}
+        items={activityItems}
+      />
+
       {/* Delete confirmation dialog */}
       {deleteTarget && (
-  <div
-    className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[13000] flex items-center justify-center px-4 py-8"
-  >
-
+        <div className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[13000] flex items-center justify-center px-4 py-8">
           <div
             className="absolute inset-0 bg-neutral-900/40"
             aria-hidden="true"
@@ -227,17 +305,42 @@ export default function WithdrawnPage() {
         <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-amber-400/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-rose-400/20 blur-3xl" />
 
-        <div className="flex items-center gap-1">
-          <Image
-            src="/icons/withdrawn.png" // same icon you used for Applied
-            alt=""
-            width={37}
-            height={37}
-            aria-hidden="true"
-            className="shrink-0 -mt-1"
-          />
-          <h1 className="text-2xl font-semibold text-neutral-900">Withdrwan</h1>
+        {/* header row with activity button */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-1">
+            <Image
+              src="/icons/withdrawn.png"
+              alt=""
+              width={37}
+              height={37}
+              aria-hidden="true"
+              className="shrink-0 -mt-1"
+            />
+            <h1 className="text-2xl font-semibold text-neutral-900">
+              Withdrawn
+            </h1>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setActivityOpen(true)}
+            className={[
+              "inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-neutral-800",
+              "bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70",
+              "border border-neutral-200 shadow-sm hover:bg-white",
+              "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-300",
+            ].join(" ")}
+          >
+            <History className="h-4 w-4 text-amber-600" aria-hidden="true" />
+            <span>Activity log</span>
+            {activityItems.length > 0 && (
+              <span className="ml-1 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-semibold text-neutral-700">
+                {activityItems.length}
+              </span>
+            )}
+          </button>
         </div>
+
         <p className="mt-1 text-neutral-700">
           Applications you chose to step away from.
         </p>

@@ -37,6 +37,8 @@ const INTERVIEWS_STORAGE_KEY = "job-tracker:interviews";
 const REJECTIONS_STORAGE_KEY = "job-tracker:rejected";
 const WITHDRAWN_STORAGE_KEY = "job-tracker:withdrawn";
 const INTERVIEWS_ACTIVITY_STORAGE_KEY = "job-tracker:interviews-activity";
+const REJECTIONS_ACTIVITY_STORAGE_KEY = "job-tracker:rejected-activity";
+const WITHDRAWN_ACTIVITY_STORAGE_KEY = "job-tracker:withdrawn-activity";
 
 type ApplicationLike = ComponentProps<
   typeof ScheduleInterviewDialog
@@ -245,6 +247,43 @@ function makeId(existingLength: number): string {
   return `${Date.now()}-${existingLength}`;
 }
 
+const makeActivityId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2);
+
+function appendRejectedActivity(entry: ActivityItem) {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = window.localStorage.getItem(REJECTIONS_ACTIVITY_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    const prev: ActivityItem[] = Array.isArray(parsed) ? parsed : [];
+    const next = [entry, ...prev].slice(0, 100);
+    window.localStorage.setItem(
+      REJECTIONS_ACTIVITY_STORAGE_KEY,
+      JSON.stringify(next)
+    );
+  } catch (err) {
+    console.error("Failed to persist rejected activity from interviews", err);
+  }
+}
+
+function appendWithdrawnActivity(entry: ActivityItem) {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = window.localStorage.getItem(WITHDRAWN_ACTIVITY_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    const prev: ActivityItem[] = Array.isArray(parsed) ? parsed : [];
+    const next = [entry, ...prev].slice(0, 100);
+    window.localStorage.setItem(
+      WITHDRAWN_ACTIVITY_STORAGE_KEY,
+      JSON.stringify(next)
+    );
+  } catch (err) {
+    console.error("Failed to persist withdrawn activity from interviews", err);
+  }
+}
+
 // --- Component ---
 
 export default function InterviewsPage() {
@@ -307,7 +346,7 @@ export default function InterviewsPage() {
       if (typeof window !== "undefined") {
         try {
           window.localStorage.setItem(
-            "job-tracker:interviews-activity",
+            INTERVIEWS_ACTIVITY_STORAGE_KEY,
             JSON.stringify(next)
           );
         } catch (err) {
@@ -497,9 +536,13 @@ export default function InterviewsPage() {
 
     // activity
     if (editingInterview) {
-      logActivity("edited", created, { note: "Interview updated" });
+      logActivity("edited", created, {
+        note: "Interview updated",
+      });
     } else {
-      logActivity("added", created, { note: "Interview scheduled" });
+      logActivity("added", created, {
+        note: "Interview scheduled",
+      });
     }
 
     setDialogOpen(false);
@@ -509,6 +552,7 @@ export default function InterviewsPage() {
 
   const handleMoveToRejectedFromInterviews = (details: RejectionDetails) => {
     const source = moveTargetInterview;
+    let newItem: RejectionRecord | null = null;
 
     // 1) Append to rejected storage
     if (typeof window !== "undefined") {
@@ -517,7 +561,7 @@ export default function InterviewsPage() {
         const parsed = raw ? JSON.parse(raw) : [];
         const prev: RejectionRecord[] = Array.isArray(parsed) ? parsed : [];
 
-        const newItem: RejectionRecord = {
+        newItem = {
           id: makeId(prev.length),
           ...details,
         };
@@ -535,7 +579,24 @@ export default function InterviewsPage() {
       }
     }
 
-    // log move
+    // 1b) Also log into Rejected activity log
+    if (newItem) {
+      appendRejectedActivity({
+        id: makeActivityId(),
+        appId: newItem.id,
+        type: "moved_to_rejected",
+        timestamp: new Date().toISOString(),
+        company: newItem.company,
+        role: newItem.role,
+        location: newItem.location,
+        appliedOn: newItem.appliedDate,
+        fromStatus: "Interview",
+        toStatus: "Rejected",
+        note: newItem.notes,
+      });
+    }
+
+    // 2) log move in Interviews activity
     if (source) {
       logActivity("moved_to_rejected", source, {
         fromStatus: "Interview",
@@ -544,7 +605,7 @@ export default function InterviewsPage() {
       });
     }
 
-    // 2) Remove from interviews with animation
+    // 3) Remove from interviews with animation
     if (source) {
       const sourceId = source.id;
       const elementId = `interview-card-${sourceId}`;
@@ -568,7 +629,6 @@ export default function InterviewsPage() {
           return next;
         });
 
-        // Close whole dialog after animation + removal
         handleMoveDialogClose();
       });
     } else {
@@ -583,6 +643,8 @@ export default function InterviewsPage() {
       return;
     }
 
+    let newItem: WithdrawnRecord | null = null;
+
     // 1) Append to withdrawn storage
     if (typeof window !== "undefined") {
       try {
@@ -590,7 +652,7 @@ export default function InterviewsPage() {
         const parsed = raw ? JSON.parse(raw) : [];
         const prev: WithdrawnRecord[] = Array.isArray(parsed) ? parsed : [];
 
-        const newItem: WithdrawnRecord = {
+        newItem = {
           id: makeId(prev.length),
           company: details.company || source.company,
           role: details.role || source.role,
@@ -622,14 +684,31 @@ export default function InterviewsPage() {
       }
     }
 
-    // log move
+    // 1b) Also log into Withdrawn activity log
+    if (newItem) {
+      appendWithdrawnActivity({
+        id: makeActivityId(),
+        appId: newItem.id,
+        type: "moved_to_withdrawn",
+        timestamp: new Date().toISOString(),
+        company: newItem.company,
+        role: newItem.role,
+        location: newItem.location,
+        appliedOn: newItem.appliedOn,
+        fromStatus: "Interview",
+        toStatus: "Withdrawn",
+        note: newItem.notes || newItem.withdrawnReason,
+      });
+    }
+
+    // 2) log move in Interviews activity
     logActivity("moved_to_withdrawn", source, {
       fromStatus: "Interview",
       toStatus: "Withdrawn",
       note: details.reason || "Moved to withdrawn",
     });
 
-    // 2) Remove from interviews with animation
+    // 3) Remove from interviews with animation
     const sourceId = source.id;
     const elementId = `interview-card-${sourceId}`;
 

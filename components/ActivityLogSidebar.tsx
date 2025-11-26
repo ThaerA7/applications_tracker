@@ -1,9 +1,12 @@
-// components/ActivityLogSidebar.tsx
 "use client";
 
 import { X } from "lucide-react";
 
-export type ActivityVariant = "applied" | "interviews" | "rejected";
+export type ActivityVariant =
+  | "applied"
+  | "interviews"
+  | "rejected"
+  | "withdrawn";
 
 export type ActivityType =
   | "added"
@@ -121,6 +124,23 @@ function getActivityLabel(
         default:
           return "Activity";
       }
+    case "withdrawn":
+      switch (type) {
+        case "added":
+          return "Withdrawn added";
+        case "edited":
+          return "Withdrawn updated";
+        case "deleted":
+          return "Withdrawn deleted";
+        case "moved_to_withdrawn":
+          return "Moved to withdrawn";
+        case "moved_to_rejected":
+          return "Moved to rejected";
+        case "moved_to_interviews":
+          return "Moved to interviews";
+        default:
+          return "Activity";
+      }
     default:
       return "Activity";
   }
@@ -177,7 +197,7 @@ const VARIANT_CONFIG: Record<ActivityVariant, VariantConfig> = {
     emptyBorderClass: "border-emerald-100/80",
     headerTitle: "Interview activity",
     headerSubtitle: "Created, updated, moved and deleted interviews.",
-    headerIconAlt: "Interview history",
+    headerIconAlt: "Interview activity",
     closeButtonFocusRingClass:
       "focus-visible:ring-2 focus-visible:ring-emerald-300",
   },
@@ -200,6 +220,25 @@ const VARIANT_CONFIG: Record<ActivityVariant, VariantConfig> = {
     headerIconAlt: "Rejected activity",
     closeButtonFocusRingClass:
       "focus-visible:ring-2 focus-visible:ring-rose-300",
+  },
+  withdrawn: {
+    backdrop: "bg-neutral-900/40",
+    panelGradient: "bg-gradient-to-b from-white via-amber-50/70 to-rose-50/70",
+    topBarGradient:
+      "bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400",
+    appliedBoxClass:
+      "rounded-lg border border-neutral-200/80 bg-neutral-50/80 px-2.5 py-1.5",
+    actionBoxClass:
+      "rounded-lg border border-amber-100/80 bg-amber-50/70 px-2.5 py-1.5",
+    actionLabelClass:
+      "text-[10px] font-semibold uppercase tracking-wide text-amber-700",
+    hoverBorderClass: "hover:border-amber-200",
+    emptyBorderClass: "border-neutral-300/80",
+    headerTitle: "Withdrawn activity",
+    headerSubtitle: "Created, updated and deleted withdrawn applications.",
+    headerIconAlt: "Withdrawn activity",
+    closeButtonFocusRingClass:
+      "focus-visible:ring-2 focus-visible:ring-amber-300",
   },
 };
 
@@ -298,13 +337,25 @@ export default function ActivityLogSidebar({
                   "No interview activity yet. Creating, editing, moving or deleting interviews will show up here."}
                 {variant === "rejected" &&
                   "No rejected activity yet. Creating, editing, moving or deleting rejected applications will show up here."}
+                {variant === "withdrawn" &&
+                  "No withdrawn activity yet. Creating, editing or deleting withdrawn applications will show up here."}
               </p>
             </div>
           ) : (
             <ul className="space-y-2.5">
               {items.map((item) => {
-                const label = getActivityLabel(variant, item.type);
+                const baseLabel = getActivityLabel(variant, item.type);
                 const iconSrc = getActivityIconSrc(item.type);
+
+                const isMoveType =
+                  item.type === "moved_to_interviews" ||
+                  item.type === "moved_to_rejected" ||
+                  item.type === "moved_to_withdrawn";
+
+                const displayLabel =
+                  isMoveType && item.fromStatus
+                    ? `${baseLabel} from ${item.fromStatus}`
+                    : baseLabel;
 
                 return (
                   <li
@@ -332,7 +383,7 @@ export default function ActivityLogSidebar({
                         <div className="flex items-center justify-center">
                           <img
                             src={iconSrc}
-                            alt={label}
+                            alt={displayLabel}
                             className="h-7 w-7 object-contain"
                           />
                         </div>
@@ -351,8 +402,10 @@ export default function ActivityLogSidebar({
                             </span>
                           </div>
 
-                          {/* Action label */}
-                          <div className={config.actionLabelClass}>{label}</div>
+                          {/* Single combined label */}
+                          <div className={config.actionLabelClass}>
+                            {displayLabel}
+                          </div>
                         </div>
                       </div>
 

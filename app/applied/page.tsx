@@ -40,6 +40,10 @@ type StoredWithdrawn = {
 const REJECTIONS_STORAGE_KEY = "job-tracker:rejected";
 const WITHDRAWN_STORAGE_KEY = "job-tracker:withdrawn";
 
+// target activity logs (read by RejectedPage and WithdrawnPage)
+const REJECTIONS_ACTIVITY_STORAGE_KEY = "job-tracker:rejected-activity";
+const WITHDRAWN_ACTIVITY_STORAGE_KEY = "job-tracker:withdrawn-activity";
+
 function fmtDate(d: string) {
   const date = new Date(d);
   if (Number.isNaN(date.getTime())) return d;
@@ -71,6 +75,43 @@ function appToForm(app: Application): NewApplicationForm {
   return rest;
 }
 
+const makeActivityId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2);
+
+function appendRejectedActivity(entry: ActivityItem) {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = window.localStorage.getItem(REJECTIONS_ACTIVITY_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    const prev: ActivityItem[] = Array.isArray(parsed) ? parsed : [];
+    const next = [entry, ...prev].slice(0, 100);
+    window.localStorage.setItem(
+      REJECTIONS_ACTIVITY_STORAGE_KEY,
+      JSON.stringify(next)
+    );
+  } catch (err) {
+    console.error("Failed to persist rejected activity log", err);
+  }
+}
+
+function appendWithdrawnActivity(entry: ActivityItem) {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = window.localStorage.getItem(WITHDRAWN_ACTIVITY_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    const prev: ActivityItem[] = Array.isArray(parsed) ? parsed : [];
+    const next = [entry, ...prev].slice(0, 100);
+    window.localStorage.setItem(
+      WITHDRAWN_ACTIVITY_STORAGE_KEY,
+      JSON.stringify(next)
+    );
+  } catch (err) {
+    console.error("Failed to persist withdrawn activity log", err);
+  }
+}
+
 export default function AppliedPage() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [query, setQuery] = useState("");
@@ -85,7 +126,7 @@ export default function AppliedPage() {
   // Delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState<Application | null>(null);
 
-  // Activity sidebar / log state
+  // Activity sidebar / log state (for Applied page)
   const [activityOpen, setActivityOpen] = useState(false);
   const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
 
@@ -111,10 +152,11 @@ export default function AppliedPage() {
       company: app.company,
       role: app.role,
       location: app.location,
-      appliedOn: app.appliedOn,
+      appliedOn: app.appliedOn, // for "Applied on" column
       ...extras,
     };
 
+    // newest first, keep last 100
     setActivityItems((prev) => [base, ...prev].slice(0, 100));
   };
 
@@ -242,9 +284,6 @@ export default function AppliedPage() {
         return copy;
       });
 
-      // After this, if it was the last application,
-      // applications.length === 0 and filtered.length === 0,
-      // so the "No applications yet..." empty-state shows.
       closeMoveDialog();
     });
   };
@@ -255,9 +294,10 @@ export default function AppliedPage() {
       return;
     }
 
+    // Applied → Interviews
     logActivity("moved_to_interviews", appBeingMoved, {
-      fromStatus: appBeingMoved.status,
-      toStatus: "Interview",
+      fromStatus: "Applied",
+      toStatus: "Interviews",
     });
 
     moveOutOfApplied();
@@ -294,14 +334,29 @@ export default function AppliedPage() {
       }
     }
 
+    // log to Applied activity (Applied → Rejected)
     if (appBeingMoved) {
       logActivity("moved_to_rejected", appBeingMoved, {
-        fromStatus: appBeingMoved.status,
+        fromStatus: "Applied",
         toStatus: "Rejected",
-        // RejectionDetails doesn't have `reason` in your types, so keep this generic
         note: "Marked as rejected",
       });
     }
+
+    // ALSO log into Rejected activity log (for Rejected page)
+    appendRejectedActivity({
+      id: makeActivityId(),
+      appId: newRejection.id,
+      type: "moved_to_rejected",
+      timestamp: new Date().toISOString(),
+      company: newRejection.company,
+      role: newRejection.role,
+      location: newRejection.location,
+      appliedOn: newRejection.appliedDate,
+      fromStatus: "Applied",
+      toStatus: "Rejected",
+      note: newRejection.notes,
+    });
 
     moveOutOfApplied();
   };
@@ -351,10 +406,26 @@ export default function AppliedPage() {
       }
     }
 
+    // log to Applied activity (Applied → Withdrawn)
     logActivity("moved_to_withdrawn", source, {
-      fromStatus: source.status,
+      fromStatus: "Applied",
       toStatus: "Withdrawn",
-      note: details.reason || undefined,
+      note: details.reason || "Moved to withdrawn",
+    });
+
+    // ALSO log into Withdrawn activity log (for Withdrawn page)
+    appendWithdrawnActivity({
+      id: makeActivityId(),
+      appId: newWithdrawn.id,
+      type: "moved_to_withdrawn",
+      timestamp: new Date().toISOString(),
+      company: newWithdrawn.company,
+      role: newWithdrawn.role,
+      location: newWithdrawn.location,
+      appliedOn: newWithdrawn.appliedOn,
+      fromStatus: "Applied",
+      toStatus: "Withdrawn",
+      note: newWithdrawn.notes || newWithdrawn.withdrawnReason,
     });
 
     moveOutOfApplied();
@@ -411,7 +482,7 @@ export default function AppliedPage() {
         </div>
       )}
 
-      {/* Activity sidebar (slides in from the right) */}
+      {/* Activity sidebar (Applied) */}
       <ActivityLogSidebar
         variant="applied"
         open={activityOpen}
@@ -434,7 +505,7 @@ export default function AppliedPage() {
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-1">
             <Image
-              src="/icons/checklist.png" // same icon you used for Applied
+              src="/icons/checklist.png"
               alt=""
               width={37}
               height={37}
