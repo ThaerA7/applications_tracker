@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ComponentType } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import {
   ChevronLeft,
@@ -79,40 +79,6 @@ const KIND_META: Record<
     label: "Offer",
     badge: "bg-fuchsia-50 text-fuchsia-800 ring-fuchsia-200",
     accentDot: "bg-fuchsia-500",
-  },
-};
-
-type KindIconMeta = {
-  Icon: ComponentType<any>;
-  iconBg: string;
-  iconColor: string;
-};
-
-const KIND_ICON_META: Record<ActivityKind, KindIconMeta> = {
-  applied: {
-    Icon: Briefcase,
-    iconBg: "bg-sky-50",
-    iconColor: "text-sky-600",
-  },
-  interview: {
-    Icon: PhoneCall,
-    iconBg: "bg-emerald-50",
-    iconColor: "text-emerald-600",
-  },
-  rejected: {
-    Icon: XCircle,
-    iconBg: "bg-rose-50",
-    iconColor: "text-rose-600",
-  },
-  withdrawn: {
-    Icon: Undo2,
-    iconBg: "bg-amber-50",
-    iconColor: "text-amber-600",
-  },
-  offer: {
-    Icon: Sparkles,
-    iconBg: "bg-fuchsia-50",
-    iconColor: "text-fuchsia-600",
   },
 };
 
@@ -198,7 +164,9 @@ function formatHumanDateTime(date: string, time?: string): string {
   return base;
 }
 
-function getCountdownLabel(ev: CalendarEvent, now: Date): string | null {
+function getCountdownParts(ev: CalendarEvent, now: Date | null) {
+  if (!now) return null;
+
   const baseIso =
     ev.dateTime ?? (ev.time ? `${ev.date}T${ev.time}` : `${ev.date}T00:00:00`);
 
@@ -206,22 +174,16 @@ function getCountdownLabel(ev: CalendarEvent, now: Date): string | null {
   if (Number.isNaN(target.getTime())) return null;
 
   const diffMs = target.getTime() - now.getTime();
-  const future = diffMs >= 0;
+  const isPast = diffMs < 0;
   const abs = Math.abs(diffMs);
 
-  const totalMinutes = Math.round(abs / 60000);
-  const days = Math.floor(totalMinutes / (60 * 24));
-  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
-  const minutes = totalMinutes % 60;
+  const totalSeconds = Math.floor(abs / 1000);
+  const days = Math.floor(totalSeconds / (60 * 60 * 24));
+  const hours = Math.floor((totalSeconds % (60 * 60 * 24)) / (60 * 60));
+  const minutes = Math.floor((totalSeconds % (60 * 60)) / 60);
+  const seconds = totalSeconds % 60;
 
-  const parts: string[] = [];
-  if (days) parts.push(`${days} day${days === 1 ? "" : "s"}`);
-  if (hours) parts.push(`${hours} h`);
-  if (!days && minutes) parts.push(`${minutes} min`);
-
-  if (!parts.length) return future ? "in a few moments" : "just now";
-  const text = parts.join(", ");
-  return future ? `in ${text}` : `${text} ago`;
+  return { days, hours, minutes, seconds, isPast };
 }
 
 export default function CalendarPage() {
@@ -236,13 +198,13 @@ export default function CalendarPage() {
 
   const todayIso = useMemo(() => toIsoDate(new Date()), []);
 
-  // For live-ish countdowns
+  // Live countdown (seconds)
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => {
     setNow(new Date());
     const id = window.setInterval(() => {
       setNow(new Date());
-    }, 60_000); // update every minute
+    }, 1_000); // update every second
     return () => window.clearInterval(id);
   }, []);
 
@@ -395,7 +357,7 @@ export default function CalendarPage() {
       });
     });
 
-    // Deduplicate by (kind, date, title, subtitle)
+    // Deduplicate by (kind, date, title, subtitle, time)
     const map = new Map<string, CalendarEvent>();
     for (const ev of collected) {
       const key = `${ev.kind}-${ev.date}-${ev.title}-${ev.subtitle ?? ""}-${
@@ -509,7 +471,10 @@ export default function CalendarPage() {
 
   // Upcoming interviews (from now onwards, considering time if available)
   const upcomingInterviews = useMemo(() => {
-    const nowMs = Date.now();
+    if (!now) return [];
+
+    const nowMs = now.getTime();
+
     return events
       .filter((ev) => ev.kind === "interview")
       .filter((ev) => {
@@ -528,7 +493,12 @@ export default function CalendarPage() {
         return aStr.localeCompare(bStr);
       })
       .slice(0, 5);
-  }, [events]);
+  }, [events, now]);
+
+  const nextInterview = upcomingInterviews[0] ?? null;
+  const laterInterviews = nextInterview ? upcomingInterviews.slice(1) : [];
+
+  const pad = (n: number) => `${n}`.padStart(2, "0");
 
   return (
     <>
@@ -767,72 +737,179 @@ export default function CalendarPage() {
 
             {/* Right: upcoming interviews + hint */}
             <div className="flex flex-col gap-4">
-              {/* Upcoming interviews */}
-              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-3 shadow-sm">
+              {/* Upcoming interviews - redesigned */}
+              <div className="rounded-2xl border border-emerald-100 bg-gradient-to-b from-emerald-50/90 via-white to-emerald-50/70 p-3 sm:p-4 shadow-sm">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100">
-                      <PhoneCall className="h-3.5 w-3.5 text-emerald-700" />
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100">
+                      <PhoneCall className="h-4 w-4 text-emerald-700" />
                     </div>
                     <div>
-                      <h2 className="text-xs font-semibold text-emerald-900">
+                      <h2 className="text-xs sm:text-sm font-semibold text-emerald-900">
                         Upcoming interviews
                       </h2>
                       <p className="text-[11px] text-emerald-800/80">
                         {upcomingInterviews.length > 0
-                          ? "Your next scheduled interview dates."
+                          ? "Your next scheduled interviews, sorted by date."
                           : "No upcoming interviews found."}
                       </p>
                     </div>
                   </div>
 
                   {upcomingInterviews.length > 0 && (
-                    <span className="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-medium text-emerald-800">
-                      {upcomingInterviews.length} upcoming
+                    <span className="rounded-full bg-white/90 px-2.5 py-0.5 text-[10px] font-medium text-emerald-800 shadow-sm">
+                      {upcomingInterviews.length}{" "}
+                      {upcomingInterviews.length === 1
+                        ? "interview"
+                        : "interviews"}
                     </span>
                   )}
                 </div>
 
-                {upcomingInterviews.length > 0 && (
-                  <ul className="mt-3 space-y-1.5 text-xs">
-                    {upcomingInterviews.map((ev) => {
-                      const countdown =
-                        now != null ? getCountdownLabel(ev, now) : null;
+                {/* No upcoming */}
+                {upcomingInterviews.length === 0 && (
+                  <div className="mt-3 rounded-xl border border-dashed border-emerald-200 bg-emerald-50/80 px-3 py-2.5 text-[11px] text-emerald-800/90">
+                    Add interview dates in your tracker and they&apos;ll show up
+                    here with a live countdown and quick access to that
+                    day&apos;s activity.
+                  </div>
+                )}
 
-                      return (
-                        <li
-                          key={ev.id}
-                          className="flex items-start gap-2 rounded-lg border border-emerald-100 bg-white/80 px-2.5 py-1.5 cursor-pointer"
-                          onClick={() => {
-                            setSelectedDate(ev.date);
-                            setSidebarOpen(true);
-                          }}
-                        >
-                          <span className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                          <div className="flex-1">
-                            <div className="flex flex-wrap items-center gap-1">
-                              <span className="font-medium text-neutral-900">
-                                {ev.title}
-                              </span>
-                              {ev.subtitle && (
-                                <span className="text-[11px] text-neutral-600">
-                                  · {ev.subtitle}
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-[11px] text-emerald-700">
-                              {formatHumanDateTime(ev.date, ev.time)}
-                            </div>
-                            {countdown && (
-                              <div className="text-[10px] text-emerald-800/80">
-                                {countdown}
-                              </div>
-                            )}
+                {/* Next interview card */}
+                {nextInterview && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedDate(nextInterview.date);
+                      setSidebarOpen(true);
+                    }}
+                    className="mt-4 flex w-full items-stretch gap-3 rounded-xl border border-emerald-200 bg-white/95 px-3 py-2.5 text-left text-xs shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md"
+                  >
+                    {/* Date pill */}
+                    <div className="flex flex-col items-center justify-center rounded-lg bg-emerald-50 px-2.5 py-1.5 text-emerald-900">
+                      <span className="text-lg font-semibold leading-none">
+                        {new Date(nextInterview.date).getDate()}
+                      </span>
+                      <span className="text-[10px] font-medium uppercase tracking-wide">
+                        {MONTH_NAMES[
+                          new Date(nextInterview.date).getMonth()
+                        ].slice(0, 3)}
+                      </span>
+                    </div>
+
+                    {/* Info + countdown */}
+                    <div className="flex flex-1 items-center justify-between gap-3">
+                      {/* Bigger, vertically centered text block */}
+                      <div className="flex flex-col justify-center space-y-0.5">
+                        <div className="flex flex-wrap items-center gap-1">
+                          <span className="text-sm sm:text-base font-semibold text-neutral-900">
+                            {nextInterview.title}
+                          </span>
+                          {nextInterview.subtitle && (
+                            <span className="text-xs sm:text-sm text-neutral-600">
+                              · {nextInterview.subtitle}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="text-xs sm:text-sm text-emerald-700 font-medium">
+                          {formatHumanDateTime(
+                            nextInterview.date,
+                            nextInterview.time
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Bigger countdown, stacked + centered (days:hours:mins:secs) */}
+                      {(() => {
+                        const parts = getCountdownParts(nextInterview, now);
+                        if (!parts) return null;
+                        const { days, hours, minutes, seconds } = parts;
+
+                        return (
+                          <div className="ml-auto flex h-full min-w-[110px] flex-col items-center justify-center rounded-xl bg-emerald-50 px-3 py-2 text-center text-[11px] sm:text-[12px] font-semibold text-emerald-900">
+                            {/* Line 1: Days: XX */}
+                            <span className="leading-tight">
+                              Days: {pad(days)}
+                            </span>
+
+                            {/* Line 2: HHh MMm SSs */}
+                            <span className="mt-0.5 text-[10px] sm:text-[11px] font-medium leading-tight">
+                              {pad(hours)}h {pad(minutes)}m {pad(seconds)}s
+                            </span>
                           </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
+                        );
+                      })()}
+                    </div>
+                  </button>
+                )}
+
+                {/* Later interviews list */}
+                {laterInterviews.length > 0 && (
+                  <div className="mt-4">
+                    <div className="mb-1 flex items-center justify-between text-[10px] font-medium uppercase tracking-wide text-emerald-900/80">
+                      <span>Later interviews</span>
+                      <span className="text-emerald-700/80">
+                        {laterInterviews.length} more
+                      </span>
+                    </div>
+
+                    <div className="overflow-hidden rounded-xl border border-emerald-100 bg-white/90">
+                      <ul className="divide-y divide-emerald-50 text-[11px]">
+                        {laterInterviews.map((ev) => {
+                          const parts = getCountdownParts(ev, now);
+
+                          return (
+                            <li
+                              key={ev.id}
+                              className="flex cursor-pointer items-center gap-2 px-2.5 py-1.5 transition hover:bg-emerald-50/70"
+                              onClick={() => {
+                                setSelectedDate(ev.date);
+                                setSidebarOpen(true);
+                              }}
+                            >
+                              <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-emerald-500" />
+
+                              <div className="flex flex-1 items-center justify-between gap-2 min-w-0">
+                                {/* Bigger, vertically centered text */}
+                                <div className="flex flex-col justify-center min-w-0">
+                                  <div className="flex flex-wrap items-center gap-1">
+                                    <span className="truncate text-[13px] sm:text-sm font-semibold text-neutral-900">
+                                      {ev.title}
+                                    </span>
+                                    {ev.subtitle && (
+                                      <span className="truncate text-[11px] sm:text-xs text-neutral-600">
+                                        · {ev.subtitle}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-xs sm:text-[13px] text-emerald-700 font-medium">
+                                    {formatHumanDateTime(ev.date, ev.time)}
+                                  </div>
+                                </div>
+
+                                {/* Right-side stacked countdown (days:hours:mins:secs) */}
+                                {parts && (
+                                  <div className="flex h-full min-w-[95px] flex-col items-center justify-center rounded-lg bg-emerald-50 px-2 py-1.5 text-[9px] sm:text-[10px] font-semibold text-emerald-900 text-center">
+                                    {/* Line 1: Days: XX */}
+                                    <span className="leading-tight">
+                                      Days: {pad(parts.days)}
+                                    </span>
+
+                                    {/* Line 2: HHh MMm SSs */}
+                                    <span className="mt-0.5 text-[9px] sm:text-[10px] font-medium leading-tight">
+                                      {pad(parts.hours)}h {pad(parts.minutes)}m{" "}
+                                      {pad(parts.seconds)}s
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  </div>
                 )}
               </div>
 
@@ -858,7 +935,7 @@ export default function CalendarPage() {
         </div>
       </section>
 
-      {/* 🔥 Day activity sidebar – OUTSIDE the section, like ActivityLogSidebar */}
+      {/* Day activity sidebar */}
       <CalendarDaySidebar
         open={sidebarOpen && !!selectedDate}
         onClose={() => setSidebarOpen(false)}
