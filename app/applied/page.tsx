@@ -1,24 +1,22 @@
-'use client';
+"use client";
 
-import { useMemo, useState } from 'react';
-import { Search, Plus, Filter, History } from 'lucide-react';
-import Image from 'next/image';
-import { animateCardExit } from '../../components/cardExitAnimation';
+import { useMemo, useState } from "react";
+import { Search, Plus, Filter, History } from "lucide-react";
+import Image from "next/image";
+import { animateCardExit } from "../../components/cardExitAnimation";
 
 import AddApplicationDialog, {
   type NewApplicationForm,
-} from '../../components/AddApplicationDialog';
-import MoveApplicationDialog from '../../components/MoveApplicationDialog';
-import type { RejectionDetails } from '../../components/MoveToRejectedDialog';
-import type { WithdrawnDetails } from '../../components/MoveToWithdrawnDialog';
-import type { Interview } from '../../components/ScheduleInterviewDialog';
-import ApplicationCard, {
-  type Application,
-} from './ApplicationCard';
+} from "../../components/AddApplicationDialog";
+import MoveApplicationDialog from "../../components/MoveApplicationDialog";
+import type { RejectionDetails } from "../../components/MoveToRejectedDialog";
+import type { WithdrawnDetails } from "../../components/MoveToWithdrawnDialog";
+import type { Interview } from "../../components/ScheduleInterviewDialog";
+import ApplicationCard, { type Application } from "./ApplicationCard";
 import ActivityLogSidebar, {
   type ActivityItem,
   type ActivityType,
-} from './ActivityLogSidebar';
+} from "@/components/ActivityLogSidebar";
 
 type StoredRejection = RejectionDetails & { id: string };
 
@@ -36,35 +34,35 @@ type StoredWithdrawn = {
   logoUrl?: string;
   notes?: string;
   withdrawnDate?: string;
-  withdrawnReason?: WithdrawnDetails['reason'];
+  withdrawnReason?: WithdrawnDetails["reason"];
 };
 
-const REJECTIONS_STORAGE_KEY = 'job-tracker:rejected';
-const WITHDRAWN_STORAGE_KEY = 'job-tracker:withdrawn';
+const REJECTIONS_STORAGE_KEY = "job-tracker:rejected";
+const WITHDRAWN_STORAGE_KEY = "job-tracker:withdrawn";
 
 function fmtDate(d: string) {
   const date = new Date(d);
   if (Number.isNaN(date.getTime())) return d;
   return new Intl.DateTimeFormat(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
+    year: "numeric",
+    month: "short",
+    day: "numeric",
   }).format(date);
 }
 
 function statusClasses(status: string) {
   const s = status.toLowerCase();
-  if (s.includes('interview'))
-    return 'bg-indigo-100 text-indigo-800 ring-1 ring-inset ring-indigo-300';
-  if (s.includes('offer'))
-    return 'bg-emerald-100 text-emerald-800 ring-1 ring-inset ring-emerald-300';
-  if (s.includes('rejected') || s.includes('declined'))
-    return 'bg-rose-100 text-rose-800 ring-1 ring-inset ring-rose-300';
-  if (s.includes('submitted'))
-    return 'bg-sky-100 text-sky-800 ring-1 ring-inset ring-sky-300';
-  if (s.includes('withdrawn') || s.includes('stopped'))
-    return 'bg-amber-100 text-amber-800 ring-1 ring-inset ring-amber-300';
-  return 'bg-cyan-100 text-cyan-800 ring-1 ring-inset ring-cyan-300';
+  if (s.includes("interview"))
+    return "bg-indigo-100 text-indigo-800 ring-1 ring-inset ring-indigo-300";
+  if (s.includes("offer"))
+    return "bg-emerald-100 text-emerald-800 ring-1 ring-inset ring-emerald-300";
+  if (s.includes("rejected") || s.includes("declined"))
+    return "bg-rose-100 text-rose-800 ring-1 ring-inset ring-rose-300";
+  if (s.includes("submitted"))
+    return "bg-sky-100 text-sky-800 ring-1 ring-inset ring-sky-300";
+  if (s.includes("withdrawn") || s.includes("stopped"))
+    return "bg-amber-100 text-amber-800 ring-1 ring-inset ring-amber-300";
+  return "bg-cyan-100 text-cyan-800 ring-1 ring-inset ring-cyan-300";
 }
 
 // Helper to convert full Application -> dialog form data
@@ -75,16 +73,14 @@ function appToForm(app: Application): NewApplicationForm {
 
 export default function AppliedPage() {
   const [applications, setApplications] = useState<Application[]>([]);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingApp, setEditingApp] = useState<Application | null>(null);
 
   // Move dialog state
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
-  const [appBeingMoved, setAppBeingMoved] = useState<Application | null>(
-    null,
-  );
+  const [appBeingMoved, setAppBeingMoved] = useState<Application | null>(null);
 
   // Delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState<Application | null>(null);
@@ -94,35 +90,33 @@ export default function AppliedPage() {
   const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
 
   const logActivity = (
-  type: ActivityType,
-  app: Application | null,
-  extras?: Partial<ActivityItem>,
-) => {
-  if (!app) return;
+    type: ActivityType,
+    app: Application | null,
+    extras?: Partial<ActivityItem>
+  ) => {
+    if (!app) return;
 
-  const id =
-    typeof crypto !== 'undefined' && 'randomUUID' in crypto
-      ? crypto.randomUUID()
-      : Math.random().toString(36).slice(2);
+    const id =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2);
 
-  const timestamp = new Date().toISOString();
+    const timestamp = new Date().toISOString();
 
-  const base: ActivityItem = {
-    id,
-    appId: app.id,
-    type,
-    timestamp,
-    company: app.company,
-    role: app.role,
-    location: app.location,
-    appliedOn: app.appliedOn, // 🔥 this line makes "Applied on" work
-    ...extras,
+    const base: ActivityItem = {
+      id,
+      appId: app.id,
+      type,
+      timestamp,
+      company: app.company,
+      role: app.role,
+      location: app.location,
+      appliedOn: app.appliedOn,
+      ...extras,
+    };
+
+    setActivityItems((prev) => [base, ...prev].slice(0, 100));
   };
-
-  // newest first, keep last 100
-  setActivityItems((prev) => [base, ...prev].slice(0, 100));
-};
-
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
@@ -130,16 +124,15 @@ export default function AppliedPage() {
     return applications.filter((a) =>
       [a.company, a.role, a.location, a.status]
         .filter(Boolean)
-        .some((v) => v!.toLowerCase().includes(q)),
+        .some((v) => v!.toLowerCase().includes(q))
     );
   }, [applications, query]);
 
-  const toggle = (id: string) =>
-    setExpanded((s) => ({ ...s, [id]: !s[id] }));
+  const toggle = (id: string) => setExpanded((s) => ({ ...s, [id]: !s[id] }));
 
   const handleCreate = (data: NewApplicationForm) => {
     const id =
-      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      typeof crypto !== "undefined" && "randomUUID" in crypto
         ? crypto.randomUUID()
         : Math.random().toString(36).slice(2);
 
@@ -150,9 +143,9 @@ export default function AppliedPage() {
 
     setApplications((prev) => [newApp, ...prev]);
 
-    logActivity('added', newApp, {
+    logActivity("added", newApp, {
       toStatus: newApp.status,
-      note: 'Application created',
+      note: "Application created",
     });
   };
 
@@ -162,10 +155,10 @@ export default function AppliedPage() {
     const updatedApp: Application = { ...editingApp, ...data };
 
     setApplications((prev) =>
-      prev.map((app) => (app.id === editingApp.id ? updatedApp : app)),
+      prev.map((app) => (app.id === editingApp.id ? updatedApp : app))
     );
 
-    logActivity('edited', updatedApp, {
+    logActivity("edited", updatedApp, {
       fromStatus: editingApp.status,
       toStatus: data.status,
     });
@@ -196,12 +189,12 @@ export default function AppliedPage() {
     const elementId = `application-card-${id}`;
 
     // log before removing
-    logActivity('deleted', deleteTarget, {
+    logActivity("deleted", deleteTarget, {
       fromStatus: deleteTarget.status,
-      note: 'Application removed from Applied list',
+      note: "Application removed from Applied list",
     });
 
-    animateCardExit(elementId, 'delete', () => {
+    animateCardExit(elementId, "delete", () => {
       // actually remove from state AFTER animation
       setApplications((prev) => prev.filter((app) => app.id !== id));
 
@@ -240,7 +233,7 @@ export default function AppliedPage() {
     const id = appBeingMoved.id;
     const elementId = `application-card-${id}`;
 
-    animateCardExit(elementId, 'move', () => {
+    animateCardExit(elementId, "move", () => {
       setApplications((prev) => prev.filter((app) => app.id !== id));
 
       setExpanded((prev) => {
@@ -262,9 +255,9 @@ export default function AppliedPage() {
       return;
     }
 
-    logActivity('moved_to_interviews', appBeingMoved, {
+    logActivity("moved_to_interviews", appBeingMoved, {
       fromStatus: appBeingMoved.status,
-      toStatus: 'Interview',
+      toStatus: "Interview",
     });
 
     moveOutOfApplied();
@@ -272,7 +265,7 @@ export default function AppliedPage() {
 
   const moveToRejected = (details: RejectionDetails) => {
     const id =
-      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      typeof crypto !== "undefined" && "randomUUID" in crypto
         ? crypto.randomUUID()
         : Math.random().toString(36).slice(2);
 
@@ -281,7 +274,7 @@ export default function AppliedPage() {
       ...details,
     };
 
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       try {
         const raw = window.localStorage.getItem(REJECTIONS_STORAGE_KEY);
         let existing: StoredRejection[] = [];
@@ -294,19 +287,19 @@ export default function AppliedPage() {
         const next = [...existing, newRejection];
         window.localStorage.setItem(
           REJECTIONS_STORAGE_KEY,
-          JSON.stringify(next),
+          JSON.stringify(next)
         );
       } catch (err) {
-        console.error('Failed to persist rejected application', err);
+        console.error("Failed to persist rejected application", err);
       }
     }
 
     if (appBeingMoved) {
-      logActivity('moved_to_rejected', appBeingMoved, {
+      logActivity("moved_to_rejected", appBeingMoved, {
         fromStatus: appBeingMoved.status,
-        toStatus: 'Rejected',
+        toStatus: "Rejected",
         // RejectionDetails doesn't have `reason` in your types, so keep this generic
-        note: 'Marked as rejected',
+        note: "Marked as rejected",
       });
     }
 
@@ -322,7 +315,7 @@ export default function AppliedPage() {
     const source = appBeingMoved;
 
     const id =
-      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      typeof crypto !== "undefined" && "randomUUID" in crypto
         ? crypto.randomUUID()
         : Math.random().toString(36).slice(2);
 
@@ -332,8 +325,7 @@ export default function AppliedPage() {
       role: details.role || source.role,
       location: details.location || source.location,
       appliedOn: details.appliedDate || source.appliedOn,
-      employmentType:
-        details.employmentType || source.employmentType,
+      employmentType: details.employmentType || source.employmentType,
       contactName: details.contactName || source.contactPerson,
       contactEmail: details.contactEmail || source.contactEmail,
       contactPhone: details.contactPhone || source.contactPhone,
@@ -344,26 +336,24 @@ export default function AppliedPage() {
       withdrawnReason: details.reason,
     };
 
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       try {
         const raw = window.localStorage.getItem(WITHDRAWN_STORAGE_KEY);
         const parsed = raw ? JSON.parse(raw) : [];
-        const existing: StoredWithdrawn[] = Array.isArray(parsed)
-          ? parsed
-          : [];
+        const existing: StoredWithdrawn[] = Array.isArray(parsed) ? parsed : [];
         const next = [...existing, newWithdrawn];
         window.localStorage.setItem(
           WITHDRAWN_STORAGE_KEY,
-          JSON.stringify(next),
+          JSON.stringify(next)
         );
       } catch (err) {
-        console.error('Failed to persist withdrawn application', err);
+        console.error("Failed to persist withdrawn application", err);
       }
     }
 
-    logActivity('moved_to_withdrawn', source, {
+    logActivity("moved_to_withdrawn", source, {
       fromStatus: source.status,
-      toStatus: 'Withdrawn',
+      toStatus: "Withdrawn",
       note: details.reason || undefined,
     });
 
@@ -374,9 +364,7 @@ export default function AppliedPage() {
     <>
       {/* Delete confirmation dialog */}
       {deleteTarget && (
-        <div
-          className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[13000] flex items-center justify-center px-4 py-8"
-        >
+        <div className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[13000] flex items-center justify-center px-4 py-8">
           {/* Backdrop */}
           <div
             className="absolute inset-0 bg-neutral-900/40"
@@ -387,23 +375,17 @@ export default function AppliedPage() {
           {/* Panel */}
           <div
             className={[
-              'relative z-10 w-full max-w-sm rounded-2xl border border-neutral-200/80',
-              'bg-white shadow-2xl p-5',
-            ].join(' ')}
+              "relative z-10 w-full max-w-sm rounded-2xl border border-neutral-200/80",
+              "bg-white shadow-2xl p-5",
+            ].join(" ")}
           >
             <h2 className="text-sm font-semibold text-neutral-900">
               Delete application?
             </h2>
             <p className="mt-2 text-sm text-neutral-700">
-              This will permanently remove your application to{' '}
-              <span className="font-medium">
-                {deleteTarget.company}
-              </span>{' '}
-              for the role{' '}
-              <span className="font-medium">
-                {deleteTarget.role}
-              </span>
-              .
+              This will permanently remove your application to{" "}
+              <span className="font-medium">{deleteTarget.company}</span> for
+              the role <span className="font-medium">{deleteTarget.role}</span>.
             </p>
             <p className="mt-1 text-xs text-neutral-500">
               This action cannot be undone.
@@ -431,18 +413,18 @@ export default function AppliedPage() {
 
       {/* Activity sidebar (slides in from the right) */}
       <ActivityLogSidebar
+        variant="applied"
         open={activityOpen}
         onClose={() => setActivityOpen(false)}
         items={activityItems}
-        statusClasses={statusClasses}
       />
 
       <section
         className={[
-          'relative rounded-2xl border border-neutral-200/70',
-          'bg-gradient-to-br from-sky-50 via-fuchsia-50 to-amber-50',
-          'p-8 shadow-md overflow-hidden',
-        ].join(' ')}
+          "relative rounded-2xl border border-neutral-200/70",
+          "bg-gradient-to-br from-sky-50 via-fuchsia-50 to-amber-50",
+          "p-8 shadow-md overflow-hidden",
+        ].join(" ")}
       >
         {/* soft color blobs */}
         <div className="pointer-events-none absolute -top-20 -right-24 h-72 w-72 rounded-full bg-sky-400/20 blur-3xl" />
@@ -459,20 +441,18 @@ export default function AppliedPage() {
               aria-hidden="true"
               className="shrink-0"
             />
-            <h1 className="text-2xl font-semibold text-neutral-900">
-              Applied
-            </h1>
+            <h1 className="text-2xl font-semibold text-neutral-900">Applied</h1>
           </div>
 
           <button
             type="button"
             onClick={() => setActivityOpen(true)}
             className={[
-              'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-neutral-800',
-              'bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70',
-              'border border-neutral-200 shadow-sm hover:bg-white',
-              'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-300',
-            ].join(' ')}
+              "inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-neutral-800",
+              "bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70",
+              "border border-neutral-200 shadow-sm hover:bg-white",
+              "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-300",
+            ].join(" ")}
           >
             <History className="h-4 w-4 text-sky-600" aria-hidden="true" />
             <span>Activity log</span>
@@ -503,14 +483,14 @@ export default function AppliedPage() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className={[
-                'h-11 w-full rounded-lg pl-9 pr-3 text-sm text-neutral-900 placeholder:text-neutral-500',
-                'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
-                'border border-neutral-200 shadow-sm',
-                'hover:bg-white focus:bg-white',
-                'ring-1 ring-transparent',
-                'focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-sky-300',
-                'transition-shadow',
-              ].join(' ')}
+                "h-11 w-full rounded-lg pl-9 pr-3 text-sm text-neutral-900 placeholder:text-neutral-500",
+                "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
+                "border border-neutral-200 shadow-sm",
+                "hover:bg-white focus:bg-white",
+                "ring-1 ring-transparent",
+                "focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-sky-300",
+                "transition-shadow",
+              ].join(" ")}
             />
           </div>
 
@@ -522,11 +502,11 @@ export default function AppliedPage() {
               setDialogOpen(true);
             }}
             className={[
-              'inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800',
-              'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
-              'border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50',
-              'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-300',
-            ].join(' ')}
+              "inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800",
+              "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
+              "border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50",
+              "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-300",
+            ].join(" ")}
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
             Add
@@ -536,11 +516,11 @@ export default function AppliedPage() {
           <button
             type="button"
             className={[
-              'inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800',
-              'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
-              'border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50',
-              'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-300',
-            ].join(' ')}
+              "inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800",
+              "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
+              "border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50",
+              "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-300",
+            ].join(" ")}
           >
             <Filter className="h-4 w-4" aria-hidden="true" />
             Filter
@@ -571,8 +551,8 @@ export default function AppliedPage() {
               <div className="mb-2 text-5xl">🔎</div>
               <p className="text-sm text-neutral-700">
                 {applications.length === 0
-                  ? 'No applications yet. Click “Add” to create your first one.'
-                  : 'No applications match your search.'}
+                  ? "No applications yet. Click “Add” to create your first one."
+                  : "No applications match your search."}
               </p>
             </div>
           )}

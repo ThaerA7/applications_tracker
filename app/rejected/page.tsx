@@ -9,9 +9,9 @@ import MoveToRejectedDialog, {
 import RejectedCard, { type Rejection } from "./RejectedCard";
 import { Search, Plus, Filter, History } from "lucide-react";
 import { animateCardExit } from "@/components/cardExitAnimation";
-import RejectedActivityLogSidebar, {
-  type RejectedActivityItem,
-} from "./RejectedActivityLogSidebar";
+import ActivityLogSidebar, {
+  type ActivityItem,
+} from "@/components/ActivityLogSidebar";
 
 const REJECTIONS_STORAGE_KEY = "job-tracker:rejected";
 const REJECTIONS_ACTIVITY_STORAGE_KEY = "job-tracker:rejected-activity";
@@ -36,12 +36,10 @@ export default function RejectedPage() {
 
   // Activity log sidebar & data
   const [activityOpen, setActivityOpen] = useState(false);
-  const [activityItems, setActivityItems] = useState<RejectedActivityItem[]>(
-    []
-  );
+  const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
 
   // helper to append to activity log (and persist)
-  const appendActivity = (entry: RejectedActivityItem) => {
+  const appendActivity = (entry: ActivityItem) => {
     setActivityItems((prev) => {
       const next = [entry, ...prev].slice(0, 100);
       if (typeof window !== "undefined") {
@@ -161,7 +159,7 @@ export default function RejectedPage() {
       appendActivity({
         id: activityId,
         appId: target.id,
-        type: "deleted",
+        type: "deleted", // ActivityType
         timestamp: new Date().toISOString(),
         company: target.company,
         role: target.role,
@@ -469,7 +467,8 @@ export default function RejectedPage() {
       </section>
 
       {/* Activity log sidebar */}
-      <RejectedActivityLogSidebar
+      <ActivityLogSidebar
+        variant="rejected"
         open={activityOpen}
         onClose={() => setActivityOpen(false)}
         items={activityItems}

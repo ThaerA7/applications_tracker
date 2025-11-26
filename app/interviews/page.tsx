@@ -28,16 +28,15 @@ import type { WithdrawnDetails } from "../../components/MoveToWithdrawnDialog";
 import InterviewCard from "./InterviewCard";
 import { animateCardExit } from "../../components/cardExitAnimation";
 
-import InterviewsActivityLogSidebar, {
+import ActivityLogSidebar, {
   type ActivityItem,
   type ActivityType,
-} from "./InterviewsActivityLogSidebar";
+} from "@/components/ActivityLogSidebar";
 
 const INTERVIEWS_STORAGE_KEY = "job-tracker:interviews";
 const REJECTIONS_STORAGE_KEY = "job-tracker:rejected";
 const WITHDRAWN_STORAGE_KEY = "job-tracker:withdrawn";
-const INTERVIEWS_ACTIVITY_STORAGE_KEY =
-  "job-tracker:interviews-activity";
+const INTERVIEWS_ACTIVITY_STORAGE_KEY = "job-tracker:interviews-activity";
 
 type ApplicationLike = ComponentProps<
   typeof ScheduleInterviewDialog
@@ -308,7 +307,7 @@ export default function InterviewsPage() {
       if (typeof window !== "undefined") {
         try {
           window.localStorage.setItem(
-            INTERVIEWS_ACTIVITY_STORAGE_KEY,
+            "job-tracker:interviews-activity",
             JSON.stringify(next)
           );
         } catch (err) {
@@ -690,11 +689,11 @@ export default function InterviewsPage() {
   return (
     <>
       {/* Interview activity sidebar */}
-      <InterviewsActivityLogSidebar
+      <ActivityLogSidebar
+        variant="interviews"
         open={activityOpen}
         onClose={() => setActivityOpen(false)}
         items={activityItems}
-        statusClasses={statusClasses}
       />
 
       {/* Dialog shared for Add + Edit */}
