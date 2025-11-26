@@ -1,15 +1,8 @@
 "use client";
 
-import { useEffect, useState, type ComponentType } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import {
-  X,
-  Briefcase,
-  PhoneCall,
-  XCircle,
-  Undo2,
-  Sparkles,
-} from "lucide-react";
+import { X, Briefcase, MapPin } from "lucide-react";
 
 type ActivityKind =
   | "applied"
@@ -26,12 +19,8 @@ export type CalendarDayEvent = {
   subtitle?: string;
   time?: string;
   dateTime?: string;
-};
-
-type KindIconMeta = {
-  Icon: ComponentType<any>;
-  iconBg: string;
-  iconColor: string;
+  location?: string;
+  employmentType?: string;
 };
 
 const KIND_META: Record<
@@ -65,33 +54,24 @@ const KIND_META: Record<
   },
 };
 
-const KIND_ICON_META: Record<ActivityKind, KindIconMeta> = {
-  applied: {
-    Icon: Briefcase,
-    iconBg: "bg-sky-50",
-    iconColor: "text-sky-600",
-  },
-  interview: {
-    Icon: PhoneCall,
-    iconBg: "bg-emerald-50",
-    iconColor: "text-emerald-600",
-  },
-  rejected: {
-    Icon: XCircle,
-    iconBg: "bg-rose-50",
-    iconColor: "text-rose-600",
-  },
-  withdrawn: {
-    Icon: Undo2,
-    iconBg: "bg-amber-50",
-    iconColor: "text-amber-600",
-  },
-  offer: {
-    Icon: Sparkles,
-    iconBg: "bg-fuchsia-50",
-    iconColor: "text-fuchsia-600",
-  },
-};
+const DAY_ICON_SRC = "/icons/day.png";
+
+function getKindIconSrc(kind: ActivityKind): string {
+  switch (kind) {
+    case "applied":
+      return "/icons/checklist.png";
+    case "interview":
+      return "/icons/interview.png";
+    case "rejected":
+      return "/icons/cancel.png";
+    case "withdrawn":
+      return "/icons/withdrawn.png";
+    case "offer":
+      return "/icons/briefcase.png";
+    default:
+      return "/icons/history.png";
+  }
+}
 
 type CalendarDaySidebarProps = {
   open: boolean;
@@ -116,41 +96,49 @@ export default function CalendarDaySidebar({
     setMounted(true);
   }, []);
 
-  if (!mounted || !open) return null;
+  if (!mounted) return null;
 
   return createPortal(
     <div
       className={[
-        // 🔥 full-screen overlay, ABOVE TOPBAR & EVERYTHING
+        // full-screen overlay, ABOVE TOPBAR & EVERYTHING
         "fixed inset-0 z-[13000] flex justify-end",
-        "pointer-events-auto",
+        open ? "pointer-events-auto" : "pointer-events-none",
       ].join(" ")}
+      aria-hidden={!open}
     >
       {/* Backdrop over the whole viewport */}
       <div
-        className="absolute inset-0 bg-neutral-900/40 transition-opacity duration-300 opacity-100"
-        onClick={onClose}
+        className={[
+          "absolute inset-0 bg-neutral-900/40",
+          "transition-opacity duration-300",
+          open ? "opacity-100" : "opacity-0",
+        ].join(" ")}
+        onClick={open ? onClose : undefined}
         aria-hidden="true"
       />
 
       {/* Right-side panel */}
       <aside
-        aria-hidden={false}
+        aria-hidden={!open}
         className={[
           "relative z-10 flex h-full w-full max-w-md flex-col",
           "border-l border-neutral-200/80",
           "bg-gradient-to-b from-white via-indigo-50/70 to-sky-50/70",
           "shadow-2xl backdrop-blur-sm",
-          "transform transition-transform duration-300 ease-out translate-x-0",
+          "transform transition-transform duration-300 ease-out",
+          open ? "translate-x-0" : "translate-x-full",
         ].join(" ")}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <header className="flex items-center justify-between border-b border-neutral-200/70 px-4 py-3">
           <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-100">
-              <Sparkles className="h-5 w-5 text-indigo-600" />
-            </div>
+            <img
+              src={DAY_ICON_SRC}
+              alt="Day activity"
+              className="h-9 w-9 object-contain"
+            />
             <div>
               <h2 className="text-sm font-semibold text-neutral-900">
                 {dateIso ? "Day activity" : "No day selected"}
@@ -200,8 +188,7 @@ export default function CalendarDaySidebar({
             <ul className="space-y-2.5">
               {events.map((ev) => {
                 const meta = KIND_META[ev.kind];
-                const iconMeta = KIND_ICON_META[ev.kind];
-                const Icon = iconMeta.Icon;
+                const kindIconSrc = getKindIconSrc(ev.kind);
 
                 return (
                   <li
@@ -220,14 +207,11 @@ export default function CalendarDaySidebar({
                     <div className="relative space-y-2 pt-1">
                       {/* Icon + text block */}
                       <div className="flex items-center gap-2">
-                        <div
-                          className={[
-                            "flex h-7 w-7 items-center justify-center rounded-full",
-                            iconMeta.iconBg,
-                          ].join(" ")}
-                        >
-                          <Icon
-                            className={`h-3.5 w-3.5 ${iconMeta.iconColor}`}
+                        <div className="flex items-center justify-center">
+                          <img
+                            src={kindIconSrc}
+                            alt={meta.label}
+                            className="h-7 w-7 object-contain"
                           />
                         </div>
 
@@ -243,18 +227,30 @@ export default function CalendarDaySidebar({
                             )}
                           </div>
 
-                          <div className="inline-flex items-center gap-1">
-                            <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
-                              {meta.label}
-                            </span>
-                            <span
-                              className={[
-                                "inline-flex items-center truncate rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset",
-                                meta.badge,
-                              ].join(" ")}
-                            >
-                              {dateLabel}
-                            </span>
+                          <div className="inline-flex flex-wrap items-center gap-1.5 text-[10px] text-neutral-500">
+                            {ev.location && (
+                              <span className="inline-flex items-center gap-1 font-medium text-neutral-700">
+                                <MapPin
+                                  className="h-3 w-3 text-neutral-400"
+                                  aria-hidden="true"
+                                />
+                                <span>{ev.location}</span>
+                              </span>
+                            )}
+
+                            {ev.location && ev.employmentType && (
+                              <span className="text-neutral-300">·</span>
+                            )}
+
+                            {ev.employmentType && (
+                              <span className="inline-flex items-center gap-1 font-medium text-neutral-700">
+                                <Briefcase
+                                  className="h-3 w-3 text-neutral-400"
+                                  aria-hidden="true"
+                                />
+                                <span>{ev.employmentType}</span>
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
