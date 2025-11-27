@@ -37,7 +37,6 @@ type CalendarEvent = {
   employmentType?: string;
 };
 
-
 const MONTH_NAMES = [
   "January",
   "February",
@@ -305,8 +304,9 @@ export default function CalendarPage() {
       if (interviewDateOnly) {
         const time = extractTime(item.interviewDate);
         addEvent({
-          id: `interview-from-withdrawn-${item.id ?? item.interviewDate ?? interviewDateOnly
-            }`,
+          id: `interview-from-withdrawn-${
+            item.id ?? item.interviewDate ?? interviewDateOnly
+          }`,
           date: interviewDateOnly,
           kind: "interview",
           title: item.company || "Interview",
@@ -379,8 +379,9 @@ export default function CalendarPage() {
     // Deduplicate by (kind, date, title, subtitle, time)
     const map = new Map<string, CalendarEvent>();
     for (const ev of collected) {
-      const key = `${ev.kind}-${ev.date}-${ev.title}-${ev.subtitle ?? ""}-${ev.time ?? ""
-        }`;
+      const key = `${ev.kind}-${ev.date}-${ev.title}-${ev.subtitle ?? ""}-${
+        ev.time ?? ""
+      }`;
       if (!map.has(key)) {
         map.set(key, ev);
       }
@@ -533,29 +534,29 @@ export default function CalendarPage() {
 
         <div className="relative z-10">
           {/* Header */}
-          <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            {/* Left: icon + title, subtitle below (like Rejected page) */}
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
                 <Image
                   src="/icons/calendar.png"
                   alt=""
-                  width={40}
-                  height={40}
+                  width={37}
+                  height={37}
                   aria-hidden="true"
-                  className="shrink-0"
+                  className="shrink-0 -mt-1"
                 />
-                <div>
-                  <h1 className="text-xl sm:text-2xl font-semibold text-neutral-900">
-                    Activity calendar
-                  </h1>
-                  <p className="mt-1 text-xs sm:text-sm text-neutral-600">
-                    See when you applied, interviewed, got responses, or
-                    withdrew — all in one clean view.
-                  </p>
-                </div>
+                <h1 className="text-2xl font-semibold text-neutral-900">
+                  Activity calendar
+                </h1>
               </div>
+              <p className="mt-1 text-sm text-neutral-700">
+                See when you applied, interviewed, got responses, or withdrew —
+                all in one clean view.
+              </p>
             </div>
 
+            {/* Right: month navigation + Today button (unchanged) */}
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <div className="flex items-center gap-1 rounded-xl border border-neutral-200 bg-white/80 px-2 py-1.5 shadow-sm">
                 <button
