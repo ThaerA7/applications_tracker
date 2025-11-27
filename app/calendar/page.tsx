@@ -527,7 +527,7 @@ export default function CalendarPage() {
         <div className="relative z-10">
           {/* Header */}
           <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            {/* Left: icon + title, subtitle below (like Rejected page) */}
+            {/* Left: icon + title, subtitle below */}
             <div>
               <div className="flex items-center gap-1">
                 <Image
@@ -546,38 +546,6 @@ export default function CalendarPage() {
                 See when you applied, interviewed, got responses, or withdrew —
                 all in one clean view.
               </p>
-            </div>
-
-            {/* Right: month navigation + Today button (unchanged) */}
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <div className="flex items-center gap-1 rounded-xl border border-neutral-200 bg-white/80 px-2 py-1.5 shadow-sm">
-                <button
-                  type="button"
-                  onClick={handlePrevMonth}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-lg hover:bg-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
-                  aria-label="Previous month"
-                >
-                  <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-                </button>
-                <div className="px-1 text-sm font-medium text-neutral-900">
-                  {MONTH_NAMES[monthState.month]} {monthState.year}
-                </div>
-                <button
-                  type="button"
-                  onClick={handleNextMonth}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-lg hover:bg-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
-                  aria-label="Next month"
-                >
-                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
-                </button>
-              </div>
-              <button
-                type="button"
-                onClick={handleToday}
-                className="inline-flex items-center gap-1 rounded-lg border border-neutral-200 bg-white/80 px-3 py-1.5 text-xs font-medium text-neutral-800 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
-              >
-                Today
-              </button>
             </div>
           </header>
 
@@ -632,62 +600,98 @@ export default function CalendarPage() {
             {/* Left: calendar */}
             <div className="flex flex-col">
               <div className="rounded-2xl border border-neutral-200/80 bg-white/85 p-4 shadow-sm backdrop-blur">
-                {/* Legend (using custom PNG icons, no Offer) */}
-                <div className="mb-4 flex flex-wrap gap-2 text-[11px]">
-                  {/* Applied */}
-                  <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white px-2.5 py-1 shadow-sm">
-                    <Image
-                      src="/icons/checklist.png"
-                      alt="Applied icon"
-                      width={16}
-                      height={16}
-                      className="h-3.5 w-3.5"
-                    />
-                    <span className="font-medium text-neutral-900">
-                      {KIND_META.applied.label}
-                    </span>
+                {/* Legend + month navigation in SAME ROW */}
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  {/* 4 tags (chips) */}
+                  <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                    {/* Applied */}
+                    <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white px-2.5 py-1 shadow-sm">
+                      <Image
+                        src="/icons/checklist.png"
+                        alt="Applied icon"
+                        width={16}
+                        height={16}
+                        className="h-3.5 w-3.5"
+                      />
+                      <span className="font-medium text-neutral-900">
+                        {KIND_META.applied.label}
+                      </span>
+                    </div>
+
+                    {/* Interview */}
+                    <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white px-2.5 py-1 shadow-sm">
+                      <Image
+                        src="/icons/interview.png"
+                        alt="Interview icon"
+                        width={16}
+                        height={16}
+                        className="h-3.5 w-3.5"
+                      />
+                      <span className="font-medium text-neutral-900">
+                        {KIND_META.interview.label}
+                      </span>
+                    </div>
+
+                    {/* Rejected */}
+                    <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white px-2.5 py-1 shadow-sm">
+                      <Image
+                        src="/icons/cancel.png"
+                        alt="Rejected icon"
+                        width={16}
+                        height={16}
+                        className="h-3.5 w-3.5"
+                      />
+                      <span className="font-medium text-neutral-900">
+                        {KIND_META.rejected.label}
+                      </span>
+                    </div>
+
+                    {/* Withdrawn */}
+                    <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white px-2.5 py-1 shadow-sm">
+                      <Image
+                        src="/icons/withdrawn.png"
+                        alt="Withdrawn icon"
+                        width={16}
+                        height={16}
+                        className="h-3.5 w-3.5"
+                      />
+                      <span className="font-medium text-neutral-900">
+                        {KIND_META.withdrawn.label}
+                      </span>
+                    </div>
                   </div>
 
-                  {/* Interview */}
-                  <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white px-2.5 py-1 shadow-sm">
-                    <Image
-                      src="/icons/interview.png"
-                      alt="Interview icon"
-                      width={16}
-                      height={16}
-                      className="h-3.5 w-3.5"
-                    />
-                    <span className="font-medium text-neutral-900">
-                      {KIND_META.interview.label}
-                    </span>
-                  </div>
-
-                  {/* Rejected */}
-                  <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white px-2.5 py-1 shadow-sm">
-                    <Image
-                      src="/icons/cancel.png"
-                      alt="Rejected icon"
-                      width={16}
-                      height={16}
-                      className="h-3.5 w-3.5"
-                    />
-                    <span className="font-medium text-neutral-900">
-                      {KIND_META.rejected.label}
-                    </span>
-                  </div>
-
-                  {/* Withdrawn */}
-                  <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white px-2.5 py-1 shadow-sm">
-                    <Image
-                      src="/icons/withdrawn.png"
-                      alt="Withdrawn icon"
-                      width={16}
-                      height={16}
-                      className="h-3.5 w-3.5"
-                    />
-                    <span className="font-medium text-neutral-900">
-                      {KIND_META.withdrawn.label}
-                    </span>
+                  {/* Compact month switcher + Today on the same row (top right of calendar) */}
+                  <div className="flex items-center gap-2 text-[10px] sm:text-xs">
+                    <div className="flex items-center gap-1 rounded-lg border border-neutral-200 bg-white/80 px-2 py-1 shadow-sm">
+                      <button
+                        type="button"
+                        onClick={handlePrevMonth}
+                        className="inline-flex h-6 w-6 items-center justify-center rounded-md hover:bg-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+                        aria-label="Previous month"
+                      >
+                        <ChevronLeft className="h-3 w-3" aria-hidden="true" />
+                      </button>
+                      <div className="px-1 min-w-[72px] text-center font-medium text-neutral-900">
+                        {MONTH_NAMES[monthState.month].slice(0, 3)}{" "}
+                        {monthState.year}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleNextMonth}
+                        className="inline-flex h-6 w-6 items-center justify-center rounded-md hover:bg-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+                        aria-label="Next month"
+                      >
+                        <ChevronRight className="h-3 w-3" aria-hidden="true" />
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleToday}
+                      className="hidden sm:inline-flex items-center rounded-md border border-neutral-200 bg-white/80 px-2 py-1 text-[10px] font-medium text-neutral-700 shadow-sm hover:bg-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+                    >
+                      Today
+                    </button>
                   </div>
                 </div>
 
@@ -835,7 +839,7 @@ export default function CalendarPage() {
 
                     {/* Info + countdown */}
                     <div className="flex flex-1 items-center justify-between gap-3">
-                      {/* Main upcoming interview text (slightly reduced) */}
+                      {/* Main upcoming interview text */}
                       <div className="flex flex-col justify-center space-y-0.5">
                         <div className="flex flex-wrap items-center gap-1">
                           <span className="text-sm sm:text-[15px] font-semibold text-neutral-900">
@@ -918,7 +922,7 @@ export default function CalendarPage() {
                               </div>
 
                               <div className="flex flex-1 items-center justify-between gap-2 min-w-0">
-                                {/* LATER INTERVIEWS: smaller text than nextInterview */}
+                                {/* Later interviews text */}
                                 <div className="flex flex-col justify-center min-w-0">
                                   <div className="flex flex-wrap items-center gap-1">
                                     <span className="truncate text-xs sm:text-sm font-semibold text-neutral-900">
@@ -935,7 +939,7 @@ export default function CalendarPage() {
                                   </div>
                                 </div>
 
-                                {/* Right-side countdown: "Days: XX" then "HHh MMm SSs" */}
+                                {/* Right-side countdown */}
                                 {parts && (
                                   <div className="flex h-full min-w-[95px] flex-col items-center justify-center rounded-lg bg-emerald-50 px-2 py-1.5 text-[9px] sm:text-[10px] font-semibold text-emerald-900 text-center">
                                     <span className="leading-tight">
