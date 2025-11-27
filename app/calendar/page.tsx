@@ -1,3 +1,5 @@
+// CalendarPage.tsx
+
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -6,180 +8,22 @@ import { ChevronLeft, ChevronRight, PhoneCall, Sparkles } from "lucide-react";
 import CalendarDaySidebar, {
   type CalendarDayEvent,
 } from "./CalendarDaySidebar";
+import CalendarStatsSection from "./CalendarStatsSection";
 
-type ActivityKind =
-  | "applied"
-  | "interview"
-  | "rejected"
-  | "withdrawn"
-  | "offer";
-
-type CalendarEvent = {
-  id: string;
-  date: string; // YYYY-MM-DD
-  kind: ActivityKind;
-  title: string;
-  subtitle?: string;
-  /** Optional HH:MM (from original ISO) */
-  time?: string;
-  /** Optional full datetime ISO used for countdowns */
-  dateTime?: string;
-  /** NEW: used in CalendarDaySidebar under the title */
-  location?: string;
-  employmentType?: string;
-};
-
-const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-] as const;
-
-const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
-
-const KIND_META: Record<
+import {
   ActivityKind,
-  { label: string; badge: string; accentDot: string }
-> = {
-  applied: {
-    label: "Applied",
-    badge: "bg-sky-50 text-sky-800 ring-sky-200",
-    accentDot: "bg-sky-500",
-  },
-  interview: {
-    label: "Interview",
-    badge: "bg-emerald-50 text-emerald-800 ring-emerald-200",
-    accentDot: "bg-emerald-500",
-  },
-  rejected: {
-    label: "Rejected",
-    badge: "bg-rose-50 text-rose-800 ring-rose-200",
-    accentDot: "bg-rose-500",
-  },
-  withdrawn: {
-    label: "Withdrawn",
-    badge: "bg-amber-50 text-amber-900 ring-amber-200",
-    accentDot: "bg-amber-500",
-  },
-  offer: {
-    label: "Offer",
-    badge: "bg-fuchsia-50 text-fuchsia-800 ring-fuchsia-200",
-    accentDot: "bg-fuchsia-500",
-  },
-};
-
-type GridDay = {
-  date: Date;
-  iso: string;
-  inCurrentMonth: boolean;
-};
-
-function toIsoDate(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function normalizeDate(value: unknown): string | null {
-  if (!value || typeof value !== "string") return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  const [datePart] = trimmed.split("T");
-  if (!datePart) return null;
-
-  const [y, m, d] = datePart.split("-");
-  if (!y || !m || !d) return null;
-
-  const year = y.padStart(4, "0");
-  const month = m.padStart(2, "0");
-  const day = d.padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function extractTime(value: unknown): string | null {
-  if (!value || typeof value !== "string") return null;
-  const trimmed = value.trim();
-  const [, timePartRaw] = trimmed.split("T");
-  if (!timePartRaw) return null;
-  const [hh, mm] = timePartRaw.split(":");
-  if (!hh || !mm) return null;
-  return `${hh.padStart(2, "0")}:${mm.padStart(2, "0")}`;
-}
-
-function buildMonthGrid(year: number, month: number): GridDay[] {
-  // month: 0–11, Monday-first grid
-  const firstOfMonth = new Date(year, month, 1);
-  const startWeekday = (firstOfMonth.getDay() + 6) % 7; // convert Sun=0 to Mon=0
-  const daysBefore = startWeekday;
-  const totalCells = 42; // 6 weeks * 7 days
-
-  const grid: GridDay[] = [];
-  for (let i = 0; i < totalCells; i++) {
-    const dayOffset = i - daysBefore;
-    const d = new Date(year, month, 1 + dayOffset);
-    grid.push({
-      date: d,
-      iso: toIsoDate(d),
-      inCurrentMonth: d.getMonth() === month,
-    });
-  }
-
-  return grid;
-}
-
-function formatHumanDate(iso: string): string {
-  const [y, m, d] = iso.split("-");
-  if (!y || !m || !d) return iso;
-  const asDate = new Date(Number(y), Number(m) - 1, Number(d));
-  try {
-    return asDate.toLocaleDateString("de-DE", {
-      weekday: "short",
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  } catch {
-    return iso;
-  }
-}
-
-function formatHumanDateTime(date: string, time?: string): string {
-  const base = formatHumanDate(date);
-  if (time) return `${base} · ${time}`;
-  return base;
-}
-
-function getCountdownParts(ev: CalendarEvent, now: Date | null) {
-  if (!now) return null;
-
-  const baseIso =
-    ev.dateTime ?? (ev.time ? `${ev.date}T${ev.time}` : `${ev.date}T00:00:00`);
-
-  const target = new Date(baseIso);
-  if (Number.isNaN(target.getTime())) return null;
-
-  const diffMs = target.getTime() - now.getTime();
-  const isPast = diffMs < 0;
-  const abs = Math.abs(diffMs);
-
-  const totalSeconds = Math.floor(abs / 1000);
-  const days = Math.floor(totalSeconds / (60 * 60 * 24));
-  const hours = Math.floor((totalSeconds % (60 * 60 * 24)) / (60 * 60));
-  const minutes = Math.floor((totalSeconds % (60 * 60)) / 60);
-  const seconds = totalSeconds % 60;
-
-  return { days, hours, minutes, seconds, isPast };
-}
+  CalendarEvent,
+  KIND_META,
+  MONTH_NAMES,
+  WEEKDAYS,
+  buildMonthGrid,
+  extractTime,
+  formatHumanDate,
+  formatHumanDateTime,
+  getCountdownParts,
+  normalizeDate,
+  toIsoDate,
+} from "./calendarUtils";
 
 export default function CalendarPage() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -448,38 +292,6 @@ export default function CalendarPage() {
     setSidebarOpen(true);
   };
 
-  // Month-level stats
-  const monthStats = useMemo(() => {
-    const monthEvents = events.filter((ev) => {
-      const [y, m] = ev.date.split("-");
-      if (!y || !m) return false;
-      return (
-        Number(y) === monthState.year && Number(m) === monthState.month + 1
-      );
-    });
-
-    const countByKind: Record<ActivityKind, number> = {
-      applied: 0,
-      interview: 0,
-      rejected: 0,
-      withdrawn: 0,
-      offer: 0,
-    };
-
-    monthEvents.forEach((ev) => {
-      countByKind[ev.kind] += 1;
-    });
-
-    const outcomes =
-      countByKind.rejected + countByKind.withdrawn + countByKind.offer;
-
-    return {
-      total: monthEvents.length,
-      byKind: countByKind,
-      outcomes,
-    };
-  }, [events, monthState]);
-
   // Upcoming interviews (from now onwards, considering time if available)
   const upcomingInterviews = useMemo(() => {
     if (!now) return [];
@@ -549,51 +361,8 @@ export default function CalendarPage() {
             </div>
           </header>
 
-          {/* Month stats */}
-          <div className="mt-5 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-xl border border-neutral-200 bg-white/80 p-3 shadow-sm">
-              <div className="text-[11px] font-medium uppercase tracking-wide text-neutral-500">
-                This month
-              </div>
-              <div className="mt-1 flex items-baseline gap-1">
-                <span className="text-lg font-semibold text-neutral-900">
-                  {monthStats.total}
-                </span>
-                <span className="text-xs text-neutral-500">total events</span>
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-neutral-200 bg-white/80 p-3 shadow-sm flex items-center justify-between gap-2">
-              <div>
-                <div className="text-[11px] font-medium uppercase tracking-wide text-neutral-500">
-                  Applications
-                </div>
-                <div className="mt-1 text-lg font-semibold text-neutral-900">
-                  {monthStats.byKind.applied}
-                </div>
-              </div>
-              <div className="flex -space-x-1">
-                <span className="h-2 w-2 rounded-full bg-sky-500" />
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-neutral-200 bg-white/80 p-3 shadow-sm flex items-center justify-between gap-2">
-              <div>
-                <div className="text-[11px] font-medium uppercase tracking-wide text-neutral-500">
-                  Outcomes
-                </div>
-                <div className="mt-1 text-lg font-semibold text-neutral-900">
-                  {monthStats.outcomes}
-                </div>
-              </div>
-              <div className="flex -space-x-1">
-                <span className="h-2 w-2 rounded-full bg-rose-500" />
-                <span className="h-2 w-2 rounded-full bg-amber-500" />
-                <span className="h-2 w-2 rounded-full bg-fuchsia-500" />
-              </div>
-            </div>
-          </div>
+          {/* Stats section (3 cards) */}
+          <CalendarStatsSection events={events} monthState={monthState} />
 
           {/* Main layout: calendar + upcoming */}
           <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)]">
@@ -682,7 +451,10 @@ export default function CalendarPage() {
                         className="inline-flex h-6 w-6 items-center justify-center rounded-md hover:bg-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
                         aria-label="Next month"
                       >
-                        <ChevronRight className="h-3 w-3" aria-hidden="true" />
+                        <ChevronRight
+                          className="h-3 w-3"
+                          aria-hidden="true"
+                        />
                       </button>
                     </div>
                     <button
