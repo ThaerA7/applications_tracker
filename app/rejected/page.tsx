@@ -112,7 +112,12 @@ export default function RejectedPage() {
       offerUrl: item.url,
       logoUrl: item.logoUrl,
       notes: item.notes,
-    } as ApplicationLike;
+      decisionDate: item.decisionDate,
+      rejectionType: item.rejectionType,
+      phoneScreenDate: item.phoneScreenDate,
+      firstInterviewDate: item.firstInterviewDate,
+      secondInterviewDate: item.secondInterviewDate,
+    };
 
     setEditingRejection(item);
     setDialogApplication(app);
@@ -462,6 +467,7 @@ export default function RejectedPage() {
             onClose={handleDialogClose}
             application={dialogApplication}
             onRejectionCreated={handleRejectionCreated}
+            mode={editingRejection ? "edit" : "add"}
           />
         </div>
       </section>

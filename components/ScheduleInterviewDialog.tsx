@@ -20,8 +20,7 @@ import {
 
 const INTERVIEWS_STORAGE_KEY = "job-tracker:interviews";
 
-const INTERVIEWS_ACTIVITY_STORAGE_KEY =
-  "job-tracker:interviews-activity";
+const INTERVIEWS_ACTIVITY_STORAGE_KEY = "job-tracker:interviews-activity";
 
 type InterviewActivityItem = {
   id: string;
@@ -38,13 +37,9 @@ type InterviewActivityItem = {
 function appendInterviewActivity(item: InterviewActivityItem) {
   if (typeof window === "undefined") return;
   try {
-    const raw = window.localStorage.getItem(
-      INTERVIEWS_ACTIVITY_STORAGE_KEY
-    );
+    const raw = window.localStorage.getItem(INTERVIEWS_ACTIVITY_STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
-    const prev: InterviewActivityItem[] = Array.isArray(parsed)
-      ? parsed
-      : [];
+    const prev: InterviewActivityItem[] = Array.isArray(parsed) ? parsed : [];
     const next = [item, ...prev].slice(0, 100);
     window.localStorage.setItem(
       INTERVIEWS_ACTIVITY_STORAGE_KEY,
@@ -88,17 +83,10 @@ type ScheduleInterviewDialogProps = {
     appliedOn?: string;
     employmentType?: string;
     notes?: string;
+    interviewDateTimeIso?: string; // e.g. "2025-11-12T14:00"
+    interviewType?: InterviewType;
   } | null;
-  /**
-   * Called after the interview has been persisted.
-   */
   onInterviewCreated?: (interview: Interview) => void;
-  /**
-   * Controls text & behavior:
-   * - "schedule": coming from Applications page (default)
-   * - "add": add new interview on /interviews
-   * - "edit": edit existing interview on /interviews
-   */
   mode?: "schedule" | "add" | "edit";
 };
 
@@ -140,13 +128,33 @@ function makeInitialForm(
   const min = String(now.getMinutes()).padStart(2, "0");
 
   const today = `${yyyy}-${mm}-${dd}`;
+  const defaultTime = `${hh}:${min}`;
+
+  // ✅ Try to use existing interview date/time if provided
+  let date = today;
+  let time = defaultTime;
+  let type: InterviewType = "phone";
+
+  if (app?.interviewDateTimeIso) {
+    const [datePart, timePart] = app.interviewDateTimeIso.split("T");
+    if (datePart) {
+      date = datePart; // "YYYY-MM-DD"
+    }
+    if (timePart) {
+      time = timePart.slice(0, 5); // "HH:mm"
+    }
+  }
+
+  if (app?.interviewType) {
+    type = app.interviewType;
+  }
 
   return {
     company: app?.company ?? "",
     role: app?.role ?? "",
-    date: today,
-    time: `${hh}:${min}`,
-    type: "phone",
+    date,
+    time,
+    type,
     location: app?.location ?? "",
     contactName: app?.contactPerson ?? "",
     contactEmail: app?.contactEmail ?? "",

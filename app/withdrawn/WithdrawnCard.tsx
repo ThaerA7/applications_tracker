@@ -1,4 +1,3 @@
-// app/withdrawn/WithdrawnCard.tsx
 "use client";
 
 import Image from "next/image";
@@ -14,6 +13,7 @@ import {
   FileText,
   Link as LinkIcon,
   Trash2,
+  Pencil,
   Clock,
   Building2,
   AlertCircle,
@@ -45,6 +45,7 @@ export type WithdrawnRecord = {
 
 type WithdrawnCardProps = {
   item: WithdrawnRecord;
+  onEdit: (item: WithdrawnRecord) => void;
   onDelete: (item: WithdrawnRecord) => void;
 };
 
@@ -91,7 +92,11 @@ function formatTime(iso?: string) {
   }).format(d);
 }
 
-export default function WithdrawnCard({ item, onDelete }: WithdrawnCardProps) {
+export default function WithdrawnCard({
+  item,
+  onEdit,
+  onDelete,
+}: WithdrawnCardProps) {
   const interviewMeta = item.interviewType
     ? INTERVIEW_TYPE_META[item.interviewType]
     : null;
@@ -119,8 +124,19 @@ export default function WithdrawnCard({ item, onDelete }: WithdrawnCardProps) {
         "before:opacity-90",
       ].join(" ")}
     >
-      {/* Top-right: Delete */}
+      {/* Top-right: Edit + Delete */}
       <div className="absolute right-3 top-3 z-10 flex flex-col items-center gap-1">
+        {/* Edit (blue) */}
+        <button
+          type="button"
+          onClick={() => onEdit(item)}
+          className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-sky-200 bg-sky-50 text-sky-600 shadow-sm hover:bg-sky-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+          aria-label="Edit withdrawn application"
+        >
+          <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+        </button>
+
+        {/* Delete (amber) */}
         <button
           type="button"
           onClick={() => onDelete(item)}

@@ -1,6 +1,6 @@
-// app/withdrawn/page.tsx
 "use client";
 
+import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Search, Filter, Plus, History } from "lucide-react";
 import Image from "next/image";
@@ -28,6 +28,10 @@ const makeId = () =>
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
+type ApplicationLike = React.ComponentProps<
+  typeof MoveToWithdrawnDialog
+>["application"];
+
 export default function WithdrawnPage() {
   const [withdrawn, setWithdrawn] = useState<WithdrawnRecord[]>([]);
   const [query, setQuery] = useState("");
@@ -35,8 +39,12 @@ export default function WithdrawnPage() {
     null
   );
 
-  // Add dialog state
+  // Add/edit dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogApplication, setDialogApplication] =
+    useState<ApplicationLike>(null);
+  const [editingWithdrawn, setEditingWithdrawn] =
+    useState<WithdrawnRecord | null>(null);
 
   // Activity log sidebar & data
   const [activityOpen, setActivityOpen] = useState(false);
@@ -172,70 +180,158 @@ export default function WithdrawnPage() {
     setDeleteTarget(null);
   };
 
-  // --- Add withdrawn manually via MoveToWithdrawnDialog ---
+  // --- Add / Edit withdrawn via MoveToWithdrawnDialog ---
 
   const handleAdd = () => {
+    setEditingWithdrawn(null);
+    setDialogApplication(null);
+    setDialogOpen(true);
+  };
+
+  const handleEdit = (item: WithdrawnRecord) => {
+    const app: ApplicationLike = {
+      id: item.id,
+      company: item.company,
+      role: item.role,
+      location: item.location,
+      appliedOn: item.appliedOn,
+      employmentType: item.employmentType,
+      contactPerson: item.contactName,
+      contactEmail: item.contactEmail,
+      contactPhone: item.contactPhone,
+      offerUrl: item.url,
+      logoUrl: item.logoUrl,
+      notes: item.notes,
+      // used by dialog to prefill existing withdrawn data
+      withdrawnDate: item.withdrawnDate,
+      reason: item.withdrawnReason,
+    };
+
+    setEditingWithdrawn(item);
+    setDialogApplication(app);
     setDialogOpen(true);
   };
 
   const handleDialogClose = () => {
     setDialogOpen(false);
+    setEditingWithdrawn(null);
+    setDialogApplication(null);
   };
 
   const handleSaveWithdrawn = (details: WithdrawnDetails) => {
-    const newItem: WithdrawnRecord = {
-      id: makeId(),
-      company: details.company,
-      role: details.role,
-      location: details.location,
-      appliedOn: details.appliedDate,
-      withdrawnDate: details.withdrawnDate,
-      withdrawnReason: details.reason,
-      employmentType: details.employmentType,
-      contactName: details.contactName,
-      contactEmail: details.contactEmail,
-      contactPhone: details.contactPhone,
-      url: details.url,
-      logoUrl: details.logoUrl,
-      notes: details.notes,
-      // interviewDate / interviewType left empty here (withdrawn before interview)
-    };
+    if (editingWithdrawn) {
+      // Update existing withdrawn record
+      const updated: WithdrawnRecord = {
+        ...editingWithdrawn,
+        company: details.company,
+        role: details.role,
+        location: details.location ?? editingWithdrawn.location,
+        appliedOn: details.appliedDate ?? editingWithdrawn.appliedOn,
+        withdrawnDate: details.withdrawnDate,
+        withdrawnReason: details.reason,
+        employmentType:
+          details.employmentType ?? editingWithdrawn.employmentType,
+        contactName: details.contactName ?? editingWithdrawn.contactName,
+        contactEmail: details.contactEmail ?? editingWithdrawn.contactEmail,
+        contactPhone: details.contactPhone ?? editingWithdrawn.contactPhone,
+        url: details.url ?? editingWithdrawn.url,
+        logoUrl: details.logoUrl ?? editingWithdrawn.logoUrl,
+        notes: details.notes ?? editingWithdrawn.notes,
+      };
 
-    setWithdrawn((prev) => {
-      const next = [...prev, newItem];
+      setWithdrawn((prev) => {
+        const next = prev.map((item) =>
+          item.id === updated.id ? updated : item
+        );
 
-      if (typeof window !== "undefined") {
-        try {
-          window.localStorage.setItem(
-            WITHDRAWN_STORAGE_KEY,
-            JSON.stringify(next)
-          );
-        } catch (err) {
-          console.error(
-            "Failed to persist withdrawn applications after create",
-            err
-          );
+        if (typeof window !== "undefined") {
+          try {
+            window.localStorage.setItem(
+              WITHDRAWN_STORAGE_KEY,
+              JSON.stringify(next)
+            );
+          } catch (err) {
+            console.error(
+              "Failed to persist withdrawn applications after edit",
+              err
+            );
+          }
         }
-      }
 
-      return next;
-    });
+        return next;
+      });
 
-    // log add activity
-    const activityId = makeId();
-    appendActivity({
-      id: activityId,
-      appId: newItem.id,
-      type: "added",
-      timestamp: new Date().toISOString(),
-      company: newItem.company,
-      role: newItem.role,
-      location: newItem.location,
-      appliedOn: newItem.appliedOn,
-      note: newItem.notes,
-    });
+      // log edit activity
+      const activityId = makeId();
+      appendActivity({
+        id: activityId,
+        appId: updated.id,
+        type: "edited",
+        timestamp: new Date().toISOString(),
+        company: updated.company,
+        role: updated.role,
+        location: updated.location,
+        appliedOn: updated.appliedOn,
+        note: updated.notes,
+      });
+    } else {
+      // Create new withdrawn record
+      const newItem: WithdrawnRecord = {
+        id: makeId(),
+        company: details.company,
+        role: details.role,
+        location: details.location,
+        appliedOn: details.appliedDate,
+        withdrawnDate: details.withdrawnDate,
+        withdrawnReason: details.reason,
+        employmentType: details.employmentType,
+        contactName: details.contactName,
+        contactEmail: details.contactEmail,
+        contactPhone: details.contactPhone,
+        url: details.url,
+        logoUrl: details.logoUrl,
+        notes: details.notes,
+        // interviewDate / interviewType left empty here (withdrawn before interview)
+      };
+
+      setWithdrawn((prev) => {
+        const next = [...prev, newItem];
+
+        if (typeof window !== "undefined") {
+          try {
+            window.localStorage.setItem(
+              WITHDRAWN_STORAGE_KEY,
+              JSON.stringify(next)
+            );
+          } catch (err) {
+            console.error(
+              "Failed to persist withdrawn applications after create",
+              err
+            );
+          }
+        }
+
+        return next;
+      });
+
+      // log add activity
+      const activityId = makeId();
+      appendActivity({
+        id: activityId,
+        appId: newItem.id,
+        type: "added",
+        timestamp: new Date().toISOString(),
+        company: newItem.company,
+        role: newItem.role,
+        location: newItem.location,
+        appliedOn: newItem.appliedOn,
+        note: newItem.notes,
+      });
+    }
 
     setDialogOpen(false);
+    setEditingWithdrawn(null);
+    setDialogApplication(null);
   };
 
   return (
@@ -407,6 +503,7 @@ export default function WithdrawnPage() {
             <WithdrawnCard
               key={item.id}
               item={item}
+              onEdit={handleEdit}
               onDelete={openDeleteDialog}
             />
           ))}
@@ -435,12 +532,12 @@ export default function WithdrawnPage() {
         </div>
       </section>
 
-      {/* Manual add-to-withdrawn dialog (uses same component as move) */}
+      {/* Manual add/edit withdrawn dialog */}
       <MoveToWithdrawnDialog
         open={dialogOpen}
         onClose={handleDialogClose}
-        application={null}
-        mode="add"
+        application={dialogApplication}
+        mode={editingWithdrawn ? "edit" : "add"}
         onWithdrawnCreated={handleSaveWithdrawn}
       />
     </>

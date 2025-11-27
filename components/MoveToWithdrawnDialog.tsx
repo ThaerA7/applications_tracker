@@ -1,4 +1,3 @@
-// components/MoveToWithdrawnDialog.tsx
 "use client";
 
 import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
@@ -60,6 +59,11 @@ type MoveToWithdrawnDialogProps = {
     offerUrl?: string;
     logoUrl?: string;
     notes?: string;
+
+    // for editing existing withdrawn entries
+    withdrawnDate?: string;
+    reason?: WithdrawnReason;
+    otherReasonText?: string;
   } | null;
   /**
    * Called when the user submits the withdrawn form.
@@ -68,10 +72,11 @@ type MoveToWithdrawnDialogProps = {
   onWithdrawnCreated?: (details: WithdrawnDetails) => void;
   /**
    * Controls the copy & intent:
-   * - "move" (default): from Applications page ("Move to withdrawn")
+   * - "move": from Applications page ("Move to withdrawn")
    * - "add": manual add from /withdrawn ("Add withdrawn application")
+   * - "edit": edit existing withdrawn record
    */
-  mode?: "move" | "add";
+  mode?: "move" | "add" | "edit";
 };
 
 type FormState = {
@@ -160,8 +165,8 @@ function makeInitialForm(
     company: app?.company ?? "",
     role: app?.role ?? "",
     appliedDate: app?.appliedOn ?? today,
-    withdrawnDate: today,
-    reason: "personal-reasons",
+    withdrawnDate: app?.withdrawnDate ?? today,
+    reason: app?.reason ?? "personal-reasons",
     employmentType: app?.employmentType ?? "",
     location: app?.location ?? "",
     contactName: app?.contactPerson ?? "",
@@ -169,7 +174,7 @@ function makeInitialForm(
     contactPhone: app?.contactPhone ?? "",
     url: app?.offerUrl ?? "",
     notes: app?.notes ?? "",
-    otherReasonText: "",
+    otherReasonText: app?.otherReasonText ?? "",
   };
 }
 
@@ -183,16 +188,23 @@ export default function MoveToWithdrawnDialog({
   const [form, setForm] = useState<FormState>(() => makeInitialForm(null));
 
   const isAddMode = mode === "add";
+  const isEditMode = mode === "edit";
 
-  const title = isAddMode
+  const title = isEditMode
+    ? "Edit withdrawn application"
+    : isAddMode
     ? "Add withdrawn application"
     : "Move to the withdrawn section";
 
-  const description = isAddMode
+  const description = isEditMode
+    ? "Update the details of this withdrawn application."
+    : isAddMode
     ? "Record an application you previously withdrew from."
     : "Capture when and why you decided to withdraw.";
 
-  const submitLabel = isAddMode
+  const submitLabel = isEditMode
+    ? "Save changes"
+    : isAddMode
     ? "Save withdrawn application"
     : "Save & move to withdrawn";
 
@@ -267,10 +279,7 @@ export default function MoveToWithdrawnDialog({
     form.withdrawnDate.trim().length > 0;
 
   const dialog = (
-  <div
-    className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[12500] flex items-center justify-center px-4 py-8"
-  >
-
+    <div className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[12500] flex items-center justify-center px-4 py-8">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-neutral-900/40"

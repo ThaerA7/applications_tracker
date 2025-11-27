@@ -426,6 +426,8 @@ export default function InterviewsPage() {
       appliedOn: item.appliedOn,
       employmentType: item.employmentType,
       notes: item.notes ?? "",
+      interviewDateTimeIso: item.date,
+      interviewType: item.type,
     };
 
     setEditingInterview(item);

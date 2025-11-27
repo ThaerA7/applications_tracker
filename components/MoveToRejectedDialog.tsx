@@ -58,12 +58,20 @@ type MoveToRejectedDialogProps = {
     offerUrl?: string;
     logoUrl?: string;
     notes?: string;
+    decisionDate?: string;
+    rejectionType?: RejectionType;
+    phoneScreenDate?: string;
+    firstInterviewDate?: string;
+    secondInterviewDate?: string;
   } | null;
-  /**
-   * Called when the user submits the rejection form.
-   * You can persist this data and/or move the application to /rejected.
-   */
   onRejectionCreated?: (details: RejectionDetails) => void;
+  /**
+   * Controls copy & intent:
+   * - "move": from Applications page ("Move to rejected")
+   * - "add": manual add from /rejected ("Add rejected application")
+   * - "edit": edit existing rejected record
+   */
+  mode?: "move" | "add" | "edit";
 };
 
 type FormState = {
@@ -139,11 +147,11 @@ function makeInitialForm(
     company: app?.company ?? "",
     role: app?.role ?? "",
     appliedDate: app?.appliedOn ?? today,
-    decisionDate: today,
-    rejectionType: "no-interview",
-    phoneScreenDate: "",
-    firstInterviewDate: "",
-    secondInterviewDate: "",
+    decisionDate: app?.decisionDate ?? today,
+    rejectionType: app?.rejectionType ?? "no-interview",
+    phoneScreenDate: app?.phoneScreenDate ?? "",
+    firstInterviewDate: app?.firstInterviewDate ?? "",
+    secondInterviewDate: app?.secondInterviewDate ?? "",
     employmentType: app?.employmentType ?? "",
     location: app?.location ?? "",
     contactName: app?.contactPerson ?? "",
@@ -159,8 +167,30 @@ export default function MoveToRejectedDialog({
   onClose,
   application = null,
   onRejectionCreated,
+  mode = "move",
 }: MoveToRejectedDialogProps) {
   const [form, setForm] = useState<FormState>(() => makeInitialForm(null));
+
+  const isAddMode = mode === "add";
+  const isEditMode = mode === "edit";
+
+  const title = isEditMode
+    ? "Edit rejected application"
+    : isAddMode
+    ? "Add rejected application"
+    : "Move to the rejected section";
+
+  const description = isEditMode
+    ? "Update the details of this rejected application."
+    : isAddMode
+    ? "Record an application that ended in rejection."
+    : "Capture how and when this application was rejected.";
+
+  const submitLabel = isEditMode
+    ? "Save changes"
+    : isAddMode
+    ? "Save rejected application"
+    : "Save & move to rejected";
 
   useEffect(() => {
     if (!open) return;
@@ -232,10 +262,7 @@ export default function MoveToRejectedDialog({
     form.decisionDate.trim().length > 0;
 
   const dialog = (
-  <div
-    className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[12500] flex items-center justify-center px-4 py-8"
-  >
-
+    <div className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[12500] flex items-center justify-center px-4 py-8">
       {/* Backdrop with rose tint */}
       <div
         className="absolute inset-0 bg-rose-950/40"
@@ -273,11 +300,9 @@ export default function MoveToRejectedDialog({
                 id="move-to-rejected-title"
                 className="text-sm font-semibold text-neutral-900"
               >
-                Move to the rejected section
+                {title}
               </h2>
-              <p className="mt-0.5 text-xs text-neutral-600">
-                Capture how and when this application was rejected.
-              </p>
+              <p className="mt-0.5 text-xs text-neutral-600">{description}</p>
             </div>
           </div>
 
@@ -691,7 +716,7 @@ export default function MoveToRejectedDialog({
                 "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
               ].join(" ")}
             >
-              Save &amp; move to rejected
+              {submitLabel}
             </button>
           </div>
         </form>
