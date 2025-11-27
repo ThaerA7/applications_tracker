@@ -2,15 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Briefcase,
-  PhoneCall,
-  XCircle,
-  Undo2,
-  Sparkles,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, PhoneCall, Sparkles } from "lucide-react";
 import CalendarDaySidebar, {
   type CalendarDayEvent,
 } from "./CalendarDaySidebar";
@@ -640,36 +632,61 @@ export default function CalendarPage() {
             {/* Left: calendar */}
             <div className="flex flex-col">
               <div className="rounded-2xl border border-neutral-200/80 bg-white/85 p-4 shadow-sm backdrop-blur">
-                {/* Legend */}
+                {/* Legend (using custom PNG icons, no Offer) */}
                 <div className="mb-4 flex flex-wrap gap-2 text-[11px]">
+                  {/* Applied */}
                   <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white px-2.5 py-1 shadow-sm">
-                    <Briefcase className="h-3.5 w-3.5 text-sky-600" />
+                    <Image
+                      src="/icons/checklist.png"
+                      alt="Applied icon"
+                      width={16}
+                      height={16}
+                      className="h-3.5 w-3.5"
+                    />
                     <span className="font-medium text-neutral-900">
                       {KIND_META.applied.label}
                     </span>
                   </div>
+
+                  {/* Interview */}
                   <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white px-2.5 py-1 shadow-sm">
-                    <PhoneCall className="h-3.5 w-3.5 text-emerald-600" />
+                    <Image
+                      src="/icons/interview.png"
+                      alt="Interview icon"
+                      width={16}
+                      height={16}
+                      className="h-3.5 w-3.5"
+                    />
                     <span className="font-medium text-neutral-900">
                       {KIND_META.interview.label}
                     </span>
                   </div>
+
+                  {/* Rejected */}
                   <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white px-2.5 py-1 shadow-sm">
-                    <XCircle className="h-3.5 w-3.5 text-rose-600" />
+                    <Image
+                      src="/icons/cancel.png"
+                      alt="Rejected icon"
+                      width={16}
+                      height={16}
+                      className="h-3.5 w-3.5"
+                    />
                     <span className="font-medium text-neutral-900">
                       {KIND_META.rejected.label}
                     </span>
                   </div>
+
+                  {/* Withdrawn */}
                   <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white px-2.5 py-1 shadow-sm">
-                    <Undo2 className="h-3.5 w-3.5 text-amber-600" />
+                    <Image
+                      src="/icons/withdrawn.png"
+                      alt="Withdrawn icon"
+                      width={16}
+                      height={16}
+                      className="h-3.5 w-3.5"
+                    />
                     <span className="font-medium text-neutral-900">
                       {KIND_META.withdrawn.label}
-                    </span>
-                  </div>
-                  <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white px-2.5 py-1 shadow-sm">
-                    <Sparkles className="h-3.5 w-3.5 text-fuchsia-600" />
-                    <span className="font-medium text-neutral-900">
-                      {KIND_META.offer.label}
                     </span>
                   </div>
                 </div>
