@@ -18,11 +18,11 @@ import {
   Building2,
   AlertCircle,
 } from "lucide-react";
-import type { InterviewType } from "@/components/ScheduleInterviewDialog";
+import type { InterviewType } from "@/components/dialogs/ScheduleInterviewDialog";
 import type {
   WithdrawnDetails,
   WithdrawnReason,
-} from "@/components/MoveToWithdrawnDialog";
+} from "@/components/dialogs/MoveToWithdrawnDialog";
 
 export type WithdrawnRecord = {
   id: string;

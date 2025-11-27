@@ -3,15 +3,15 @@
 import { useMemo, useState } from "react";
 import { Search, Plus, Filter, History } from "lucide-react";
 import Image from "next/image";
-import { animateCardExit } from "../../components/cardExitAnimation";
+import { animateCardExit } from "../../components/dialogs/cardExitAnimation";
 
 import AddApplicationDialog, {
   type NewApplicationForm,
-} from "../../components/AddApplicationDialog";
-import MoveApplicationDialog from "../../components/MoveApplicationDialog";
-import type { RejectionDetails } from "../../components/MoveToRejectedDialog";
-import type { WithdrawnDetails } from "../../components/MoveToWithdrawnDialog";
-import type { Interview } from "../../components/ScheduleInterviewDialog";
+} from "../../components/dialogs/AddApplicationDialog";
+import MoveApplicationDialog from "../../components/dialogs/MoveApplicationDialog";
+import type { RejectionDetails } from "../../components/dialogs/MoveToRejectedDialog";
+import type { WithdrawnDetails } from "../../components/dialogs/MoveToWithdrawnDialog";
+import type { Interview } from "../../components/dialogs/ScheduleInterviewDialog";
 import ApplicationCard, { type Application } from "./ApplicationCard";
 import ActivityLogSidebar, {
   type ActivityItem,

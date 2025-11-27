@@ -5,11 +5,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Search, Filter, Plus, History } from "lucide-react";
 import Image from "next/image";
 import WithdrawnCard, { type WithdrawnRecord } from "./WithdrawnCard";
-import type { InterviewType } from "@/components/ScheduleInterviewDialog";
+import type { InterviewType } from "@/components/dialogs/ScheduleInterviewDialog";
 import MoveToWithdrawnDialog, {
   type WithdrawnDetails,
-} from "@/components/MoveToWithdrawnDialog";
-import { animateCardExit } from "@/components/cardExitAnimation";
+} from "@/components/dialogs/MoveToWithdrawnDialog";
+import { animateCardExit } from "@/components/dialogs/cardExitAnimation";
 import ActivityLogSidebar, {
   type ActivityItem,
 } from "@/components/ActivityLogSidebar";

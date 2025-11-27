@@ -19,7 +19,7 @@ import {
   MoveRight,
   Pencil,
 } from 'lucide-react';
-import type { NewApplicationForm } from '../../components/AddApplicationDialog';
+import type { NewApplicationForm } from '../../components/dialogs/AddApplicationDialog';
 
 export type Application = {
   id: string;

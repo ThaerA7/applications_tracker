@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import type { ComponentType } from "react";
-import type { RejectionDetails } from "@/components/MoveToRejectedDialog";
+import type { RejectionDetails } from "@/components/dialogs/MoveToRejectedDialog";
 import {
   Briefcase,
   MapPin,

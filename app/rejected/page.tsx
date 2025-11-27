@@ -5,10 +5,10 @@ import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import MoveToRejectedDialog, {
   type RejectionDetails,
-} from "@/components/MoveToRejectedDialog";
+} from "@/components/dialogs/MoveToRejectedDialog";
 import RejectedCard, { type Rejection } from "./RejectedCard";
 import { Search, Plus, Filter, History } from "lucide-react";
-import { animateCardExit } from "@/components/cardExitAnimation";
+import { animateCardExit } from "@/components/dialogs/cardExitAnimation";
 import ActivityLogSidebar, {
   type ActivityItem,
 } from "@/components/ActivityLogSidebar";

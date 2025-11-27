@@ -21,12 +21,12 @@ import Image from "next/image";
 import ScheduleInterviewDialog, {
   type Interview,
   type InterviewType,
-} from "../../components/ScheduleInterviewDialog";
-import MoveApplicationDialog from "../../components/MoveApplicationDialog";
-import type { RejectionDetails } from "../../components/MoveToRejectedDialog";
-import type { WithdrawnDetails } from "../../components/MoveToWithdrawnDialog";
+} from "../../components/dialogs/ScheduleInterviewDialog";
+import MoveApplicationDialog from "../../components/dialogs/MoveApplicationDialog";
+import type { RejectionDetails } from "../../components/dialogs/MoveToRejectedDialog";
+import type { WithdrawnDetails } from "../../components/dialogs/MoveToWithdrawnDialog";
 import InterviewCard from "./InterviewCard";
-import { animateCardExit } from "../../components/cardExitAnimation";
+import { animateCardExit } from "../../components/dialogs/cardExitAnimation";
 
 import ActivityLogSidebar, {
   type ActivityItem,

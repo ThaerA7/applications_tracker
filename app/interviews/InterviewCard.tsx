@@ -18,7 +18,7 @@ import {
   ArrowRight,
   FileText,
 } from "lucide-react";
-import type { Interview } from "../../components/ScheduleInterviewDialog";
+import type { Interview } from "../../components/dialogs/ScheduleInterviewDialog";
 
 type InterviewCardProps = {
   item: Interview;
