@@ -173,77 +173,62 @@ export default function ApplicationCard({
         </div>
       </div>
 
-      {/* Edit + move + delete + expand buttons */}
-      <div className="flex items-center justify-end gap-2">
-        <button
-          type="button"
-          onClick={() => onEdit(app)}
-          className={[
-            'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium',
-            'text-neutral-800',
-            'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
-            'border border-neutral-200 shadow-sm',
-            'hover:bg-white active:bg-neutral-50',
-            'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-300',
-          ].join(' ')}
-        >
-          <Pencil className="h-3 w-3" aria-hidden="true" />
-          Edit
-        </button>
+           {/* Edit + move + delete + expand buttons – compact icon group */}
+      <div className="flex items-center justify-end">
+        <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white/90 px-1.5 py-1 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/80">
+          {/* Edit */}
+          <button
+            type="button"
+            onClick={() => onEdit(app)}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-1 focus-visible:ring-offset-white"
+            aria-label="Edit application"
+          >
+            <Pencil className="h-4 w-4" aria-hidden="true" />
+          </button>
 
-        <button
-          type="button"
-          onClick={() => onMove(app)}
-          className={[
-            'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium',
-            'text-sky-800',
-            'bg-sky-50/80 backdrop-blur supports-[backdrop-filter]:bg-sky-50/70',
-            'border border-sky-200 shadow-sm',
-            'hover:bg-sky-50 active:bg-sky-100',
-            'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-300',
-          ].join(' ')}
-        >
-          <MoveRight className="h-3 w-3" aria-hidden="true" />
-          Move
-        </button>
+          {/* Move */}
+          <button
+            type="button"
+            onClick={() => onMove(app)}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-1 focus-visible:ring-offset-white"
+            aria-label="Move application"
+          >
+            <MoveRight className="h-4 w-4" aria-hidden="true" />
+          </button>
 
-        <button
-          type="button"
-          onClick={() => onDelete(app)} // open confirmation in parent
-          className={[
-            'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium',
-            'text-rose-700',
-            'bg-rose-50/80 backdrop-blur supports-[backdrop-filter]:bg-rose-50/70',
-            'border border-rose-200 shadow-sm',
-            'hover:bg-rose-50 active:bg-rose-100',
-            'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-rose-300',
-          ].join(' ')}
-        >
-          <Trash2 className="h-3 w-3" aria-hidden="true" />
-          Delete
-        </button>
+          {/* Delete */}
+          <button
+            type="button"
+            onClick={() => onDelete(app)}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-rose-600 hover:bg-rose-50 hover:text-rose-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-1 focus-visible:ring-offset-white"
+            aria-label="Delete application"
+          >
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
+          </button>
 
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-expanded={isExpanded}
-          aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
-          className={[
-            'inline-flex items-center rounded-md px-2.5 py-1.5 text-sm',
-            'text-neutral-800',
-            'bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60',
-            'border border-neutral-200 shadow-sm',
-            'hover:bg-white active:bg-neutral-50',
-            'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-fuchsia-300',
-          ].join(' ')}
-        >
-          {isExpanded ? (
-            <ChevronUp className="h-4 w-4" aria-hidden="true" />
-          ) : (
-            <ChevronDown className="h-4 w-4" aria-hidden="true" />
-          )}
-        </button>
+          {/* Divider between main actions and expand */}
+          <span
+            aria-hidden="true"
+            className="mx-0.5 h-5 w-px bg-neutral-200"
+          />
+
+          {/* Expand / collapse */}
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={isExpanded}
+            aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-300 focus-visible:ring-offset-1 focus-visible:ring-offset-white"
+          >
+            {isExpanded ? (
+              <ChevronUp className="h-4 w-4" aria-hidden="true" />
+            ) : (
+              <ChevronDown className="h-4 w-4" aria-hidden="true" />
+            )}
+          </button>
+        </div>
       </div>
+
 
       {isExpanded && (
         <div className="col-span-3 mt-3 space-y-4 rounded-xl border border-neutral-200 bg-gradient-to-br from-sky-50/80 via-white to-amber-50/80 p-4 text-sm text-neutral-800">
