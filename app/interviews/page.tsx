@@ -16,6 +16,8 @@ import {
   Video,
   Users,
   History,
+  Calendar,
+  CheckCircle2,
 } from "lucide-react";
 import Image from "next/image";
 import ScheduleInterviewDialog, {
@@ -25,7 +27,9 @@ import ScheduleInterviewDialog, {
 import MoveApplicationDialog from "../../components/dialogs/MoveApplicationDialog";
 import type { RejectionDetails } from "../../components/dialogs/MoveToRejectedDialog";
 import type { WithdrawnDetails } from "../../components/dialogs/MoveToWithdrawnDialog";
-import InterviewCard from "./InterviewCard";
+import InterviewCard, {
+  type InterviewWithStage,
+} from "./InterviewCard";
 import { animateCardExit } from "../../components/dialogs/cardExitAnimation";
 
 import ActivityLogSidebar, {
@@ -69,6 +73,8 @@ type WithdrawnRecord = {
   withdrawnReason?: WithdrawnDetails["reason"];
 };
 
+type InterviewStage = "upcoming" | "past" | "done";
+
 const INTERVIEW_TYPE_META: Record<
   InterviewType,
   { label: string; Icon: ComponentType<any> }
@@ -78,8 +84,34 @@ const INTERVIEW_TYPE_META: Record<
   "in-person": { label: "In person", Icon: Users },
 };
 
+const STAGE_FILTERS: {
+  id: InterviewStage;
+  label: string;
+  shortLabel: string;
+  icon: ComponentType<any>;
+}[] = [
+  {
+    id: "upcoming",
+    label: "Upcoming interviews",
+    shortLabel: "Upcoming",
+    icon: Calendar,
+  },
+  {
+    id: "past",
+    label: "Interviews with passed dates",
+    shortLabel: "Passed",
+    icon: History,
+  },
+  {
+    id: "done",
+    label: "Done • waiting for answer",
+    shortLabel: "Done",
+    icon: CheckCircle2,
+  },
+];
+
 // Initial demo data (used only if localStorage is empty)
-const DEMO_INTERVIEWS: Interview[] = [
+const DEMO_INTERVIEWS: InterviewWithStage[] = [
   {
     id: "1",
     company: "Acme Corp",
@@ -92,6 +124,7 @@ const DEMO_INTERVIEWS: Interview[] = [
     logoUrl: "/logos/acme.svg",
     employmentType: "Full-time",
     notes: "Prepare system design questions and review React hooks.",
+    stage: "upcoming",
   },
   {
     id: "2",
@@ -104,6 +137,7 @@ const DEMO_INTERVIEWS: Interview[] = [
     logoUrl: "/logos/globex.png",
     employmentType: "Full-time",
     notes: "Phone screen with HR – ask about team structure.",
+    stage: "upcoming",
   },
   {
     id: "3",
@@ -117,6 +151,7 @@ const DEMO_INTERVIEWS: Interview[] = [
     logoUrl: "/logos/initech.svg",
     employmentType: "Full-time",
     notes: "Onsite: bring printed CV, prepare examples for past projects.",
+    stage: "upcoming",
   },
 ];
 
@@ -284,31 +319,53 @@ function appendWithdrawnActivity(entry: ActivityItem) {
   }
 }
 
+function inferStageFromDate(iso: string | undefined | null): InterviewStage {
+  if (!iso) return "upcoming";
+  const timeMs = Date.parse(iso);
+  if (Number.isNaN(timeMs)) return "upcoming";
+  return timeMs < Date.now() ? "past" : "upcoming";
+}
+
+function ensureInterviewStage(
+  interview: Interview | InterviewWithStage
+): InterviewWithStage {
+  const withAnyStage = interview as InterviewWithStage;
+  if (withAnyStage.stage) {
+    return withAnyStage;
+  }
+  return {
+    ...interview,
+    stage: inferStageFromDate((interview as Interview).date),
+  };
+}
+
 // --- Component ---
 
 export default function InterviewsPage() {
   const [query, setQuery] = useState("");
-  const [items, setItems] = useState<Interview[]>(DEMO_INTERVIEWS);
+  const [items, setItems] = useState<InterviewWithStage[]>(DEMO_INTERVIEWS);
+  const [stageFilter, setStageFilter] = useState<InterviewStage>("upcoming");
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogApplication, setDialogApplication] =
     useState<ApplicationLike>(null);
-  const [editingInterview, setEditingInterview] = useState<Interview | null>(
-    null
-  );
+  const [editingInterview, setEditingInterview] =
+    useState<InterviewWithStage | null>(null);
 
   // For countdown / countup, only on client to avoid hydration issues
   const [now, setNow] = useState<number | null>(null);
 
   // Delete confirmation dialog target
-  const [deleteTarget, setDeleteTarget] = useState<Interview | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<InterviewWithStage | null>(
+    null
+  );
 
   // Move dialog state (reusing MoveApplicationDialog)
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
   const [moveDialogApplication, setMoveDialogApplication] =
     useState<MoveDialogApplication>(null);
   const [moveTargetInterview, setMoveTargetInterview] =
-    useState<Interview | null>(null);
+    useState<InterviewWithStage | null>(null);
 
   // Activity log state for interviews
   const [activityOpen, setActivityOpen] = useState(false);
@@ -317,7 +374,7 @@ export default function InterviewsPage() {
   // Helper to log interview activity (also persists to localStorage)
   const logActivity = (
     type: ActivityType,
-    interview: Interview | null,
+    interview: InterviewWithStage | null,
     extras?: Partial<ActivityItem>
   ) => {
     if (!interview) return;
@@ -375,7 +432,10 @@ export default function InterviewsPage() {
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
-          setItems(parsed);
+          const withStages: InterviewWithStage[] = parsed.map((item: any) =>
+            ensureInterviewStage(item as Interview)
+          );
+          setItems(withStages);
         } else {
           setItems(DEMO_INTERVIEWS);
         }
@@ -412,7 +472,7 @@ export default function InterviewsPage() {
     setDialogOpen(true);
   };
 
-  const handleEdit = (item: Interview) => {
+  const handleEdit = (item: InterviewWithStage) => {
     const app: ApplicationLike = {
       id: item.id,
       company: item.company,
@@ -435,7 +495,7 @@ export default function InterviewsPage() {
     setDialogOpen(true);
   };
 
-  const handleMove = (item: Interview) => {
+  const handleMove = (item: InterviewWithStage) => {
     const app: MoveDialogApplication = {
       id: item.id,
       company: item.company,
@@ -463,7 +523,7 @@ export default function InterviewsPage() {
     setMoveTargetInterview(null);
   };
 
-  const openDeleteDialog = (item: Interview) => {
+  const openDeleteDialog = (item: InterviewWithStage) => {
     setDeleteTarget(item);
   };
 
@@ -510,16 +570,20 @@ export default function InterviewsPage() {
   };
 
   const handleInterviewCreated = (created: Interview) => {
+    const createdWithStage: InterviewWithStage = editingInterview
+      ? { ...created, stage: editingInterview.stage }
+      : ensureInterviewStage(created);
+
     setItems((prev) => {
-      let next: Interview[];
+      let next: InterviewWithStage[];
       if (editingInterview) {
         // Replace existing interview by id
         next = prev.map((item) =>
-          item.id === editingInterview.id ? created : item
+          item.id === editingInterview.id ? createdWithStage : item
         );
       } else {
         // Add new interview
-        next = [...prev, created];
+        next = [...prev, createdWithStage];
       }
 
       if (typeof window !== "undefined") {
@@ -538,11 +602,11 @@ export default function InterviewsPage() {
 
     // activity
     if (editingInterview) {
-      logActivity("edited", created, {
+      logActivity("edited", createdWithStage, {
         note: "Interview updated",
       });
     } else {
-      logActivity("added", created, {
+      logActivity("added", createdWithStage, {
         note: "Interview scheduled",
       });
     }
@@ -550,6 +614,39 @@ export default function InterviewsPage() {
     setDialogOpen(false);
     setEditingInterview(null);
     setDialogApplication(null);
+  };
+
+  const handleStageChange = (interviewId: string, newStage: InterviewStage) => {
+    setItems((prev) => {
+      const next = prev.map((item) =>
+        item.id === interviewId ? { ...item, stage: newStage } : item
+      );
+
+      if (typeof window !== "undefined") {
+        try {
+          window.localStorage.setItem(
+            INTERVIEWS_STORAGE_KEY,
+            JSON.stringify(next)
+          );
+        } catch (err) {
+          console.error("Failed to persist interviews after stage change", err);
+        }
+      }
+
+      const target = next.find((item) => item.id === interviewId) || null;
+      if (target) {
+        logActivity("edited", target, {
+          note:
+            newStage === "done"
+              ? "Marked as done – waiting for answer"
+              : newStage === "past"
+              ? "Marked as interview with passed date"
+              : "Marked as upcoming interview",
+        });
+      }
+
+      return next;
+    });
   };
 
   const handleMoveToRejectedFromInterviews = (details: RejectionDetails) => {
@@ -739,8 +836,12 @@ export default function InterviewsPage() {
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
-    if (!q) return items;
-    return items.filter((i) =>
+
+    const byStage = items.filter((i) => i.stage === stageFilter);
+
+    if (!q) return byStage;
+
+    return byStage.filter((i) =>
       [
         i.company,
         i.role,
@@ -756,7 +857,7 @@ export default function InterviewsPage() {
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q))
     );
-  }, [query, items]);
+  }, [query, items, stageFilter]);
 
   // Formatting + status styles for MoveApplicationDialog
   const fmtDate = (date: string) => date;
@@ -766,6 +867,8 @@ export default function InterviewsPage() {
     }
     return "bg-neutral-50 text-neutral-700 border border-neutral-200";
   };
+
+  const hasItemsInCurrentStage = items.some((i) => i.stage === stageFilter);
 
   return (
     <>
@@ -953,12 +1056,47 @@ export default function InterviewsPage() {
             ].join(" ")}
           >
             <Filter className="h-4 w-4" aria-hidden="true" />
-            Filter
           </button>
         </div>
 
+        {/* Stage view toggle – full width, same container width as cards */}
+        <div className="mt-3 w-full">
+          <div
+            className={[
+              "grid grid-cols-3 gap-2 rounded-2xl border border-neutral-200 bg-white/80 p-1",
+              "shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/70",
+            ].join(" ")}
+            role="tablist"
+            aria-label="Filter interviews by status"
+          >
+            {STAGE_FILTERS.map((option) => {
+              const active = stageFilter === option.id;
+              const Icon = option.icon;
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => setStageFilter(option.id)}
+                  className={[
+                    "flex items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-[11px] font-medium transition",
+                    active
+                      ? "bg-emerald-600 text-white shadow-sm"
+                      : "text-neutral-700 hover:bg-neutral-50",
+                  ].join(" ")}
+                  aria-pressed={active}
+                  role="tab"
+                >
+                  <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span className="hidden sm:inline">{option.label}</span>
+                  <span className="sm:hidden">{option.shortLabel}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Grid */}
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((item) => {
             const { date, time } = formatDateTime(item.date);
             const { label: typeLabel, Icon: TypeIcon } =
@@ -979,6 +1117,9 @@ export default function InterviewsPage() {
                 onEdit={handleEdit}
                 onMove={handleMove}
                 onDelete={openDeleteDialog}
+                onStageChange={(newStage) =>
+                  handleStageChange(item.id, newStage)
+                }
               />
             );
           })}
@@ -987,19 +1128,25 @@ export default function InterviewsPage() {
             <div className="col-span-full flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
               <div className="mb-2 text-5xl">📅</div>
 
-              {items.length === 0 ? (
+              {!hasItemsInCurrentStage ? (
                 <>
                   <p className="text-sm text-neutral-700">
-                    You don&apos;t have any interviews yet.
+                    You don&apos;t have any{" "}
+                    {stageFilter === "upcoming"
+                      ? "upcoming interviews"
+                      : stageFilter === "past"
+                      ? "interviews with passed dates"
+                      : "interviews marked as done and waiting for an answer"}
+                    .
                   </p>
                   <p className="mt-1 text-xs text-neutral-500">
                     Click <span className="font-medium">Add</span> to schedule
-                    your first interview.
+                    your next interview.
                   </p>
                 </>
               ) : (
                 <p className="text-sm text-neutral-700">
-                  No interviews match your search.
+                  No interviews match your search in this view.
                 </p>
               )}
             </div>
