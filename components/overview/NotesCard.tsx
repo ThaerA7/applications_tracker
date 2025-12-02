@@ -228,13 +228,19 @@ export default function NotesOverviewCard() {
                 and prepare for interviews.
               </p>
             </div>
+
+            {/* EXACT same button style as "Add interview", only text differs */}
             <button
               type="button"
               onClick={openAddDialog}
-              className="inline-flex items-center gap-1 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-800 shadow-sm hover:bg-neutral-50"
+              className={[
+                "inline-flex items-center gap-1.5 rounded-full border border-emerald-100",
+                "bg-white/80 px-2.5 py-1 text-[11px] font-medium text-emerald-700 shadow-sm",
+                "hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300",
+              ].join(" ")}
             >
-              <Plus className="h-3.5 w-3.5" />
-              <span>Add</span>
+              <Plus className="h-3 w-3" aria-hidden="true" />
+              <span>Add note</span>
             </button>
           </div>
 
@@ -390,7 +396,10 @@ export default function NotesOverviewCard() {
                 <button
                   type="button"
                   onClick={closeNoteDialog}
-                  className="inline-flex items-center gap-1 rounded-md border border-neutral-200 bg-white/80 px-3 py-1.5 text-xs font-medium text-neutral-700 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-300"
+                  className={[
+                    "inline-flex items-center gap-1 rounded-md border border-neutral-200 bg-white/80 px-3 py-1.5 text-xs font-medium text-neutral-700 shadow-sm hover:bg-white",
+                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-300",
+                  ].join(" ")}
                   aria-label="Cancel"
                   title="Cancel"
                 >
@@ -400,7 +409,7 @@ export default function NotesOverviewCard() {
                 <button
                   type="button"
                   onClick={handleSaveNote}
-                  className="inline-flex items-center gap-1 rounded-md border border-neutral-900 bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-neutral-800"
+                  className="inline-flex items-center gap-1 rounded-md border border-neutral-900 bg-neutral-900 px-3 py-1.5 text-xs font-medium text:white shadow-sm hover:bg-neutral-800"
                   aria-label="Save note"
                   title="Save"
                 >
@@ -414,4 +423,4 @@ export default function NotesOverviewCard() {
       )}
     </>
   );
-} 
+}
