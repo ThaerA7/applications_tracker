@@ -7,9 +7,11 @@ import {
   PartyPopper,
   Trophy,
   Calendar,
+  CalendarDays,
   MapPin,
   Star,
   ExternalLink,
+  Briefcase,
 } from "lucide-react";
 
 type AcceptedJob = {
@@ -17,11 +19,16 @@ type AcceptedJob = {
   company: string;
   role: string;
   location?: string;
-  startDate?: string; // free-form for now, e.g. "01 Dec 2025"
+  startDate?: string; // e.g. "01 Dec 2025"
   salary?: string;
   url?: string;
   logoUrl?: string;
   notes?: string;
+
+  // new meta fields
+  appliedOn?: string; // when you applied (YYYY-MM-DD or free-form)
+  decisionDate?: string; // when company responded / offer decision
+  employmentType?: string; // e.g. "Ausbildung", "Full-time"
 };
 
 const ACCEPTED_STORAGE_KEY = "job-tracker:accepted";
@@ -32,6 +39,9 @@ const DEMO_ACCEPTED_JOBS: AcceptedJob[] = [
     company: "Acme Corp",
     role: "Frontend Engineer",
     location: "Berlin",
+    appliedOn: "2025-10-10",
+    decisionDate: "2025-11-01",
+    employmentType: "Full-time",
     startDate: "12 Jan 2026",
     salary: "€65,000 / year",
     url: "https://jobs.example/acme/frontend",
@@ -43,6 +53,9 @@ const DEMO_ACCEPTED_JOBS: AcceptedJob[] = [
     company: "Globex",
     role: "Mobile Developer (Flutter)",
     location: "Remote",
+    appliedOn: "2025-09-25",
+    decisionDate: "2025-10-15",
+    employmentType: "Ausbildung",
     startDate: "01 Mar 2026",
     salary: "€60,000 / year",
     logoUrl: "/logos/globex.png",
@@ -85,58 +98,59 @@ export default function AcceptedPage() {
 
   const totalAccepted = items.length;
   const firstJob = items[0];
-return (
-  <section
-    className={[
-      "relative rounded-2xl border border-neutral-200/70",
-      "bg-gradient-to-br from-emerald-50 via-white to-lime-50",
-      "p-8 shadow-md overflow-hidden",
-    ].join(" ")}
-  >
-    {/* cheerful blobs */}
-    <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-emerald-400/20 blur-3xl" />
-    <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-lime-400/20 blur-3xl" />
 
-    {/* header row */}
-    <div className="flex items-center justify-between gap-3 relative z-10">
-      <div>
-        <h1 className="text-2xl font-semibold text-neutral-900 flex items-center gap-1">
-          {/* ✅ icon directly next to the word "Accepted" */}
-          <Image
-            src="/icons/accepted.png"
-            alt="Accepted icon"
-            width={37}
-            height={37}
-            className="shrink-0"
-          />
-          <span>Accepted 🎉</span>
-        </h1>
-        <p className="mt-1 text-sm text-neutral-700">
-          This is your win board – every card here is a{" "}
-          <span className="font-semibold text-emerald-700">
-            “Yes, you&apos;re hired!”
+  return (
+    <section
+      className={[
+        "relative rounded-2xl border border-neutral-200/70",
+        "bg-gradient-to-br from-emerald-50 via-white to-lime-50",
+        "p-8 shadow-md overflow-hidden",
+      ].join(" ")}
+    >
+      {/* cheerful blobs */}
+      <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-emerald-400/20 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-lime-400/20 blur-3xl" />
+
+      {/* header row */}
+      <div className="flex items-center justify-between gap-3 relative z-10">
+        <div>
+          <h1 className="text-2xl font-semibold text-neutral-900 flex items-center gap-1">
+            {/* ✅ icon directly next to the word "Accepted" */}
+            <Image
+              src="/icons/accepted.png"
+              alt="Accepted icon"
+              width={37}
+              height={37}
+              className="shrink-0"
+            />
+            <span>Accepted 🎉</span>
+          </h1>
+          <p className="mt-1 text-sm text-neutral-700">
+            This is your win board – every card here is a{" "}
+            <span className="font-semibold text-emerald-700">
+              “Yes, you&apos;re hired!”
+            </span>
+          </p>
+        </div>
+
+        {/* summary pill */}
+        <div
+          className={[
+            "inline-flex items-center gap-2 rounded-full border border-emerald-200",
+            "bg-white/80 px-3 py-1.5 text-xs font-medium text-emerald-800",
+            "shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/70",
+          ].join(" ")}
+        >
+          <Trophy className="h-4 w-4 text-amber-500" aria-hidden="true" />
+          <span>
+            {totalAccepted === 0
+              ? "Your next win is loading…"
+              : totalAccepted === 1
+              ? "1 role secured – amazing!"
+              : `${totalAccepted} roles secured – incredible!`}
           </span>
-        </p>
+        </div>
       </div>
-
-      {/* small positive summary pill stays the same */}
-      <div
-        className={[
-          "inline-flex items-center gap-2 rounded-full border border-emerald-200",
-          "bg-white/80 px-3 py-1.5 text-xs font-medium text-emerald-800",
-          "shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/70",
-        ].join(" ")}
-      >
-        <Trophy className="h-4 w-4 text-amber-500" aria-hidden="true" />
-        <span>
-          {totalAccepted === 0
-            ? "Your next win is loading…"
-            : totalAccepted === 1
-            ? "1 role secured – amazing!"
-            : `${totalAccepted} roles secured – incredible!`}
-        </span>
-      </div>
-    </div>
 
       {/* stats row */}
       <div className="mt-6 grid gap-3 sm:grid-cols-3 relative z-10">
@@ -168,7 +182,7 @@ return (
               <>
                 <span className="font-semibold">{firstJob.role}</span> at{" "}
                 <span className="font-semibold">{firstJob.company}</span>.
-                You turned interviews into a real job offer. 🌟
+                You turned applications and interviews into a real job offer. 🌟
               </>
             ) : (
               <>Your future success story will appear here.</>
@@ -197,6 +211,10 @@ return (
               "group relative flex h-full flex-col rounded-xl border border-emerald-100",
               "bg-white/80 shadow-sm transition-all",
               "hover:-translate-y-0.5 hover:shadow-md",
+              // cheerful left ribbon (like interviews card)
+              "before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl",
+              "before:bg-gradient-to-b before:from-emerald-500 before:via-lime-500 before:to-amber-400",
+              "before:opacity-90",
             ].join(" ")}
           >
             <div className="flex-1 px-5 pt-4 pb-5">
@@ -228,22 +246,50 @@ return (
                 </div>
               </div>
 
+              {/* divider under company + role */}
+              <div
+                className="mt-3 h-px w-full bg-emerald-100/80"
+                role="separator"
+                aria-hidden="true"
+              />
+
+              {/* meta fields */}
               <dl className="mt-4 space-y-2 text-sm">
-                {item.location && (
+                {/* Applied on */}
+                {item.appliedOn && (
                   <div className="flex items-center gap-2">
-                    <MapPin
+                    <CalendarDays
                       className="h-4 w-4 text-neutral-500"
                       aria-hidden="true"
                     />
                     <div>
-                      <dt className="text-xs text-neutral-500">Location</dt>
+                      <dt className="text-xs text-neutral-500">Applied on</dt>
                       <dd className="font-medium text-neutral-900">
-                        {item.location}
+                        {item.appliedOn}
                       </dd>
                     </div>
                   </div>
                 )}
 
+                {/* Decision date = when company responded */}
+                {item.decisionDate && (
+                  <div className="flex items-center gap-2">
+                    <Calendar
+                      className="h-4 w-4 text-emerald-500"
+                      aria-hidden="true"
+                    />
+                    <div>
+                      <dt className="text-xs text-neutral-500">
+                        Decision date (company)
+                      </dt>
+                      <dd className="font-medium text-neutral-900">
+                        {item.decisionDate}
+                      </dd>
+                    </div>
+                  </div>
+                )}
+
+                {/* Start date */}
                 {item.startDate && (
                   <div className="flex items-center gap-2">
                     <Calendar
@@ -259,6 +305,41 @@ return (
                   </div>
                 )}
 
+                {/* Employment type: Ausbildung, Full-time, etc. */}
+                {item.employmentType && (
+                  <div className="flex items-center gap-2">
+                    <Briefcase
+                      className="h-4 w-4 text-neutral-500"
+                      aria-hidden="true"
+                    />
+                    <div>
+                      <dt className="text-xs text-neutral-500">
+                        Employment type
+                      </dt>
+                      <dd className="font-medium text-neutral-900">
+                        {item.employmentType}
+                      </dd>
+                    </div>
+                  </div>
+                )}
+
+                {/* Location */}
+                {item.location && (
+                  <div className="flex items-center gap-2">
+                    <MapPin
+                      className="h-4 w-4 text-neutral-500"
+                      aria-hidden="true"
+                    />
+                    <div>
+                      <dt className="text-xs text-neutral-500">Location</dt>
+                      <dd className="font-medium text-neutral-900">
+                        {item.location}
+                      </dd>
+                    </div>
+                  </div>
+                )}
+
+                {/* Salary */}
                 {item.salary && (
                   <div className="flex items-center gap-2">
                     <Trophy
@@ -312,8 +393,9 @@ return (
               No accepted offers yet – but you&apos;re on your way.
             </p>
             <p className="mt-1 text-xs text-neutral-500">
-              When a company says <span className="font-semibold">&quot;Yes&quot;</span>, move
-              that offer here and celebrate your progress.
+              When a company says{" "}
+              <span className="font-semibold">&quot;Yes&quot;</span>, move that
+              offer here and celebrate your progress.
             </p>
           </div>
         )}
