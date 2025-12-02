@@ -13,6 +13,7 @@ const ROUTES: Record<string, RouteMeta> = {
   "/applied": { title: "Applied" },
   "/interviews": { title: "Interviews" },
   "/offers": { title: "Offers" },
+  "/accepted": { title: "Accepted" }, // ⭐ NEW
   "/rejected": { title: "Rejected" },
   "/withdrawn": { title: "Withdrawn" },
   "/wishlist": { title: "Wishlist" },
@@ -52,6 +53,13 @@ const ACCENTS: Record<string, Accent> = {
     barFrom: "after:from-amber-500",
     barTo: "after:to-orange-500",
     focus: "focus-visible:ring-amber-300",
+  },
+  "/accepted": {
+    // 🎉 Positive, cheering vibe
+    washFrom: "from-lime-50",
+    barFrom: "after:from-lime-500",
+    barTo: "after:to-emerald-500",
+    focus: "focus-visible:ring-lime-300",
   },
   "/rejected": {
     washFrom: "from-rose-50",

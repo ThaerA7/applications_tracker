@@ -12,16 +12,17 @@ type Item = {
 };
 
 const items: Item[] = [
-  { href: '/',           label: 'Overview',  icon: '/icons/home.png' },
-  { href: '/offers',     label: 'Offers',    icon: '/icons/briefcase.png' },
-  { href: '/applied',    label: 'Applied',   icon: '/icons/checklist.png' },
-  { href: '/interviews', label: 'Interviews',icon: '/icons/interview.png' },
-  { href: '/rejected',   label: 'Rejected',  icon: '/icons/cancel.png' },
-  { href: '/withdrawn',  label: 'Withdrawn', icon: '/icons/withdrawn.png' },
-  { href: '/wishlist',   label: 'Wishlist',  icon: '/icons/star.png' },
-  { href: '/calendar',   label: 'Calendar',  icon: '/icons/calendar.png' },
-  { href: '/notes',      label: 'Notes',     icon: '/icons/note.png' },
-  { href: '/settings',   label: 'Settings',  icon: '/icons/settings.png' },
+  { href: '/',           label: 'Overview',   icon: '/icons/home.png' },
+  { href: '/offers',     label: 'Offers',     icon: '/icons/briefcase.png' },
+  { href: '/accepted',   label: 'Accepted',   icon: '/icons/accepted.png' }, // ⭐ NEW
+  { href: '/applied',    label: 'Applied',    icon: '/icons/checklist.png' },
+  { href: '/interviews', label: 'Interviews', icon: '/icons/interview.png' },
+  { href: '/rejected',   label: 'Rejected',   icon: '/icons/cancel.png' },
+  { href: '/withdrawn',  label: 'Withdrawn',  icon: '/icons/withdrawn.png' },
+  { href: '/wishlist',   label: 'Wishlist',   icon: '/icons/star.png' },
+  { href: '/calendar',   label: 'Calendar',   icon: '/icons/calendar.png' },
+  { href: '/notes',      label: 'Notes',      icon: '/icons/note.png' },
+  { href: '/settings',   label: 'Settings',   icon: '/icons/settings.png' },
 ];
 
 type SidebarProps = {
