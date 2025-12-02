@@ -72,45 +72,9 @@ export default function InterviewCard({
       ].join(" ")}
     >
       {/* Inner padding container for main content */}
-      <div className="relative flex-1 p-5 pb-6">
-        {/* Top-right actions: Edit + Move on top, Delete centered below */}
-        <div className="absolute right-3 top-3 z-10 flex flex-col items-center gap-1">
-          {/* Top row: Edit + Move */}
-          <div className="flex flex-row gap-2">
-            {/* Edit (blue) */}
-            <button
-              type="button"
-              onClick={() => onEdit(item)}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-sky-200 bg-sky-50 text-sky-600 shadow-sm hover:bg-sky-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-              aria-label="Edit interview"
-            >
-              <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-            </button>
-
-            {/* Move (green) */}
-            <button
-              type="button"
-              onClick={() => onMove(item)}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600 shadow-sm hover:bg-emerald-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
-              aria-label="Move interview"
-            >
-              <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-            </button>
-          </div>
-
-          {/* Bottom: Delete centered under them */}
-          <button
-            type="button"
-            onClick={() => onDelete(item)}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-600 shadow-sm hover:bg-rose-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
-            aria-label="Delete interview"
-          >
-            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-          </button>
-        </div>
-
-        {/* Header with square logo + company/role */}
-        <div className="flex items-start gap-3 pr-20 sm:pr-24">
+      <div className="relative flex-1 px-5 pt-3 pb-6">
+        {/* Header with square logo + company/role + actions */}
+        <div className="relative flex items-start gap-3 pr-16 sm:pr-20">
           {item.logoUrl ? (
             <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-neutral-200 bg-white ring-1 ring-white/60">
               <Image
@@ -144,7 +108,43 @@ export default function InterviewCard({
               </span>
             </p>
           </div>
+
+          {/* Actions – horizontal, icon-only, centered between top and divider */}
+          <div className="absolute right-0 top-1/2 -translate-y-1/2">
+            <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white/90 px-1.5 py-1 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/80">
+              {/* Edit */}
+              <button
+                type="button"
+                onClick={() => onEdit(item)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-1 focus-visible:ring-offset-white"
+                aria-label="Edit interview"
+              >
+                <Pencil className="h-4 w-4" aria-hidden="true" />
+              </button>
+
+              {/* Move */}
+              <button
+                type="button"
+                onClick={() => onMove(item)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-1 focus-visible:ring-offset-white"
+                aria-label="Move interview"
+              >
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </button>
+
+              {/* Delete */}
+              <button
+                type="button"
+                onClick={() => onDelete(item)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 hover:bg-rose-50 hover:text-rose-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:ring-offset-1 focus-visible:ring-offset-white"
+                aria-label="Delete interview"
+              >
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+          </div>
         </div>
+
 
         {/* Divider */}
         <div
@@ -338,8 +338,8 @@ export default function InterviewCard({
             {stage === "upcoming"
               ? "Upcoming interview"
               : stage === "past"
-              ? "Interview date has passed"
-              : "Done – waiting for an answer"}
+                ? "Interview date has passed"
+                : "Done – waiting for an answer"}
           </span>
         </div>
 
@@ -360,8 +360,8 @@ export default function InterviewCard({
               key === "upcoming"
                 ? Calendar
                 : key === "past"
-                ? History
-                : CheckCircle2;
+                  ? History
+                  : CheckCircle2;
 
             return (
               <button
