@@ -1,4 +1,4 @@
-// app/accepted/page.tsx
+// app/accepted/page.tsx 
 "use client";
 
 import { useEffect, useState } from "react";
@@ -13,6 +13,7 @@ import {
   Briefcase,
   Trash2,
   Plus,
+  Pencil,
 } from "lucide-react";
 import MoveToAcceptedDialog, {
   type AcceptedDetails,
@@ -29,10 +30,10 @@ type AcceptedJob = {
   logoUrl?: string;
   notes?: string;
 
-  // new meta fields
-  appliedOn?: string; // when you applied (YYYY-MM-DD or free-form)
-  decisionDate?: string; // when company responded / offer decision
-  employmentType?: string; // e.g. "Ausbildung", "Full-time"
+  // meta fields
+  appliedOn?: string;
+  decisionDate?: string;
+  employmentType?: string;
 };
 
 const ACCEPTED_STORAGE_KEY = "job-tracker:accepted";
@@ -69,7 +70,10 @@ const DEMO_ACCEPTED_JOBS: AcceptedJob[] = [
 
 export default function AcceptedPage() {
   const [items, setItems] = useState<AcceptedJob[]>(DEMO_ACCEPTED_JOBS);
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+
+  // shared dialog for add + edit
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<AcceptedJob | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -101,6 +105,15 @@ export default function AcceptedPage() {
     }
   }, []);
 
+  const persist = (next: AcceptedJob[]) => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(ACCEPTED_STORAGE_KEY, JSON.stringify(next));
+    } catch (err) {
+      console.error("Failed to persist accepted jobs", err);
+    }
+  };
+
   const handleDelete = (id: string) => {
     if (typeof window !== "undefined") {
       const confirmed = window.confirm(
@@ -111,22 +124,57 @@ export default function AcceptedPage() {
 
     setItems((prev) => {
       const next = prev.filter((job) => job.id !== id);
-      if (typeof window !== "undefined") {
-        try {
-          window.localStorage.setItem(
-            ACCEPTED_STORAGE_KEY,
-            JSON.stringify(next)
-          );
-        } catch (err) {
-          console.error("Failed to persist accepted jobs after delete", err);
-        }
-      }
+      persist(next);
       return next;
     });
   };
 
-  const handleAddAccepted = (details: AcceptedDetails) => {
+  const openAddDialog = () => {
+    setEditingItem(null);
+    setIsDialogOpen(true);
+  };
+
+  const handleEdit = (job: AcceptedJob) => {
+    setEditingItem(job);
+    setIsDialogOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    setIsDialogOpen(false);
+    setEditingItem(null);
+  };
+
+  const handleAcceptedCreated = (details: AcceptedDetails) => {
     setItems((prev) => {
+      // Edit existing card
+      if (editingItem) {
+        const next = prev.map((job) =>
+          job.id === editingItem.id
+            ? {
+                ...job,
+                company: details.company,
+                role: details.role,
+                location: details.location,
+                startDate: details.startDate || job.startDate,
+                salary: details.salary || job.salary,
+                url: details.url || job.url,
+                logoUrl: details.logoUrl || job.logoUrl,
+                notes:
+                  details.notes !== undefined && details.notes !== ""
+                    ? details.notes
+                    : job.notes,
+                appliedOn: details.appliedOn || job.appliedOn,
+                decisionDate: details.decisionDate || job.decisionDate,
+                employmentType:
+                  details.employmentType || job.employmentType,
+              }
+            : job
+        );
+        persist(next);
+        return next;
+      }
+
+      // Add new card
       const newItem: AcceptedJob = {
         id: `accepted-${Date.now()}-${Math.random()
           .toString(36)
@@ -144,20 +192,8 @@ export default function AcceptedPage() {
         employmentType: details.employmentType,
       };
 
-      // put newest at the top
       const next = [newItem, ...prev];
-
-      if (typeof window !== "undefined") {
-        try {
-          window.localStorage.setItem(
-            ACCEPTED_STORAGE_KEY,
-            JSON.stringify(next)
-          );
-        } catch (err) {
-          console.error("Failed to persist accepted jobs after add", err);
-        }
-      }
-
+      persist(next);
       return next;
     });
   };
@@ -173,12 +209,27 @@ export default function AcceptedPage() {
         "p-8 shadow-md overflow-hidden",
       ].join(" ")}
     >
-      {/* Add / manual accepted offer dialog */}
+      {/* Add / edit accepted offer dialog */}
       <MoveToAcceptedDialog
-        open={isAddDialogOpen}
-        onClose={() => setIsAddDialogOpen(false)}
-        application={null}
-        onAcceptedCreated={handleAddAccepted}
+        open={isDialogOpen}
+        onClose={handleCloseDialog}
+        application={
+          editingItem
+            ? {
+                id: editingItem.id,
+                company: editingItem.company,
+                role: editingItem.role,
+                location: editingItem.location,
+                status: "Accepted",
+                appliedOn: editingItem.appliedOn,
+                employmentType: editingItem.employmentType,
+                offerUrl: editingItem.url,
+                logoUrl: editingItem.logoUrl,
+                notes: editingItem.notes,
+              }
+            : null
+        }
+        onAcceptedCreated={handleAcceptedCreated}
         mode="add"
       />
 
@@ -190,7 +241,6 @@ export default function AcceptedPage() {
       <div className="flex items-center justify-between gap-3 relative z-10">
         <div>
           <h1 className="text-2xl font-semibold text-neutral-900 flex items-center gap-1">
-            {/* ✅ icon directly next to the word "Accepted" */}
             <Image
               src="/icons/accepted.png"
               alt="Accepted icon"
@@ -211,7 +261,7 @@ export default function AcceptedPage() {
         {/* Top-right Add button */}
         <button
           type="button"
-          onClick={() => setIsAddDialogOpen(true)}
+          onClick={openAddDialog}
           className={[
             "inline-flex items-center gap-1.5 rounded-lg border border-emerald-200",
             "bg-white/80 px-3 py-1.5 text-xs font-medium text-emerald-800 shadow-sm",
@@ -286,7 +336,10 @@ export default function AcceptedPage() {
                   "shadow-sm",
                 ].join(" ")}
               >
-                <Trophy className="h-4 w-4 text-amber-500" aria-hidden="true" />
+                <Trophy
+                  className="h-4 w-4 text-amber-500"
+                  aria-hidden="true"
+                />
                 <span>
                   {totalAccepted === 0 &&
                     "Your celebration wall is waiting 🎈"}
@@ -332,27 +385,9 @@ export default function AcceptedPage() {
               "before:opacity-90",
             ].join(" ")}
           >
-            {/* delete button in top-right corner of the card */}
-            <div className="absolute right-3 top-3 z-10">
-              <button
-                type="button"
-                onClick={() => handleDelete(item.id)}
-                className={[
-                  "inline-flex h-8 w-8 items-center justify-center rounded-full",
-                  "border border-emerald-100 bg-white/90 text-neutral-500",
-                  "hover:text-rose-600 hover:border-rose-200 hover:bg-rose-50",
-                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:ring-offset-1 focus-visible:ring-offset-white",
-                  "shadow-sm",
-                ].join(" ")}
-                aria-label="Delete accepted offer"
-              >
-                <Trash2 className="h-4 w-4" aria-hidden="true" />
-              </button>
-            </div>
-
             <div className="flex-1 px-5 pt-4 pb-5">
-              {/* header: logo + company/role */}
-              <div className="flex items-start gap-3 pr-8">
+              {/* header: logo + company/role + actions */}
+              <div className="relative flex items-start gap-3 pr-16 sm:pr-20">
                 {item.logoUrl ? (
                   <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-neutral-200 bg-white ring-1 ring-white/60">
                     <Image
@@ -376,6 +411,31 @@ export default function AcceptedPage() {
                   <p className="mt-0.5 text-sm text-neutral-700">
                     {item.role}
                   </p>
+                </div>
+
+                {/* Actions – same pill design + positioning as interview card */}
+                <div className="absolute right-0 top-1/2 -translate-y-1/2">
+                  <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white/90 px-1.5 py-1 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/80">
+                    {/* Edit */}
+                    <button
+                      type="button"
+                      onClick={() => handleEdit(item)}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-1 focus-visible:ring-offset-white"
+                      aria-label="Edit accepted offer"
+                    >
+                      <Pencil className="h-4 w-4" aria-hidden="true" />
+                    </button>
+
+                    {/* Delete */}
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(item.id)}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 hover:bg-rose-50 hover:text-rose-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:ring-offset-1 focus-visible:ring-offset-white"
+                      aria-label="Delete accepted offer"
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                  </div>
                 </div>
               </div>
 
