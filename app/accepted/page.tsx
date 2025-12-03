@@ -12,7 +12,11 @@ import {
   ExternalLink,
   Briefcase,
   Trash2,
+  Plus,
 } from "lucide-react";
+import MoveToAcceptedDialog, {
+  type AcceptedDetails,
+} from "../../components/dialogs/MoveToAcceptedDialog";
 
 type AcceptedJob = {
   id: string;
@@ -65,6 +69,7 @@ const DEMO_ACCEPTED_JOBS: AcceptedJob[] = [
 
 export default function AcceptedPage() {
   const [items, setItems] = useState<AcceptedJob[]>(DEMO_ACCEPTED_JOBS);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -96,9 +101,6 @@ export default function AcceptedPage() {
     }
   }, []);
 
-  const totalAccepted = items.length;
-  const firstJob = items[0];
-
   const handleDelete = (id: string) => {
     if (typeof window !== "undefined") {
       const confirmed = window.confirm(
@@ -123,6 +125,46 @@ export default function AcceptedPage() {
     });
   };
 
+  const handleAddAccepted = (details: AcceptedDetails) => {
+    setItems((prev) => {
+      const newItem: AcceptedJob = {
+        id: `accepted-${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2, 8)}`,
+        company: details.company,
+        role: details.role,
+        location: details.location,
+        startDate: details.startDate,
+        salary: details.salary,
+        url: details.url,
+        logoUrl: details.logoUrl,
+        notes: details.notes,
+        appliedOn: details.appliedOn,
+        decisionDate: details.decisionDate,
+        employmentType: details.employmentType,
+      };
+
+      // put newest at the top
+      const next = [newItem, ...prev];
+
+      if (typeof window !== "undefined") {
+        try {
+          window.localStorage.setItem(
+            ACCEPTED_STORAGE_KEY,
+            JSON.stringify(next)
+          );
+        } catch (err) {
+          console.error("Failed to persist accepted jobs after add", err);
+        }
+      }
+
+      return next;
+    });
+  };
+
+  const totalAccepted = items.length;
+  const firstJob = items[0];
+
   return (
     <section
       className={[
@@ -131,6 +173,15 @@ export default function AcceptedPage() {
         "p-8 shadow-md overflow-hidden",
       ].join(" ")}
     >
+      {/* Add / manual accepted offer dialog */}
+      <MoveToAcceptedDialog
+        open={isAddDialogOpen}
+        onClose={() => setIsAddDialogOpen(false)}
+        application={null}
+        onAcceptedCreated={handleAddAccepted}
+        mode="add"
+      />
+
       {/* cheerful blobs */}
       <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-emerald-400/20 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-lime-400/20 blur-3xl" />
@@ -157,7 +208,20 @@ export default function AcceptedPage() {
           </p>
         </div>
 
-        {/* top-right pill removed as requested */}
+        {/* Top-right Add button */}
+        <button
+          type="button"
+          onClick={() => setIsAddDialogOpen(true)}
+          className={[
+            "inline-flex items-center gap-1.5 rounded-lg border border-emerald-200",
+            "bg-white/80 px-3 py-1.5 text-xs font-medium text-emerald-800 shadow-sm",
+            "hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300",
+          ].join(" ")}
+        >
+          <Plus className="h-4 w-4" aria-hidden="true" />
+          <span className="hidden sm:inline">Add accepted offer</span>
+          <span className="sm:hidden">Add</span>
+        </button>
       </div>
 
       {/* Cheerful celebration banner rectangle */}
@@ -215,7 +279,6 @@ export default function AcceptedPage() {
             </div>
 
             <div className="flex flex-col items-start sm:items-end gap-2">
-              {/* Trophy + dynamic text chip INSIDE the rectangle, replacing the old star chip */}
               <div
                 className={[
                   "inline-flex items-center gap-2 rounded-full border border-emerald-100",
@@ -243,13 +306,11 @@ export default function AcceptedPage() {
             </div>
           </div>
 
-          {/* top border line similar to the left ribbon of the cards */}
           <div
             className="pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-pink-500 via-orange-400 to-amber-300"
             aria-hidden="true"
           />
 
-          {/* bottom border line similar to the left ribbon of the cards */}
           <div
             className="pointer-events-none absolute inset-x-0 bottom-0 h-1.5 bg-gradient-to-r from-pink-500 via-orange-400 to-amber-300"
             aria-hidden="true"
@@ -266,7 +327,6 @@ export default function AcceptedPage() {
               "group relative flex h-full flex-col rounded-xl border border-emerald-100",
               "bg-white/80 shadow-sm transition-all",
               "hover:-translate-y-0.5 hover:shadow-md",
-              // cheerful left ribbon
               "before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl",
               "before:bg-gradient-to-b before:from-pink-500 before:via-orange-400 before:to-amber-300",
               "before:opacity-90",
@@ -319,7 +379,6 @@ export default function AcceptedPage() {
                 </div>
               </div>
 
-              {/* divider under company + role */}
               <div
                 className="mt-3 h-px w-full bg-emerald-100/80"
                 role="separator"
@@ -328,7 +387,6 @@ export default function AcceptedPage() {
 
               {/* meta fields */}
               <dl className="mt-4 space-y-2 text-sm">
-                {/* Applied on */}
                 {item.appliedOn && (
                   <div className="flex items-center gap-2">
                     <CalendarDays
@@ -344,7 +402,6 @@ export default function AcceptedPage() {
                   </div>
                 )}
 
-                {/* Decision date = when company responded */}
                 {item.decisionDate && (
                   <div className="flex items-center gap-2">
                     <Calendar
@@ -362,7 +419,6 @@ export default function AcceptedPage() {
                   </div>
                 )}
 
-                {/* Start date */}
                 {item.startDate && (
                   <div className="flex items-center gap-2">
                     <Calendar
@@ -378,7 +434,6 @@ export default function AcceptedPage() {
                   </div>
                 )}
 
-                {/* Employment type: Ausbildung, Full-time, etc. */}
                 {item.employmentType && (
                   <div className="flex items-center gap-2">
                     <Briefcase
@@ -396,7 +451,6 @@ export default function AcceptedPage() {
                   </div>
                 )}
 
-                {/* Location */}
                 {item.location && (
                   <div className="flex items-center gap-2">
                     <MapPin
@@ -412,7 +466,6 @@ export default function AcceptedPage() {
                   </div>
                 )}
 
-                {/* Salary */}
                 {item.salary && (
                   <div className="flex items-center gap-2">
                     <Trophy
