@@ -116,10 +116,7 @@ export default function AcceptedPage() {
             JSON.stringify(next)
           );
         } catch (err) {
-          console.error(
-            "Failed to persist accepted jobs after delete",
-            err
-          );
+          console.error("Failed to persist accepted jobs after delete", err);
         }
       }
       return next;
@@ -150,7 +147,7 @@ export default function AcceptedPage() {
               height={37}
               className="shrink-0"
             />
-            <span>Accepted 🎉</span>
+            <span>Accepted</span>
           </h1>
           <p className="mt-1 text-sm text-neutral-700">
             This is your win board – every card here is a{" "}
@@ -246,9 +243,15 @@ export default function AcceptedPage() {
             </div>
           </div>
 
+          {/* top border line similar to the left ribbon of the cards */}
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-pink-500 via-orange-400 to-amber-300"
+            aria-hidden="true"
+          />
+
           {/* bottom border line similar to the left ribbon of the cards */}
           <div
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-1.5 bg-gradient-to-r from-emerald-500 via-lime-500 to-amber-400"
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-1.5 bg-gradient-to-r from-pink-500 via-orange-400 to-amber-300"
             aria-hidden="true"
           />
         </div>
@@ -265,7 +268,7 @@ export default function AcceptedPage() {
               "hover:-translate-y-0.5 hover:shadow-md",
               // cheerful left ribbon
               "before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl",
-              "before:bg-gradient-to-b before:from-emerald-500 before:via-lime-500 before:to-amber-400",
+              "before:bg-gradient-to-b before:from-pink-500 before:via-orange-400 before:to-amber-300",
               "before:opacity-90",
             ].join(" ")}
           >
