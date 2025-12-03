@@ -12,6 +12,9 @@ import MoveToRejectedDialog, {
 import MoveToWithdrawnDialog, {
   type WithdrawnDetails,
 } from './MoveToWithdrawnDialog';
+import MoveToAcceptedDialog, {
+  type AcceptedDetails,
+} from './MoveToAcceptedDialog';
 
 type MoveApplicationDialogProps = {
   open: boolean;
@@ -37,11 +40,12 @@ type MoveApplicationDialogProps = {
   onMoveToInterviews: (interview: Interview) => void;
   onMoveToRejected: (details: RejectionDetails) => void;
   onMoveToWithdrawn: (details: WithdrawnDetails) => void;
+  onMoveToAccepted?: (details: AcceptedDetails) => void;
   fmtDate: (date: string) => string;
   statusClasses: (status: string) => string;
   /**
    * default  = used from Applications page (3 options)
-   * from-interviews = used from Interviews page (only Rejected + Withdrawn)
+   * from-interviews = used from Interviews page (Accepted + Rejected + Withdrawn)
    */
   mode?: 'default' | 'from-interviews';
 };
@@ -53,6 +57,7 @@ const MoveApplicationDialog: FC<MoveApplicationDialogProps> = ({
   onMoveToInterviews,
   onMoveToRejected,
   onMoveToWithdrawn,
+  onMoveToAccepted,
   fmtDate,
   statusClasses,
   mode = 'default',
@@ -60,17 +65,22 @@ const MoveApplicationDialog: FC<MoveApplicationDialogProps> = ({
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [rejectedOpen, setRejectedOpen] = useState(false);
   const [withdrawnOpen, setWithdrawnOpen] = useState(false);
+  const [acceptedOpen, setAcceptedOpen] = useState(false);
 
   if (!open || !application) return null;
 
   const showInterviewsOption = mode !== 'from-interviews';
-  const destinationsCount = showInterviewsOption ? 3 : 2;
+  const showAcceptedOption = typeof onMoveToAccepted === 'function';
+  const destinationsCount =
+    (showInterviewsOption ? 1 : 0) +
+    (showAcceptedOption ? 1 : 0) +
+    2; // Rejected + Withdrawn
 
   return (
     <>
       <div
-  className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[11000] flex items-center justify-center px-4 py-8"
->
+        className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[11000] flex items-center justify-center px-4 py-8"
+      >
         {/* Backdrop */}
         <div
           className="absolute inset-0 bg-neutral-900/40"
@@ -203,6 +213,35 @@ const MoveApplicationDialog: FC<MoveApplicationDialogProps> = ({
                     <span className="text-[11px] font-normal text-sky-900/80">
                       When you&apos;ve been invited to a phone screen or
                       any interview round.
+                    </span>
+                  </div>
+                </button>
+              )}
+
+              {/* Accepted – only when handler is provided (e.g. from Interviews page) */}
+              {showAcceptedOption && (
+                <button
+                  type="button"
+                  onClick={() => setAcceptedOpen(true)}
+                  className={[
+                    'flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-medium',
+                    'border border-emerald-200/80 bg-gradient-to-r from-emerald-50 via-white to-emerald-50',
+                    'shadow-sm hover:from-emerald-100 hover:to-emerald-50',
+                    'focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300',
+                    'transition-colors',
+                  ].join(' ')}
+                >
+                  <img
+                    src="/icons/accepted.png"
+                    alt="Accepted stage"
+                    className="h-7 w-7 md:h-8 md:w-8 object-contain"
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-sm font-semibold text-emerald-900">
+                      Move to accepted section
+                    </span>
+                    <span className="text-[11px] font-normal text-emerald-900/80">
+                      When the company sends you a job offer and you say &quot;Yes&quot;.
                     </span>
                   </div>
                 </button>
@@ -355,6 +394,29 @@ const MoveApplicationDialog: FC<MoveApplicationDialogProps> = ({
         onWithdrawnCreated={(details) => {
           onMoveToWithdrawn(details);
           setWithdrawnOpen(false);
+          onClose();
+        }}
+      />
+
+      {/* Fifth dialog: move to accepted (details) */}
+      <MoveToAcceptedDialog
+        open={acceptedOpen}
+        onClose={() => setAcceptedOpen(false)}
+        application={{
+          id: application.id,
+          company: application.company,
+          role: application.role,
+          location: application.location,
+          status: application.status,
+          appliedOn: application.appliedOn,
+          employmentType: application.employmentType,
+          offerUrl: application.offerUrl,
+          logoUrl: application.logoUrl,
+          notes: application.notes,
+        }}
+        onAcceptedCreated={(details) => {
+          onMoveToAccepted?.(details);
+          setAcceptedOpen(false);
           onClose();
         }}
       />

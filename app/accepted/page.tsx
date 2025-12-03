@@ -9,9 +9,9 @@ import {
   Calendar,
   CalendarDays,
   MapPin,
-  Star,
   ExternalLink,
   Briefcase,
+  Trash2,
 } from "lucide-react";
 
 type AcceptedJob = {
@@ -99,6 +99,33 @@ export default function AcceptedPage() {
   const totalAccepted = items.length;
   const firstJob = items[0];
 
+  const handleDelete = (id: string) => {
+    if (typeof window !== "undefined") {
+      const confirmed = window.confirm(
+        "Remove this accepted offer from your win board?"
+      );
+      if (!confirmed) return;
+    }
+
+    setItems((prev) => {
+      const next = prev.filter((job) => job.id !== id);
+      if (typeof window !== "undefined") {
+        try {
+          window.localStorage.setItem(
+            ACCEPTED_STORAGE_KEY,
+            JSON.stringify(next)
+          );
+        } catch (err) {
+          console.error(
+            "Failed to persist accepted jobs after delete",
+            err
+          );
+        }
+      }
+      return next;
+    });
+  };
+
   return (
     <section
       className={[
@@ -133,72 +160,97 @@ export default function AcceptedPage() {
           </p>
         </div>
 
-        {/* summary pill */}
-        <div
-          className={[
-            "inline-flex items-center gap-2 rounded-full border border-emerald-200",
-            "bg-white/80 px-3 py-1.5 text-xs font-medium text-emerald-800",
-            "shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/70",
-          ].join(" ")}
-        >
-          <Trophy className="h-4 w-4 text-amber-500" aria-hidden="true" />
-          <span>
-            {totalAccepted === 0
-              ? "Your next win is loading…"
-              : totalAccepted === 1
-              ? "1 role secured – amazing!"
-              : `${totalAccepted} roles secured – incredible!`}
-          </span>
-        </div>
+        {/* top-right pill removed as requested */}
       </div>
 
-      {/* stats row */}
-      <div className="mt-6 grid gap-3 sm:grid-cols-3 relative z-10">
-        <div className="rounded-xl border border-emerald-100 bg-white/80 p-4 shadow-sm">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
-              Accepted roles
-            </span>
-            <Star className="h-4 w-4 text-amber-500" aria-hidden="true" />
-          </div>
-          <div className="mt-2 flex items-baseline gap-1">
-            <span className="text-2xl font-semibold text-neutral-900">
-              {totalAccepted}
-            </span>
-            <span className="text-xs text-neutral-500">
-              {totalAccepted === 0
-                ? "Your celebration wall is waiting 🎈"
-                : "Every card is proof you can do it 💪"}
-            </span>
-          </div>
-        </div>
+      {/* Cheerful celebration banner rectangle */}
+      <div className="mt-6 relative z-10">
+        <div
+          className={[
+            "relative overflow-hidden rounded-xl border border-emerald-100",
+            "bg-white/80 px-5 py-4 shadow-sm",
+          ].join(" ")}
+        >
+          <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-emerald-200/40 blur-2xl" />
+          <div className="pointer-events-none absolute -left-12 -bottom-10 h-24 w-24 rounded-full bg-lime-200/40 blur-2xl" />
 
-        <div className="rounded-xl border border-emerald-100 bg-white/80 p-4 shadow-sm">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
-            Biggest win
-          </span>
-          <p className="mt-2 text-sm text-neutral-800">
-            {firstJob ? (
-              <>
-                <span className="font-semibold">{firstJob.role}</span> at{" "}
-                <span className="font-semibold">{firstJob.company}</span>.
-                You turned applications and interviews into a real job offer. 🌟
-              </>
-            ) : (
-              <>Your future success story will appear here.</>
-            )}
-          </p>
-        </div>
+          <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                <PartyPopper className="h-4 w-4" aria-hidden="true" />
+                <span>
+                  {totalAccepted === 0
+                    ? "Future offer celebration"
+                    : "Offer celebration zone"}
+                </span>
+              </p>
 
-        <div className="rounded-xl border border-emerald-100 bg-white/80 p-4 shadow-sm">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
-            Mindset note
-          </span>
-          <p className="mt-2 text-sm text-neutral-800">
-            This page isn&apos;t luck. It&apos;s{" "}
-            <span className="font-semibold">consistent effort</span>, learning,
-            and courage to apply.
-          </p>
+              <p className="mt-1 text-sm text-neutral-800">
+                {totalAccepted === 0 && (
+                  <>
+                    The first “Yes” you get will land here. Until then, every
+                    application is training for that moment.
+                  </>
+                )}
+                {totalAccepted === 1 && firstJob && (
+                  <>
+                    You already turned your effort into a real offer:{" "}
+                    <span className="font-semibold">{firstJob.role}</span> at{" "}
+                    <span className="font-semibold">{firstJob.company}</span>.
+                    This page is the proof you can do it again.
+                  </>
+                )}
+                {totalAccepted > 1 && firstJob && (
+                  <>
+                    Look at this stack of wins. From{" "}
+                    <span className="font-semibold">{firstJob.company}</span> to
+                    every card below – each offer is a milestone in your story.
+                  </>
+                )}
+              </p>
+
+              {firstJob && totalAccepted > 0 && (
+                <p className="mt-1 text-xs text-neutral-500">
+                  Tip: screenshot this page when you doubt yourself – it&apos;s
+                  your personal highlight reel.
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-col items-start sm:items-end gap-2">
+              {/* Trophy + dynamic text chip INSIDE the rectangle, replacing the old star chip */}
+              <div
+                className={[
+                  "inline-flex items-center gap-2 rounded-full border border-emerald-100",
+                  "bg-emerald-50/90 px-3 py-1.5 text-[11px] font-medium text-emerald-800",
+                  "shadow-sm",
+                ].join(" ")}
+              >
+                <Trophy className="h-4 w-4 text-amber-500" aria-hidden="true" />
+                <span>
+                  {totalAccepted === 0 &&
+                    "Your celebration wall is waiting 🎈"}
+                  {totalAccepted === 1 &&
+                    "1 offer secured – huge step forward."}
+                  {totalAccepted > 1 &&
+                    `${totalAccepted} offers secured – keep stacking wins.`}
+                </span>
+              </div>
+
+              <p className="text-[11px] text-neutral-500 max-w-xs text-left sm:text-right">
+                Not luck –{" "}
+                <span className="font-semibold">
+                  consistency, learning, and courage to apply.
+                </span>
+              </p>
+            </div>
+          </div>
+
+          {/* bottom border line similar to the left ribbon of the cards */}
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-1.5 bg-gradient-to-r from-emerald-500 via-lime-500 to-amber-400"
+            aria-hidden="true"
+          />
         </div>
       </div>
 
@@ -211,15 +263,33 @@ export default function AcceptedPage() {
               "group relative flex h-full flex-col rounded-xl border border-emerald-100",
               "bg-white/80 shadow-sm transition-all",
               "hover:-translate-y-0.5 hover:shadow-md",
-              // cheerful left ribbon (like interviews card)
+              // cheerful left ribbon
               "before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl",
               "before:bg-gradient-to-b before:from-emerald-500 before:via-lime-500 before:to-amber-400",
               "before:opacity-90",
             ].join(" ")}
           >
+            {/* delete button in top-right corner of the card */}
+            <div className="absolute right-3 top-3 z-10">
+              <button
+                type="button"
+                onClick={() => handleDelete(item.id)}
+                className={[
+                  "inline-flex h-8 w-8 items-center justify-center rounded-full",
+                  "border border-emerald-100 bg-white/90 text-neutral-500",
+                  "hover:text-rose-600 hover:border-rose-200 hover:bg-rose-50",
+                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:ring-offset-1 focus-visible:ring-offset-white",
+                  "shadow-sm",
+                ].join(" ")}
+                aria-label="Delete accepted offer"
+              >
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+
             <div className="flex-1 px-5 pt-4 pb-5">
               {/* header: logo + company/role */}
-              <div className="flex items-start gap-3">
+              <div className="flex items-start gap-3 pr-8">
                 {item.logoUrl ? (
                   <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-neutral-200 bg-white ring-1 ring-white/60">
                     <Image

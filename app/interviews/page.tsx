@@ -27,6 +27,7 @@ import ScheduleInterviewDialog, {
 import MoveApplicationDialog from "../../components/dialogs/MoveApplicationDialog";
 import type { RejectionDetails } from "../../components/dialogs/MoveToRejectedDialog";
 import type { WithdrawnDetails } from "../../components/dialogs/MoveToWithdrawnDialog";
+import type { AcceptedDetails } from "../../components/dialogs/MoveToAcceptedDialog";
 import InterviewCard, {
   type InterviewWithStage,
 } from "./InterviewCard";
@@ -43,6 +44,7 @@ const WITHDRAWN_STORAGE_KEY = "job-tracker:withdrawn";
 const INTERVIEWS_ACTIVITY_STORAGE_KEY = "job-tracker:interviews-activity";
 const REJECTIONS_ACTIVITY_STORAGE_KEY = "job-tracker:rejected-activity";
 const WITHDRAWN_ACTIVITY_STORAGE_KEY = "job-tracker:withdrawn-activity";
+const ACCEPTED_STORAGE_KEY = "job-tracker:accepted";
 
 type ApplicationLike = ComponentProps<
   typeof ScheduleInterviewDialog
@@ -71,6 +73,21 @@ type WithdrawnRecord = {
   notes?: string;
   withdrawnDate?: string;
   withdrawnReason?: WithdrawnDetails["reason"];
+};
+
+type AcceptedRecord = {
+  id: string;
+  company: string;
+  role: string;
+  location?: string;
+  appliedOn?: string;
+  employmentType?: string;
+  decisionDate?: string;
+  startDate?: string;
+  salary?: string;
+  url?: string;
+  logoUrl?: string;
+  notes?: string;
 };
 
 type InterviewStage = "upcoming" | "past" | "done";
@@ -834,6 +851,84 @@ export default function InterviewsPage() {
     });
   };
 
+  const handleMoveToAcceptedFromInterviews = (details: AcceptedDetails) => {
+    const source = moveTargetInterview;
+    if (!source) {
+      handleMoveDialogClose();
+      return;
+    }
+
+    let newItem: AcceptedRecord | null = null;
+
+    // 1) Append to accepted storage
+    if (typeof window !== "undefined") {
+      try {
+        const raw = window.localStorage.getItem(ACCEPTED_STORAGE_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        const prev: AcceptedRecord[] = Array.isArray(parsed) ? parsed : [];
+
+        newItem = {
+          id: makeId(prev.length),
+          company: details.company || source.company,
+          role: details.role || source.role,
+          location: details.location || source.location,
+          appliedOn: details.appliedOn || source.appliedOn,
+          employmentType: details.employmentType || source.employmentType,
+          decisionDate: details.decisionDate,
+          startDate: details.startDate,
+          salary: details.salary,
+          url: details.url || source.url,
+          logoUrl: details.logoUrl || source.logoUrl,
+          notes: details.notes || source.notes,
+        };
+
+        const nextAccepted = [...prev, newItem];
+        window.localStorage.setItem(
+          ACCEPTED_STORAGE_KEY,
+          JSON.stringify(nextAccepted)
+        );
+      } catch (err) {
+        console.error(
+          "Failed to persist accepted application from interview",
+          err
+        );
+      }
+    }
+
+    // 2) log move in Interviews activity (using existing type)
+    logActivity("edited", source, {
+      fromStatus: "Interview",
+      toStatus: "Accepted",
+      note: details.notes || "Moved to accepted",
+    });
+
+    // 3) Remove from interviews with animation
+    const sourceId = source.id;
+    const elementId = `interview-card-${sourceId}`;
+
+    animateCardExit(elementId, "move", () => {
+      setItems((prev) => {
+        const next = prev.filter((i) => i.id !== sourceId);
+        if (typeof window !== "undefined") {
+          try {
+            window.localStorage.setItem(
+              INTERVIEWS_STORAGE_KEY,
+              JSON.stringify(next)
+            );
+          } catch (err) {
+            console.error(
+              "Failed to persist interviews after moving to accepted",
+              err
+            );
+          }
+        }
+        return next;
+      });
+
+      handleMoveDialogClose();
+    });
+  };
+
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
 
@@ -889,7 +984,7 @@ export default function InterviewsPage() {
         mode={editingInterview ? "edit" : "add"}
       />
 
-      {/* Move dialog (reusing MoveApplicationDialog with 2 buttons) */}
+      {/* Move dialog (reusing MoveApplicationDialog with 2 buttons + accepted) */}
       <MoveApplicationDialog
         open={moveDialogOpen && !!moveDialogApplication}
         application={moveDialogApplication}
@@ -899,6 +994,7 @@ export default function InterviewsPage() {
         }}
         onMoveToRejected={handleMoveToRejectedFromInterviews}
         onMoveToWithdrawn={handleMoveToWithdrawnFromInterviews}
+        onMoveToAccepted={handleMoveToAcceptedFromInterviews}
         fmtDate={fmtDate}
         statusClasses={statusClasses}
         mode="from-interviews"
