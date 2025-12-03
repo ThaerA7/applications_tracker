@@ -26,10 +26,12 @@ export type AcceptedDetails = {
   notes?: string;
 };
 
+type MoveToAcceptedDialogMode = 'move' | 'add' | 'edit';
+
 type MoveToAcceptedDialogProps = {
   open: boolean;
   onClose: () => void;
-  application:
+  application?:
     | {
         id: string;
         company: string;
@@ -44,14 +46,18 @@ type MoveToAcceptedDialogProps = {
       }
     | null;
   onAcceptedCreated: (details: AcceptedDetails) => void;
+  mode?: MoveToAcceptedDialogMode;
 };
 
 const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
   open,
   onClose,
-  application,
+  application = null,
   onAcceptedCreated,
+  mode = 'move',
 }) => {
+  const [company, setCompany] = useState('');
+  const [role, setRole] = useState('');
   const [location, setLocation] = useState('');
   const [appliedOn, setAppliedOn] = useState('');
   const [employmentType, setEmploymentType] = useState('');
@@ -62,7 +68,7 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
   const [notes, setNotes] = useState('');
 
   useEffect(() => {
-    if (!open || !application) return;
+    if (!open) return;
 
     const today = new Date();
     const yyyy = today.getFullYear();
@@ -70,22 +76,34 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
     const dd = String(today.getDate()).padStart(2, '0');
     const todayIso = `${yyyy}-${mm}-${dd}`;
 
-    setLocation(application.location ?? '');
-    setAppliedOn(application.appliedOn ?? '');
-    setEmploymentType(application.employmentType ?? '');
+    if (application) {
+      setCompany(application.company ?? '');
+      setRole(application.role ?? '');
+      setLocation(application.location ?? '');
+      setAppliedOn(application.appliedOn ?? '');
+      setEmploymentType(application.employmentType ?? '');
+      setUrl(application.offerUrl ?? '');
+      setNotes(application.notes ?? '');
+    } else {
+      setCompany('');
+      setRole('');
+      setLocation('');
+      setAppliedOn('');
+      setEmploymentType('');
+      setUrl('');
+      setNotes('');
+    }
+
     setDecisionDate(todayIso);
     setStartDate('');
     setSalary('');
-    setUrl(application.offerUrl ?? '');
-    setNotes(application.notes ?? '');
   }, [open, application]);
 
-  if (!open || !application) return null;
+  if (!open) return null;
+  if (mode === 'move' && !application) return null;
 
-  const company = application.company ?? '';
-  const role = application.role ?? '';
-
-  const canSubmit = company.trim().length > 0 && role.trim().length > 0;
+  const canSubmit =
+    company.trim().length > 0 && role.trim().length > 0;
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -100,13 +118,28 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
       decisionDate: decisionDate.trim() || undefined,
       startDate: startDate.trim() || undefined,
       salary: salary.trim() || undefined,
-      url: url.trim() || application.offerUrl || undefined,
-      logoUrl: application.logoUrl,
+      url: url.trim() || application?.offerUrl || undefined,
+      logoUrl: application?.logoUrl,
       notes: notes.trim() || undefined,
     });
 
     onClose();
   };
+
+  const isAddMode = mode === 'add';
+  const isEditMode = mode === 'edit';
+
+  const title = isEditMode
+    ? 'Edit accepted offer'
+    : isAddMode
+    ? 'Add accepted offer'
+    : 'Move to accepted section';
+
+  const description = isEditMode
+    ? 'Update the details of this accepted offer.'
+    : isAddMode
+    ? 'Manually add a job or Ausbildung offer you have accepted.'
+    : 'Capture the final offer details and celebrate this win.';
 
   return (
     <div className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[12000] flex items-center justify-center px-4 py-8">
@@ -145,10 +178,10 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
                 id="move-to-accepted-title"
                 className="text-sm font-semibold text-neutral-900"
               >
-                Move to accepted section
+                {title}
               </h2>
               <p className="mt-0.5 text-xs text-neutral-600">
-                Capture the final offer details and celebrate this win.
+                {description}
               </p>
             </div>
           </div>
@@ -167,46 +200,48 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
           </button>
         </div>
 
-        {/* Summary */}
-        <div className="relative z-10 px-5 pt-4">
-          <div className="rounded-xl border border-emerald-100/80 bg-white/90 p-3 text-xs text-neutral-800 shadow-sm">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <div className="font-medium text-neutral-900">
-                  {application.role || 'Role not set'}
+        {/* Summary - only when we have an originating application */}
+        {!isAddMode && application && (
+          <div className="relative z-10 px-5 pt-4">
+            <div className="rounded-xl border border-emerald-100/80 bg-white/90 p-3 text-xs text-neutral-800 shadow-sm">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <div className="font-medium text-neutral-900">
+                    {application.role || 'Role not set'}
+                  </div>
+                  <div className="text-neutral-600">{application.company}</div>
                 </div>
-                <div className="text-neutral-600">{application.company}</div>
+                {application.status && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-800">
+                    <Trophy className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span>Offer</span>
+                  </span>
+                )}
               </div>
-              {application.status && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-800">
-                  <Trophy className="h-3.5 w-3.5" aria-hidden="true" />
-                  <span>Offer</span>
-                </span>
-              )}
-            </div>
 
-            <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-neutral-600">
-              {application.location && (
-                <span className="inline-flex items-center gap-1.5">
-                  <MapPin
-                    className="h-3.5 w-3.5 text-neutral-400"
-                    aria-hidden="true"
-                  />
-                  {application.location}
-                </span>
-              )}
-              {application.appliedOn && (
-                <span className="inline-flex items-center gap-1.5">
-                  <CalendarDays
-                    className="h-3.5 w-3.5 text-neutral-400"
-                    aria-hidden="true"
-                  />
-                  Applied on {application.appliedOn}
-                </span>
-              )}
+              <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-neutral-600">
+                {application.location && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <MapPin
+                      className="h-3.5 w-3.5 text-neutral-400"
+                      aria-hidden="true"
+                    />
+                    {application.location}
+                  </span>
+                )}
+                {application.appliedOn && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <CalendarDays
+                      className="h-3.5 w-3.5 text-neutral-400"
+                      aria-hidden="true"
+                    />
+                    Applied on {application.appliedOn}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Form */}
         <form
@@ -214,6 +249,35 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
           className="relative z-10 max-h-[70vh] space-y-4 overflow-y-auto px-5 py-4"
         >
           <div className="grid gap-4 md:grid-cols-2">
+            {/* Company & role (required) */}
+            <label className="space-y-1 text-sm md:col-span-2">
+              <span className="font-medium text-neutral-800">
+                Company name<span className="text-emerald-500">*</span>
+              </span>
+              <input
+                type="text"
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+                placeholder="Acme GmbH"
+                className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 px-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
+                required
+              />
+            </label>
+
+            <label className="space-y-1 text-sm md:col-span-2">
+              <span className="font-medium text-neutral-800">
+                Role / position<span className="text-emerald-500">*</span>
+              </span>
+              <input
+                type="text"
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                placeholder="Frontend Engineer"
+                className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 px-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
+                required
+              />
+            </label>
+
             {/* Location */}
             <label className="space-y-1 text-sm">
               <span className="font-medium text-neutral-800">Location</span>
@@ -386,7 +450,7 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-300',
               ].join(' ')}
             >
-              Move to accepted
+              {isAddMode ? 'Add accepted offer' : 'Move to accepted'}
             </button>
           </div>
         </form>
