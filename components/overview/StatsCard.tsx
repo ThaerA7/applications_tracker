@@ -1,5 +1,8 @@
-// app/components/JobSearchOverviewCard.tsx
+"use client";
 
+// app/components/StatsCard.tsx
+
+import { useEffect, useMemo, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -20,34 +23,42 @@ import {
   TrendingUp,
 } from "lucide-react";
 
-const weeklyActivity = [
-  { day: "Mon", applications: 4, interviews: 1 },
-  { day: "Tue", applications: 3, interviews: 0 },
-  { day: "Wed", applications: 5, interviews: 1 },
-  { day: "Thu", applications: 2, interviews: 0 },
-  { day: "Fri", applications: 4, interviews: 2 },
-  { day: "Sat", applications: 1, interviews: 0 },
-  { day: "Sun", applications: 0, interviews: 0 },
-];
+/**
+ * Storage keys used across your pages
+ */
+const APPLIED_STORAGE_KEY = "job-tracker:applied"; // optional / future-proof
+const INTERVIEWS_STORAGE_KEY = "job-tracker:interviews";
+const REJECTIONS_STORAGE_KEY = "job-tracker:rejected";
+const WITHDRAWN_STORAGE_KEY = "job-tracker:withdrawn";
+const OFFERS_RECEIVED_STORAGE_KEY = "job-tracker:offers-received";
+const LEGACY_ACCEPTED_STORAGE_KEY = "job-tracker:accepted";
 
-const conversionOverTime = [
-  { label: "Week 1", applications: 18, interviews: 4, offers: 1 },
-  { label: "Week 2", applications: 21, interviews: 5, offers: 1 },
-  { label: "Week 3", applications: 16, interviews: 3, offers: 0 },
-  { label: "Week 4", applications: 19, interviews: 6, offers: 2 },
-];
+/**
+ * Lightweight shapes for analytics
+ * (we keep these loose to avoid coupling to many component-level types)
+ */
+type AnyRecord = Record<string, any>;
 
-const kpi = {
-  totalApplications: 62,
-  totalInterviews: 14,
-  totalOffers: 3,
-  totalRejected: 18,
-  totalWithdrawn: 5,
-  responseRate: 68,
-  interviewRate: 23,
-  weeklyApplications: 19,
-  monthlyApplications: 42,
+type OfferReceivedJobLike = {
+  id: string;
+  company: string;
+  role: string;
+  location?: string;
+  appliedOn?: string;
+  employmentType?: string;
+  offerReceivedDate?: string;
+  decisionDate?: string;
+  offerAcceptedDate?: string;
+  offerDeclinedDate?: string;
+  taken?: boolean;
+  startDate?: string;
+  salary?: string;
+  url?: string;
+  logoUrl?: string;
+  notes?: string;
 };
+
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
 const tooltipStyle = {
   backgroundColor: "rgba(255,255,255,0.96)",
@@ -58,7 +69,433 @@ const tooltipStyle = {
   padding: "8px 10px",
 };
 
+/**
+ * Safe localStorage read
+ */
+function readList<T = AnyRecord>(key: string): T[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as T[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Parse date-like strings robustly.
+ * Accepts:
+ * - YYYY-MM-DD
+ * - YYYY-MM-DDTHH:mm
+ * - full ISO
+ */
+function toDate(input?: string | null): Date | null {
+  if (!input) return null;
+
+  // Normalize common short format
+  // Date("YYYY-MM-DD") is generally safe in modern browsers, but we keep a fallback.
+  const d = new Date(input);
+  if (!Number.isNaN(d.getTime())) return d;
+
+  // Fallback manual parse for YYYY-MM-DD
+  const [datePart] = String(input).split("T");
+  const [y, m, day] = datePart.split("-").map((n) => Number(n));
+  if (!y || !m || !day) return null;
+  const manual = new Date(y, m - 1, day);
+  return Number.isNaN(manual.getTime()) ? null : manual;
+}
+
+/**
+ * Monday-based week helpers
+ */
+function startOfWeekMonday(date: Date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const jsDay = d.getDay(); // 0 Sun ... 6 Sat
+  const mondayIndex = (jsDay + 6) % 7; // Mon=0 ... Sun=6
+  d.setDate(d.getDate() - mondayIndex);
+  return d;
+}
+
+function addDays(date: Date, days: number) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+function isWithinRange(d: Date, start: Date, endExclusive: Date) {
+  return d.getTime() >= start.getTime() && d.getTime() < endExclusive.getTime();
+}
+
+function getMondayWeekdayIndex(d: Date) {
+  return (d.getDay() + 6) % 7; // Mon=0 ... Sun=6
+}
+
+/**
+ * Extract "applied" date across lists (different property names)
+ */
+function getAppliedDateFromRecord(r: AnyRecord): string | undefined {
+  return (
+    r.appliedOn ||
+    r.appliedDate || // rejected uses appliedDate
+    r.applied_date ||
+    undefined
+  );
+}
+
+/**
+ * Offers normalization (mirrors your OffersReceivedPage intent)
+ */
+function normalizeOffers(list: OfferReceivedJobLike[]) {
+  return list.map((j) => {
+    const offerReceivedDate = j.offerReceivedDate ?? j.decisionDate ?? undefined;
+
+    const offerAcceptedDate =
+      j.offerAcceptedDate && String(j.offerAcceptedDate).trim() !== ""
+        ? j.offerAcceptedDate
+        : undefined;
+
+    const offerDeclinedDate =
+      j.offerDeclinedDate && String(j.offerDeclinedDate).trim() !== ""
+        ? j.offerDeclinedDate
+        : undefined;
+
+    const finalAccepted = offerAcceptedDate;
+    const finalDeclined = finalAccepted ? undefined : offerDeclinedDate;
+
+    const taken = finalAccepted ? true : Boolean(j.taken);
+
+    return {
+      ...j,
+      offerReceivedDate,
+      offerAcceptedDate: finalAccepted,
+      offerDeclinedDate: finalDeclined,
+      taken,
+    };
+  });
+}
+
+/**
+ * Build weekly activity for current week:
+ * - applications counted by appliedOn/appliedDate across all lists
+ * - interviews counted by interview.date
+ */
+function buildWeeklyActivity(params: {
+  now: Date;
+  applied: AnyRecord[];
+  interviews: AnyRecord[];
+  rejected: AnyRecord[];
+  withdrawn: AnyRecord[];
+  offers: OfferReceivedJobLike[];
+}) {
+  const { now, applied, interviews, rejected, withdrawn, offers } = params;
+
+  const weekStart = startOfWeekMonday(now);
+  const weekEnd = addDays(weekStart, 7);
+
+  const rows = WEEKDAYS.map((day) => ({
+    day,
+    applications: 0,
+    interviews: 0,
+  }));
+
+  const allForAppliedDate = [
+    ...applied,
+    ...interviews,
+    ...rejected,
+    ...withdrawn,
+    ...offers,
+  ];
+
+  for (const r of allForAppliedDate) {
+    const appliedStr = getAppliedDateFromRecord(r);
+    const d = toDate(appliedStr);
+    if (!d) continue;
+
+    if (isWithinRange(d, weekStart, weekEnd)) {
+      const idx = getMondayWeekdayIndex(d);
+      rows[idx].applications += 1;
+    }
+  }
+
+  for (const i of interviews) {
+    const d = toDate(i.date);
+    if (!d) continue;
+
+    if (isWithinRange(d, weekStart, weekEnd)) {
+      const idx = getMondayWeekdayIndex(d);
+      rows[idx].interviews += 1;
+    }
+  }
+
+  return rows;
+}
+
+/**
+ * Build month buckets:
+ * Week 1 = days 1-7
+ * Week 2 = 8-14
+ * Week 3 = 15-21
+ * Week 4 = 22-end
+ */
+function getMonthWeekBucket(dayOfMonth: number) {
+  if (dayOfMonth <= 7) return 0;
+  if (dayOfMonth <= 14) return 1;
+  if (dayOfMonth <= 21) return 2;
+  return 3;
+}
+
+function buildConversionOverTime(params: {
+  now: Date;
+  applied: AnyRecord[];
+  interviews: AnyRecord[];
+  rejected: AnyRecord[];
+  withdrawn: AnyRecord[];
+  offers: OfferReceivedJobLike[];
+}) {
+  const { now, applied, interviews, rejected, withdrawn, offers } = params;
+
+  const year = now.getFullYear();
+  const month = now.getMonth(); // 0-based
+
+  const buckets = [
+    { label: "Week 1", applications: 0, interviews: 0, offers: 0 },
+    { label: "Week 2", applications: 0, interviews: 0, offers: 0 },
+    { label: "Week 3", applications: 0, interviews: 0, offers: 0 },
+    { label: "Week 4", applications: 0, interviews: 0, offers: 0 },
+  ];
+
+  const allForAppliedDate = [
+    ...applied,
+    ...interviews,
+    ...rejected,
+    ...withdrawn,
+    ...offers,
+  ];
+
+  for (const r of allForAppliedDate) {
+    const appliedStr = getAppliedDateFromRecord(r);
+    const d = toDate(appliedStr);
+    if (!d) continue;
+
+    if (d.getFullYear() === year && d.getMonth() === month) {
+      const bucket = getMonthWeekBucket(d.getDate());
+      buckets[bucket].applications += 1;
+    }
+  }
+
+  for (const i of interviews) {
+    const d = toDate(i.date);
+    if (!d) continue;
+
+    if (d.getFullYear() === year && d.getMonth() === month) {
+      const bucket = getMonthWeekBucket(d.getDate());
+      buckets[bucket].interviews += 1;
+    }
+  }
+
+  for (const o of offers) {
+    const d =
+      toDate(o.offerReceivedDate) ||
+      toDate(o.decisionDate) ||
+      null;
+
+    if (!d) continue;
+
+    if (d.getFullYear() === year && d.getMonth() === month) {
+      const bucket = getMonthWeekBucket(d.getDate());
+      buckets[bucket].offers += 1;
+    }
+  }
+
+  return buckets;
+}
+
+function countAppliedInRange(
+  records: AnyRecord[],
+  offers: OfferReceivedJobLike[],
+  start: Date,
+  endExclusive: Date
+) {
+  const all = [...records, ...offers];
+  let count = 0;
+
+  for (const r of all) {
+    const appliedStr = getAppliedDateFromRecord(r);
+    const d = toDate(appliedStr);
+    if (!d) continue;
+    if (isWithinRange(d, start, endExclusive)) count += 1;
+  }
+
+  return count;
+}
+
 export default function JobSearchOverviewCard() {
+  const [applied, setApplied] = useState<AnyRecord[]>([]);
+  const [interviews, setInterviews] = useState<AnyRecord[]>([]);
+  const [rejected, setRejected] = useState<AnyRecord[]>([]);
+  const [withdrawn, setWithdrawn] = useState<AnyRecord[]>([]);
+  const [offers, setOffers] = useState<OfferReceivedJobLike[]>([]);
+
+  // Load all data on mount + react to storage changes
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const load = () => {
+      const appliedList = readList(APPLIED_STORAGE_KEY);
+
+      const interviewsList = readList(INTERVIEWS_STORAGE_KEY);
+      const rejectedList = readList(REJECTIONS_STORAGE_KEY);
+      const withdrawnList = readList(WITHDRAWN_STORAGE_KEY);
+
+      // Offers: prefer new key, but allow legacy accepted migration presence
+      const offersNew = readList<OfferReceivedJobLike>(
+        OFFERS_RECEIVED_STORAGE_KEY
+      );
+      const offersLegacy = readList<OfferReceivedJobLike>(
+        LEGACY_ACCEPTED_STORAGE_KEY
+      );
+
+      const normalizedOffers = normalizeOffers(
+        offersNew.length > 0 ? offersNew : offersLegacy
+      );
+
+      setApplied(appliedList);
+      setInterviews(interviewsList);
+      setRejected(rejectedList);
+      setWithdrawn(withdrawnList);
+      setOffers(normalizedOffers);
+    };
+
+    load();
+
+    const onStorage = (e: StorageEvent) => {
+      if (!e.key) return;
+      if (
+        [
+          APPLIED_STORAGE_KEY,
+          INTERVIEWS_STORAGE_KEY,
+          REJECTIONS_STORAGE_KEY,
+          WITHDRAWN_STORAGE_KEY,
+          OFFERS_RECEIVED_STORAGE_KEY,
+          LEGACY_ACCEPTED_STORAGE_KEY,
+        ].includes(e.key)
+      ) {
+        load();
+      }
+    };
+
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  const now = useMemo(() => new Date(), [
+    // re-rendering of this component from parents will refresh "now";
+    // that's enough for a stats overview card.
+  ]);
+
+  const weeklyActivity = useMemo(
+    () =>
+      buildWeeklyActivity({
+        now,
+        applied,
+        interviews,
+        rejected,
+        withdrawn,
+        offers,
+      }),
+    [now, applied, interviews, rejected, withdrawn, offers]
+  );
+
+  const conversionOverTime = useMemo(
+    () =>
+      buildConversionOverTime({
+        now,
+        applied,
+        interviews,
+        rejected,
+        withdrawn,
+        offers,
+      }),
+    [now, applied, interviews, rejected, withdrawn, offers]
+  );
+
+  const kpi = useMemo(() => {
+    const totalApplied = applied.length;
+    const totalInterviews = interviews.length;
+    const totalRejected = rejected.length;
+    const totalWithdrawn = withdrawn.length;
+
+    // Offers board contains accepted/declined/pending; we count all as offers received entries
+    const totalOffers = offers.length;
+
+    // Pipeline-total style number (assumes items live in exactly one list after moves)
+    const totalApplications =
+      totalApplied +
+      totalInterviews +
+      totalOffers +
+      totalRejected +
+      totalWithdrawn;
+
+    // A pragmatic "response" approximation:
+    // interviews + rejected + offers are responses.
+    const responded = totalInterviews + totalRejected + totalOffers;
+
+    const responseRate =
+      totalApplications > 0
+        ? Math.round((responded / totalApplications) * 100)
+        : 0;
+
+    const interviewRate =
+      totalApplications > 0
+        ? Math.round((totalInterviews / totalApplications) * 100)
+        : 0;
+
+    // Weekly/monthly applied counts based on appliedOn/appliedDate across all lists
+    const weekStart = startOfWeekMonday(now);
+    const weekEnd = addDays(weekStart, 7);
+
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    monthStart.setHours(0, 0, 0, 0);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    monthEnd.setHours(0, 0, 0, 0);
+
+    const allRecordsForApplied = [
+      ...applied,
+      ...interviews,
+      ...rejected,
+      ...withdrawn,
+    ];
+
+    const weeklyApplications = countAppliedInRange(
+      allRecordsForApplied,
+      offers,
+      weekStart,
+      weekEnd
+    );
+
+    const monthlyApplications = countAppliedInRange(
+      allRecordsForApplied,
+      offers,
+      monthStart,
+      monthEnd
+    );
+
+    return {
+      totalApplications,
+      totalInterviews,
+      totalOffers,
+      totalRejected,
+      totalWithdrawn,
+      responseRate,
+      interviewRate,
+      weeklyApplications,
+      monthlyApplications,
+    };
+  }, [now, applied, interviews, rejected, withdrawn, offers]);
+
   return (
     <section
       className={[
@@ -87,7 +524,7 @@ export default function JobSearchOverviewCard() {
             </p>
           </div>
 
-          {/* Quick actions */}
+          {/* Quick actions (kept UI-only here) */}
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -181,8 +618,7 @@ export default function JobSearchOverviewCard() {
                 </span>
               </span>
               <span className="rounded-full bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700">
-                {kpi.totalOffers} offer
-                {kpi.totalOffers === 1 ? "" : "s"}
+                {kpi.totalOffers} offer{kpi.totalOffers === 1 ? "" : "s"}
               </span>
             </div>
           </div>
@@ -235,7 +671,7 @@ export default function JobSearchOverviewCard() {
                 </div>
                 <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700">
                   <TrendingUp className="h-3 w-3" />
-                  <span>+12% vs last week</span>
+                  <span>Live from your boards</span>
                 </span>
               </div>
               <div className="mt-3 h-32">
