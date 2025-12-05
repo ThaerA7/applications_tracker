@@ -120,9 +120,8 @@ export default function UpcomingCard() {
       if (interviewDateOnly) {
         const time = extractTime(item.interviewDate);
         addEvent({
-          id: `interview-from-withdrawn-${
-            item.id ?? item.interviewDate ?? interviewDateOnly
-          }`,
+          id: `interview-from-withdrawn-${item.id ?? item.interviewDate ?? interviewDateOnly
+            }`,
           date: interviewDateOnly,
           kind: "interview",
           title: item.company || "Interview",
@@ -195,9 +194,8 @@ export default function UpcomingCard() {
     // Deduplicate by (kind, date, title, subtitle, time)
     const map = new Map<string, CalendarEvent>();
     for (const ev of collected) {
-      const key = `${ev.kind}-${ev.date}-${ev.title}-${ev.subtitle ?? ""}-${
-        ev.time ?? ""
-      }`;
+      const key = `${ev.kind}-${ev.date}-${ev.title}-${ev.subtitle ?? ""}-${ev.time ?? ""
+        }`;
       if (!map.has(key)) {
         map.set(key, ev);
       }
@@ -276,11 +274,13 @@ export default function UpcomingCard() {
       <section
         className={[
           "relative overflow-hidden rounded-2xl border border-emerald-100",
-          "bg-gradient-to-br from-emerald-50 via-white to-teal-50",
+          // was: from-emerald-50 via-white to-teal-50
+          "bg-gradient-to-br from-emerald-50 via-white to-sky-50",
           "p-5 shadow-md",
         ].join(" ")}
       >
-        {/* subtle blob like other cards */}
+        <div className="pointer-events-none absolute -top-16 -right-16 h-40 w-40 rounded-full bg-emerald-400/15 blur-3xl" />
+
         <div className="pointer-events-none absolute -top-16 -right-16 h-40 w-40 rounded-full bg-emerald-400/15 blur-3xl" />
 
         <div className="relative z-10">

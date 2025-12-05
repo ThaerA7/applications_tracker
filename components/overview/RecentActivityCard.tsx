@@ -264,11 +264,14 @@ export default function RecentActivityCard() {
     <section
       className={[
         "relative overflow-hidden rounded-2xl border border-neutral-200/70",
-        "bg-gradient-to-br from-white via-slate-50 to-sky-50",
+        // was: from-white via-slate-50 to-sky-50
+        "bg-gradient-to-br from-slate-50 via-white to-indigo-50",
         "p-5 shadow-md",
       ].join(" ")}
     >
-      <div className="pointer-events-none absolute -bottom-20 -right-16 h-56 w-56 rounded-full bg-sky-400/15 blur-3xl" />
+      {/* was sky blob */}
+      <div className="pointer-events-none absolute -bottom-20 -right-16 h-56 w-56 rounded-full bg-indigo-400/15 blur-3xl" />
+
 
       <div className="relative z-10">
         <div className="flex items-center justify-between gap-2">
@@ -310,12 +313,12 @@ export default function RecentActivityCard() {
                 item.category === "applied"
                   ? "bg-sky-500"
                   : item.category === "interview"
-                  ? "bg-emerald-500"
-                  : item.category === "rejected"
-                  ? "bg-rose-500"
-                  : item.category === "withdrawn"
-                  ? "bg-amber-500"
-                  : "bg-lime-500"; // offer
+                    ? "bg-emerald-500"
+                    : item.category === "rejected"
+                      ? "bg-rose-500"
+                      : item.category === "withdrawn"
+                        ? "bg-amber-500"
+                        : "bg-lime-500"; // offer
 
               return (
                 <li

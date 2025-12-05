@@ -497,15 +497,20 @@ export default function JobSearchOverviewCard() {
   }, [now, applied, interviews, rejected, withdrawn, offers]);
 
   return (
+    // outer section
     <section
       className={[
         "relative overflow-hidden rounded-2xl border border-neutral-200/70",
-        "bg-gradient-to-br from-sky-50 via-white to-emerald-50",
+        // was: from-sky-50 via-white to-emerald-50
+        "bg-gradient-to-br from-indigo-50 via-white to-sky-50",
         "p-6 sm:p-7 shadow-md",
       ].join(" ")}
     >
-      <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-sky-400/15 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-emerald-400/15 blur-3xl" />
+      {/* blobs */}
+      {/* was: sky + emerald */}
+      <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-indigo-400/15 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-sky-400/15 blur-3xl" />
+
 
       <div className="relative z-10 space-y-5">
         {/* Header row: title + quick actions aligned */}

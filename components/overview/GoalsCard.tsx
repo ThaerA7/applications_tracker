@@ -202,7 +202,8 @@ export default function GoalsCard() {
         current: interviewsCount,
         target: settings.interviews.target,
         periodDays: settings.interviews.periodDays,
-        accent: "from-sky-500 to-cyan-400",
+        // was: from-sky-500 to-cyan-400
+        accent: "from-indigo-500 to-sky-400",
         hint: "Counted by interview date",
       },
       {
@@ -211,11 +212,13 @@ export default function GoalsCard() {
         current: offersCount,
         target: settings.offers.target,
         periodDays: settings.offers.periodDays,
-        accent: "from-amber-500 to-orange-400",
+        // was: from-amber-500 to-orange-400
+        accent: "from-emerald-500 to-teal-400",
         hint: "Counted by offer received date",
       },
     ];
   }, [interviewsCount, offersCount, settings]);
+
 
   const openSingleSettings = (key: SingleGoalKey) => {
     setSettingsKey(key);
@@ -267,9 +270,8 @@ export default function GoalsCard() {
     1
   );
 
-  const streakBadge = `Nice! You scheduled ${weeklyCount} interview${
-    weeklyCount === 1 ? "" : "s"
-  } this week 🎉`;
+  const streakBadge = `Nice! You scheduled ${weeklyCount} interview${weeklyCount === 1 ? "" : "s"
+    } this week 🎉`;
 
   return (
     <>
@@ -281,8 +283,8 @@ export default function GoalsCard() {
           settingsMode === "overview"
             ? "Set weekly & monthly goals"
             : settingsKey === "offers"
-            ? "Set offers goal"
-            : "Set interviews goal"
+              ? "Set offers goal"
+              : "Set interviews goal"
         }
         description={
           settingsMode === "overview"
@@ -292,15 +294,15 @@ export default function GoalsCard() {
         initialValues={
           settingsMode === "overview"
             ? {
-                weeklyTarget: settings.overview.weeklyTarget,
-                monthlyTarget: settings.overview.monthlyTarget,
-              }
+              weeklyTarget: settings.overview.weeklyTarget,
+              monthlyTarget: settings.overview.monthlyTarget,
+            }
             : settingsKey === "offers"
-            ? {
+              ? {
                 target: settings.offers.target,
                 periodDays: settings.offers.periodDays,
               }
-            : {
+              : {
                 target: settings.interviews.target,
                 periodDays: settings.interviews.periodDays,
               }
@@ -318,18 +320,22 @@ export default function GoalsCard() {
       <section
         className={[
           "relative overflow-hidden rounded-2xl border border-neutral-200/70",
-          "bg-gradient-to-br from-amber-50 via-white to-sky-50",
+          // was: from-amber-50 via-white to-sky-50
+          "bg-gradient-to-br from-indigo-50 via-white to-emerald-50",
           "p-6 sm:p-7 shadow-md",
         ].join(" ")}
       >
-        <div className="pointer-events-none absolute -top-24 -left-24 h-64 w-64 rounded-full bg-amber-400/20 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-24 -right-24 h-64 w-64 rounded-full bg-sky-400/20 blur-3xl" />
+        {/* blobs */}
+        {/* was amber + sky */}
+        <div className="pointer-events-none absolute -top-24 -left-24 h-64 w-64 rounded-full bg-indigo-400/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 -right-24 h-64 w-64 rounded-full bg-emerald-400/20 blur-3xl" />
+
 
         <div className="relative z-10 space-y-5">
           {/* Header + streak */}
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-amber-100 bg-white/80 px-3 py-1 text-xs font-medium text-amber-700 shadow-sm">
+              <div className="inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-white/80 px-3 py-1 text-xs font-medium text-indigo-700 shadow-sm">
                 <Target className="h-3.5 w-3.5" />
                 <span>Goals & progress</span>
               </div>

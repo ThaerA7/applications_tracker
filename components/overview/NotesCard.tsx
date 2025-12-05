@@ -164,12 +164,12 @@ export default function NotesOverviewCard() {
         return prev.map((n) =>
           n.id === editingNote.id
             ? {
-                ...editingNote,
-                title,
-                preview: content,
-                tags,
-                color: dialogColor,
-              }
+              ...editingNote,
+              title,
+              preview: content,
+              tags,
+              color: dialogColor,
+            }
             : n
         );
       }
@@ -208,15 +208,19 @@ export default function NotesOverviewCard() {
       <section
         className={[
           "relative overflow-hidden rounded-2xl border border-neutral-200/70",
-          "bg-gradient-to-br from-white via-slate-50 to-amber-50",
+          // was: from-white via-slate-50 to-amber-50
+          "bg-gradient-to-br from-indigo-50 via-white to-violet-50",
           "p-5 shadow-md",
         ].join(" ")}
       >
-        <div className="pointer-events-none absolute -top-16 -left-20 h-48 w-48 rounded-full bg-amber-400/15 blur-3xl" />
+        {/* blob */}
+        {/* was amber */}
+        <div className="pointer-events-none absolute -top-16 -left-20 h-48 w-48 rounded-full bg-indigo-400/15 blur-3xl" />
+
         <div className="relative z-10">
           <div className="flex items-center justify-between gap-2">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-amber-100 bg-white/80 px-3 py-1 text-xs font-medium text-amber-700 shadow-sm">
+              <div className="inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-white/80 px-3 py-1 text-xs font-medium text-indigo-700 shadow-sm">
                 <FileText className="h-3.5 w-3.5" />
                 <span>Notes</span>
               </div>
@@ -359,13 +363,11 @@ export default function NotesOverviewCard() {
                         onClick={() => setDialogColor(c)}
                         aria-label={`Set note color: ${c}`}
                         aria-pressed={selected}
-                        className={`h-7 w-7 rounded-full border transition ${
-                          selected ? `ring-2 ${COLOR_STYLES[c].ring}` : "ring-0"
-                        } ${
-                          c === "yellow" || c === "gray"
+                        className={`h-7 w-7 rounded-full border transition ${selected ? `ring-2 ${COLOR_STYLES[c].ring}` : "ring-0"
+                          } ${c === "yellow" || c === "gray"
                             ? "border-neutral-300"
                             : "border-transparent"
-                        }`}
+                          }`}
                         style={{ background: getColorHex(c) }}
                         title={c}
                       />
