@@ -1,7 +1,7 @@
-// components/MoveToAcceptedDialog.tsx
-'use client';
+// components/dialogs/MoveToAcceptedDialog.tsx
+"use client";
 
-import { useEffect, useState, type FC, type FormEvent } from 'react';
+import { useEffect, useState, type FC, type FormEvent } from "react";
 import {
   CalendarDays,
   MapPin,
@@ -10,7 +10,8 @@ import {
   FileText,
   Trophy,
   Link as LinkIcon,
-} from 'lucide-react';
+  CheckCircle2,
+} from "lucide-react";
 
 export type AcceptedDetails = {
   company: string;
@@ -18,7 +19,23 @@ export type AcceptedDetails = {
   location?: string;
   appliedOn?: string;
   employmentType?: string;
+
+  /**
+   * Legacy field kept for compatibility.
+   * We will also set this to offerReceivedDate on submit.
+   */
   decisionDate?: string;
+
+  /**
+   * ✅ NEW
+   */
+  offerReceivedDate?: string;
+
+  /**
+   * ✅ NEW
+   */
+  offerAcceptedDate?: string;
+
   startDate?: string;
   salary?: string;
   url?: string;
@@ -26,7 +43,7 @@ export type AcceptedDetails = {
   notes?: string;
 };
 
-type MoveToAcceptedDialogMode = 'move' | 'add' | 'edit';
+type MoveToAcceptedDialogMode = "move" | "add" | "edit";
 
 type MoveToAcceptedDialogProps = {
   open: boolean;
@@ -43,6 +60,10 @@ type MoveToAcceptedDialogProps = {
         offerUrl?: string;
         logoUrl?: string;
         notes?: string;
+
+        decisionDate?: string;
+        offerReceivedDate?: string;
+        offerAcceptedDate?: string;
       }
     | null;
   onAcceptedCreated: (details: AcceptedDetails) => void;
@@ -54,53 +75,66 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
   onClose,
   application = null,
   onAcceptedCreated,
-  mode = 'move',
+  mode = "move",
 }) => {
-  const [company, setCompany] = useState('');
-  const [role, setRole] = useState('');
-  const [location, setLocation] = useState('');
-  const [appliedOn, setAppliedOn] = useState('');
-  const [employmentType, setEmploymentType] = useState('');
-  const [decisionDate, setDecisionDate] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [salary, setSalary] = useState('');
-  const [url, setUrl] = useState('');
-  const [notes, setNotes] = useState('');
+  const [company, setCompany] = useState("");
+  const [role, setRole] = useState("");
+  const [location, setLocation] = useState("");
+  const [appliedOn, setAppliedOn] = useState("");
+  const [employmentType, setEmploymentType] = useState("");
+
+  const [offerReceivedDate, setOfferReceivedDate] = useState("");
+  const [offerAcceptedDate, setOfferAcceptedDate] = useState("");
+
+  const [startDate, setStartDate] = useState("");
+  const [salary, setSalary] = useState("");
+  const [url, setUrl] = useState("");
+  const [notes, setNotes] = useState("");
 
   useEffect(() => {
     if (!open) return;
 
     const today = new Date();
     const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
     const todayIso = `${yyyy}-${mm}-${dd}`;
 
     if (application) {
-      setCompany(application.company ?? '');
-      setRole(application.role ?? '');
-      setLocation(application.location ?? '');
-      setAppliedOn(application.appliedOn ?? '');
-      setEmploymentType(application.employmentType ?? '');
-      setUrl(application.offerUrl ?? '');
-      setNotes(application.notes ?? '');
+      setCompany(application.company ?? "");
+      setRole(application.role ?? "");
+      setLocation(application.location ?? "");
+      setAppliedOn(application.appliedOn ?? "");
+      setEmploymentType(application.employmentType ?? "");
+      setUrl(application.offerUrl ?? "");
+      setNotes(application.notes ?? "");
+
+      const received =
+        application.offerReceivedDate ??
+        application.decisionDate ??
+        "";
+
+      setOfferReceivedDate(received);
+      setOfferAcceptedDate(application.offerAcceptedDate ?? "");
     } else {
-      setCompany('');
-      setRole('');
-      setLocation('');
-      setAppliedOn('');
-      setEmploymentType('');
-      setUrl('');
-      setNotes('');
+      setCompany("");
+      setRole("");
+      setLocation("");
+      setAppliedOn("");
+      setEmploymentType("");
+      setUrl("");
+      setNotes("");
+
+      setOfferReceivedDate(todayIso);
+      setOfferAcceptedDate("");
     }
 
-    setDecisionDate(todayIso);
-    setStartDate('');
-    setSalary('');
+    setStartDate("");
+    setSalary("");
   }, [open, application]);
 
   if (!open) return null;
-  if (mode === 'move' && !application) return null;
+  if (mode === "move" && !application) return null;
 
   const canSubmit =
     company.trim().length > 0 && role.trim().length > 0;
@@ -109,13 +143,20 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
     e.preventDefault();
     if (!canSubmit) return;
 
+    const receivedClean = offerReceivedDate.trim() || undefined;
+    const acceptedClean = offerAcceptedDate.trim() || undefined;
+
     onAcceptedCreated({
       company: company.trim(),
       role: role.trim(),
       location: location.trim() || undefined,
       appliedOn: appliedOn.trim() || undefined,
       employmentType: employmentType.trim() || undefined,
-      decisionDate: decisionDate.trim() || undefined,
+
+      offerReceivedDate: receivedClean,
+      decisionDate: receivedClean,
+      offerAcceptedDate: acceptedClean,
+
       startDate: startDate.trim() || undefined,
       salary: salary.trim() || undefined,
       url: url.trim() || application?.offerUrl || undefined,
@@ -126,20 +167,26 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
     onClose();
   };
 
-  const isAddMode = mode === 'add';
-  const isEditMode = mode === 'edit';
+  const isAddMode = mode === "add";
+  const isEditMode = mode === "edit";
 
   const title = isEditMode
-    ? 'Edit accepted offer'
+    ? "Edit offer"
     : isAddMode
-    ? 'Add accepted offer'
-    : 'Move to accepted section';
+    ? "Add offer"
+    : "Move offer";
 
   const description = isEditMode
-    ? 'Update the details of this accepted offer.'
+    ? "Update the details of this offer."
     : isAddMode
-    ? 'Manually add a job or Ausbildung offer you have accepted.'
-    : 'Capture the final offer details and celebrate this win.';
+    ? "Manually add an offer you received."
+    : "Capture the final offer details and celebrate this win.";
+
+  const submitLabel = isEditMode
+    ? "Save changes"
+    : isAddMode
+    ? "Add offer"
+    : "Move offer";
 
   return (
     <div className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[12000] flex items-center justify-center px-4 py-8">
@@ -156,9 +203,9 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
         aria-modal="true"
         aria-labelledby="move-to-accepted-title"
         className={[
-          'relative z-10 w-full max-w-2xl overflow-hidden rounded-2xl border border-emerald-200/80',
-          'bg-gradient-to-br from-emerald-50 via-white to-lime-50 shadow-2xl backdrop-blur-sm',
-        ].join(' ')}
+          "relative z-10 w-full max-w-2xl overflow-hidden rounded-2xl border border-emerald-200/80",
+          "bg-gradient-to-br from-emerald-50 via-white to-lime-50 shadow-2xl backdrop-blur-sm",
+        ].join(" ")}
         onClick={(e) => e.stopPropagation()}
       >
         {/* soft blobs */}
@@ -170,7 +217,7 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
           <div className="flex items-center gap-2">
             <img
               src="/icons/accepted.png"
-              alt="Accepted icon"
+              alt="Offer icon"
               className="h-9 w-9 md:h-10 md:w-10 object-contain"
             />
             <div>
@@ -190,11 +237,11 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
             type="button"
             onClick={onClose}
             className={[
-              'inline-flex h-8 w-8 items-center justify-center rounded-full',
-              'border border-neutral-200 bg-white/80 text-neutral-500 shadow-sm',
-              'hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300',
-            ].join(' ')}
-            aria-label="Close move to accepted dialog"
+              "inline-flex h-8 w-8 items-center justify-center rounded-full",
+              "border border-neutral-200 bg-white/80 text-neutral-500 shadow-sm",
+              "hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300",
+            ].join(" ")}
+            aria-label="Close dialog"
           >
             <X className="h-4 w-4" aria-hidden="true" />
           </button>
@@ -207,9 +254,11 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
               <div className="flex items-center justify-between gap-2">
                 <div>
                   <div className="font-medium text-neutral-900">
-                    {application.role || 'Role not set'}
+                    {application.role || "Role not set"}
                   </div>
-                  <div className="text-neutral-600">{application.company}</div>
+                  <div className="text-neutral-600">
+                    {application.company}
+                  </div>
                 </div>
                 {application.status && (
                   <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-800">
@@ -316,10 +365,10 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
               </div>
             </label>
 
-            {/* Decision date */}
+            {/* Offer received date */}
             <label className="space-y-1 text-sm">
               <span className="font-medium text-neutral-800">
-                Decision date (offer accepted)
+                Offer received date
               </span>
               <div className="relative">
                 <CalendarDays
@@ -328,8 +377,27 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
                 />
                 <input
                   type="date"
-                  value={decisionDate}
-                  onChange={(e) => setDecisionDate(e.target.value)}
+                  value={offerReceivedDate}
+                  onChange={(e) => setOfferReceivedDate(e.target.value)}
+                  className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
+                />
+              </div>
+            </label>
+
+            {/* Offer accepted date */}
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-neutral-800">
+                Offer accepted date
+              </span>
+              <div className="relative">
+                <CheckCircle2
+                  className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
+                  aria-hidden="true"
+                />
+                <input
+                  type="date"
+                  value={offerAcceptedDate}
+                  onChange={(e) => setOfferAcceptedDate(e.target.value)}
                   className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
                 />
               </div>
@@ -337,7 +405,9 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
 
             {/* Start date */}
             <label className="space-y-1 text-sm">
-              <span className="font-medium text-neutral-800">Start date</span>
+              <span className="font-medium text-neutral-800">
+                Start date
+              </span>
               <div className="relative">
                 <CalendarDays
                   className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
@@ -352,9 +422,11 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
               </div>
             </label>
 
-            {/* Applied on (optional, editable) */}
+            {/* Applied on */}
             <label className="space-y-1 text-sm">
-              <span className="font-medium text-neutral-800">Applied on</span>
+              <span className="font-medium text-neutral-800">
+                Applied on
+              </span>
               <div className="relative">
                 <CalendarDays
                   className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
@@ -419,10 +491,6 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
                   className="w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 pt-2 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
                 />
               </div>
-              <p className="mt-1 text-[11px] text-neutral-500">
-                This note is only for you and will appear on your Accepted page so you
-                remember why this offer was a win for you.
-              </p>
             </label>
           </div>
 
@@ -432,10 +500,10 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
               type="button"
               onClick={onClose}
               className={[
-                'inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium text-neutral-800',
-                'bg-white/80 border border-neutral-200 shadow-sm hover:bg-white',
-                'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-300',
-              ].join(' ')}
+                "inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium text-neutral-800",
+                "bg-white/80 border border-neutral-200 shadow-sm hover:bg-white",
+                "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-300",
+              ].join(" ")}
             >
               Cancel
             </button>
@@ -443,14 +511,14 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
               type="submit"
               disabled={!canSubmit}
               className={[
-                'inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium shadow-sm',
+                "inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium shadow-sm",
                 canSubmit
-                  ? 'bg-emerald-600 text-white hover:bg-emerald-500'
-                  : 'cursor-not-allowed bg-emerald-500/60 text-white/70',
-                'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-300',
-              ].join(' ')}
+                  ? "bg-emerald-600 text-white hover:bg-emerald-500"
+                  : "cursor-not-allowed bg-emerald-500/60 text-white/70",
+                "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-300",
+              ].join(" ")}
             >
-              {isAddMode ? 'Add accepted offer' : 'Move to accepted'}
+              {submitLabel}
             </button>
           </div>
         </form>

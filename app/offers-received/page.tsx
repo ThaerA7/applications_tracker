@@ -20,10 +20,15 @@ import {
   Plus,
   Pencil,
   CheckCircle2,
+  BadgeCheck,
 } from "lucide-react";
+
 import MoveToAcceptedDialog, {
   type AcceptedDetails,
 } from "../../components/dialogs/MoveToAcceptedDialog";
+import OfferAcceptanceTagDialog, {
+  type OfferAcceptanceTagDetails,
+} from "../../components/dialogs/OfferAcceptanceTagDialog";
 
 type OfferReceivedJob = {
   id: string;
@@ -38,11 +43,30 @@ type OfferReceivedJob = {
 
   // meta fields
   appliedOn?: string;
-  decisionDate?: string;
   employmentType?: string;
 
   /**
-   * Whether the user decided to take this offer.
+   * Legacy-ish field previously used as a "company decision date".
+   * Kept for backwards compatibility.
+   */
+  decisionDate?: string;
+
+  /**
+   * ✅ NEW:
+   * When you actually received the offer.
+   * If missing, we fallback to decisionDate during normalization.
+   */
+  offerReceivedDate?: string;
+
+  /**
+   * ✅ NEW:
+   * When you accepted the offer.
+   * If present, this card will appear in the "Taken" toggle.
+   */
+  offerAcceptedDate?: string;
+
+  /**
+   * Legacy boolean.
    * Backwards compatible: missing => treated as not taken.
    */
   taken?: boolean;
@@ -82,9 +106,10 @@ const DEMO_OFFERS_RECEIVED: OfferReceivedJob[] = [
     role: "Frontend Engineer",
     location: "Berlin",
     appliedOn: "2025-10-10",
-    decisionDate: "2025-11-01",
     employmentType: "Full-time",
-    startDate: "12 Jan 2026",
+    offerReceivedDate: "2025-11-01",
+    offerAcceptedDate: "2025-11-03",
+    startDate: "2026-01-12",
     salary: "€65,000 / year",
     url: "https://jobs.example/acme/frontend",
     logoUrl: "/logos/acme.svg",
@@ -97,15 +122,39 @@ const DEMO_OFFERS_RECEIVED: OfferReceivedJob[] = [
     role: "Mobile Developer (Flutter)",
     location: "Remote",
     appliedOn: "2025-09-25",
-    decisionDate: "2025-10-15",
     employmentType: "Ausbildung",
-    startDate: "01 Mar 2026",
+    offerReceivedDate: "2025-10-15",
+    startDate: "2026-03-01",
     salary: "€60,000 / year",
     logoUrl: "/logos/globex.png",
     notes: "Remote-friendly team, strong learning potential.",
     taken: false,
   },
 ];
+
+const isTakenOffer = (i: OfferReceivedJob) =>
+  Boolean(i.offerAcceptedDate) || Boolean(i.taken);
+
+const normalizeOffers = (list: OfferReceivedJob[]) => {
+  return list.map((j) => {
+    const offerReceivedDate =
+      j.offerReceivedDate ?? j.decisionDate ?? undefined;
+
+    const offerAcceptedDate =
+      j.offerAcceptedDate && j.offerAcceptedDate.trim() !== ""
+        ? j.offerAcceptedDate
+        : undefined;
+
+    const taken = offerAcceptedDate ? true : Boolean(j.taken);
+
+    return {
+      ...j,
+      offerReceivedDate,
+      offerAcceptedDate,
+      taken,
+    };
+  });
+};
 
 export default function OffersReceivedPage() {
   const [items, setItems] =
@@ -116,6 +165,10 @@ export default function OffersReceivedPage() {
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingItem, setEditingItem] =
+    useState<OfferReceivedJob | null>(null);
+
+  const [isTagDialogOpen, setIsTagDialogOpen] = useState(false);
+  const [taggingItem, setTaggingItem] =
     useState<OfferReceivedJob | null>(null);
 
   useEffect(() => {
@@ -133,7 +186,12 @@ export default function OffersReceivedPage() {
       if (newRaw) {
         const parsed = JSON.parse(newRaw);
         if (Array.isArray(parsed)) {
-          setItems(parsed);
+          const normalized = normalizeOffers(parsed);
+          setItems(normalized);
+          window.localStorage.setItem(
+            OFFERS_RECEIVED_STORAGE_KEY,
+            JSON.stringify(normalized)
+          );
           return;
         }
       }
@@ -142,11 +200,12 @@ export default function OffersReceivedPage() {
       if (legacyRaw) {
         const parsedLegacy = JSON.parse(legacyRaw);
         if (Array.isArray(parsedLegacy)) {
+          const normalized = normalizeOffers(parsedLegacy);
           window.localStorage.setItem(
             OFFERS_RECEIVED_STORAGE_KEY,
-            JSON.stringify(parsedLegacy)
+            JSON.stringify(normalized)
           );
-          setItems(parsedLegacy);
+          setItems(normalized);
           return;
         }
       }
@@ -169,15 +228,13 @@ export default function OffersReceivedPage() {
   const persist = (next: OfferReceivedJob[]) => {
     if (typeof window === "undefined") return;
     try {
+      const normalized = normalizeOffers(next);
       window.localStorage.setItem(
         OFFERS_RECEIVED_STORAGE_KEY,
-        JSON.stringify(next)
+        JSON.stringify(normalized)
       );
     } catch (err) {
-      console.error(
-        "Failed to persist offers received",
-        err
-      );
+      console.error("Failed to persist offers received", err);
     }
   };
 
@@ -211,40 +268,92 @@ export default function OffersReceivedPage() {
     setEditingItem(null);
   };
 
+  const openTagDialog = (job: OfferReceivedJob) => {
+    setTaggingItem(job);
+    setIsTagDialogOpen(true);
+  };
+
+  const closeTagDialog = () => {
+    setIsTagDialogOpen(false);
+    setTaggingItem(null);
+  };
+
+  const handleTagSave = (details: OfferAcceptanceTagDetails) => {
+    if (!taggingItem) return;
+
+    setItems((prev) => {
+      const next = prev.map((job) => {
+        if (job.id !== taggingItem.id) return job;
+
+        const nextAcceptedDate = details.accepted
+          ? details.offerAcceptedDate || job.offerAcceptedDate
+          : undefined;
+
+        return {
+          ...job,
+          offerAcceptedDate: nextAcceptedDate,
+          taken: Boolean(nextAcceptedDate),
+        };
+      });
+
+      persist(next);
+      return next;
+    });
+
+    closeTagDialog();
+  };
+
   const handleOfferCreated = (details: AcceptedDetails) => {
     setItems((prev) => {
       // Edit existing card
       if (editingItem) {
-        const next = prev.map((job) =>
-          job.id === editingItem.id
-            ? {
-                ...job,
-                company: details.company,
-                role: details.role,
-                location: details.location,
-                startDate: details.startDate || job.startDate,
-                salary: details.salary || job.salary,
-                url: details.url || job.url,
-                logoUrl: details.logoUrl || job.logoUrl,
-                notes:
-                  details.notes !== undefined &&
-                  details.notes !== ""
-                    ? details.notes
-                    : job.notes,
-                appliedOn: details.appliedOn || job.appliedOn,
-                decisionDate:
-                  details.decisionDate || job.decisionDate,
-                employmentType:
-                  details.employmentType || job.employmentType,
-                taken: job.taken ?? false,
-              }
-            : job
-        );
+        const next = prev.map((job) => {
+          if (job.id !== editingItem.id) return job;
+
+          const nextOfferReceived =
+            details.offerReceivedDate ??
+            details.decisionDate ??
+            job.offerReceivedDate ??
+            job.decisionDate;
+
+          const nextOfferAccepted =
+            details.offerAcceptedDate ?? job.offerAcceptedDate;
+
+          return {
+            ...job,
+            company: details.company,
+            role: details.role,
+            location: details.location,
+            startDate: details.startDate || job.startDate,
+            salary: details.salary || job.salary,
+            url: details.url || job.url,
+            logoUrl: details.logoUrl || job.logoUrl,
+            notes:
+              details.notes !== undefined &&
+              details.notes !== ""
+                ? details.notes
+                : job.notes,
+            appliedOn: details.appliedOn || job.appliedOn,
+            employmentType:
+              details.employmentType || job.employmentType,
+
+            offerReceivedDate: nextOfferReceived,
+            decisionDate: nextOfferReceived,
+            offerAcceptedDate: nextOfferAccepted,
+            taken: Boolean(nextOfferAccepted),
+          };
+        });
+
         persist(next);
         return next;
       }
 
       // Add new card
+      const newOfferReceived =
+        details.offerReceivedDate ?? details.decisionDate;
+
+      const newOfferAccepted = details.offerAcceptedDate;
+
       const newItem: OfferReceivedJob = {
         id: `received-${Date.now()}-${Math.random()
           .toString(36)
@@ -258,9 +367,12 @@ export default function OffersReceivedPage() {
         logoUrl: details.logoUrl,
         notes: details.notes,
         appliedOn: details.appliedOn,
-        decisionDate: details.decisionDate,
         employmentType: details.employmentType,
-        taken: false,
+
+        offerReceivedDate: newOfferReceived,
+        decisionDate: newOfferReceived,
+        offerAcceptedDate: newOfferAccepted,
+        taken: Boolean(newOfferAccepted),
       };
 
       const next = [newItem, ...prev];
@@ -274,9 +386,9 @@ export default function OffersReceivedPage() {
 
   const filteredItems = useMemo(() => {
     if (view === "taken") {
-      return items.filter((i) => i.taken);
+      return items.filter(isTakenOffer);
     }
-    return items.filter((i) => !i.taken);
+    return items.filter((i) => !isTakenOffer(i));
   }, [items, view]);
 
   const hasItemsInCurrentView = filteredItems.length > 0;
@@ -289,8 +401,7 @@ export default function OffersReceivedPage() {
         "p-8 shadow-md overflow-hidden",
       ].join(" ")}
     >
-      {/* Add / edit offer received dialog
-          NOTE: keeping the component name for compatibility. */}
+      {/* Add / edit offer received dialog */}
       <MoveToAcceptedDialog
         open={isDialogOpen}
         onClose={handleCloseDialog}
@@ -301,18 +412,30 @@ export default function OffersReceivedPage() {
                 company: editingItem.company,
                 role: editingItem.role,
                 location: editingItem.location,
-                // Keep internal status string unless your dialog supports a new one
-                status: "Accepted",
+                status: "Offer",
                 appliedOn: editingItem.appliedOn,
                 employmentType: editingItem.employmentType,
                 offerUrl: editingItem.url,
                 logoUrl: editingItem.logoUrl,
                 notes: editingItem.notes,
+                decisionDate: editingItem.decisionDate,
+                offerReceivedDate:
+                  editingItem.offerReceivedDate ??
+                  editingItem.decisionDate,
+                offerAcceptedDate: editingItem.offerAcceptedDate,
               }
             : null
         }
         onAcceptedCreated={handleOfferCreated}
-        mode="add"
+        mode={editingItem ? "edit" : "add"}
+      />
+
+      {/* Tag accepted dialog */}
+      <OfferAcceptanceTagDialog
+        open={isTagDialogOpen}
+        onClose={closeTagDialog}
+        offer={taggingItem}
+        onSave={handleTagSave}
       />
 
       {/* cheerful blobs */}
@@ -456,259 +579,294 @@ export default function OffersReceivedPage() {
         </div>
       </div>
 
-     {/* View toggle */}
-<div className="mt-3 w-full relative z-10">
-  <div
-    className={[
-      // ✅ add relative + overflow-hidden so the stripes clip nicely
-      "relative overflow-hidden",
-      "grid grid-cols-2 gap-2 rounded-xl border border-neutral-200 bg-white/80 p-1.5",
-      "shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/70",
-    ].join(" ")}
-    role="tablist"
-    aria-label="View offers received"
-  >
-    {VIEW_FILTERS.map((option) => {
-      const active = view === option.id;
-      const Icon = option.icon;
-      return (
-        <button
-          key={option.id}
-          type="button"
-          onClick={() => setView(option.id)}
+      {/* View toggle */}
+      <div className="mt-3 w-full relative z-10">
+        <div
           className={[
-            "flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-medium transition",
-            active
-              ? "bg-emerald-600 text-white shadow-sm"
-              : "text-neutral-700 hover:bg-neutral-50",
+            "relative overflow-hidden",
+            "grid grid-cols-2 gap-2 rounded-xl border border-neutral-200 bg-white/80 p-1",
+            "shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/70",
           ].join(" ")}
-          aria-pressed={active}
-          role="tab"
+          role="tablist"
+          aria-label="View offers received"
         >
-          <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-          <span className="hidden sm:inline">{option.label}</span>
-          <span className="sm:hidden">{option.shortLabel}</span>
-        </button>
-      );
-    })}
+          {VIEW_FILTERS.map((option) => {
+            const active = view === option.id;
+            const Icon = option.icon;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => setView(option.id)}
+                className={[
+                  "flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-medium transition",
+                  active
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "text-neutral-700 hover:bg-neutral-50",
+                ].join(" ")}
+                aria-pressed={active}
+                role="tab"
+              >
+                <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                <span className="hidden sm:inline">{option.label}</span>
+                <span className="sm:hidden">{option.shortLabel}</span>
+              </button>
+            );
+          })}
 
-    {/* ✅ thinner banner-like top/bottom stripes */}
-    <div
-      className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-pink-500 via-orange-400 to-amber-300"
-      aria-hidden="true"
-    />
-    <div
-      className="pointer-events-none absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-pink-500 via-orange-400 to-amber-300"
-      aria-hidden="true"
-    />
-  </div>
-</div>
-
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-pink-500 via-orange-400 to-amber-300"
+            aria-hidden="true"
+          />
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-gradient-to-r from-pink-500 via-orange-400 to-amber-300"
+            aria-hidden="true"
+          />
+        </div>
+      </div>
 
       {/* cards grid */}
       <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 relative z-10">
-        {filteredItems.map((item) => (
-          <article
-            key={item.id}
-            className={[
-              "group relative flex h-full flex-col rounded-xl border border-emerald-100",
-              "bg-white/80 shadow-sm transition-all",
-              "hover:-translate-y-0.5 hover:shadow-md",
-              "before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl",
-              "before:bg-gradient-to-b before:from-pink-500 before:via-orange-400 before:to-amber-300",
-              "before:opacity-90",
-            ].join(" ")}
-          >
-            <div className="flex-1 px-5 pt-4 pb-5">
-              {/* header */}
-              <div className="relative flex items-start gap-3 pr-16 sm:pr-20">
-                {item.logoUrl ? (
-                  <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-neutral-200 bg-white ring-1 ring-white/60">
-                    <Image
-                      src={item.logoUrl}
-                      alt={`${item.company} logo`}
-                      fill
-                      sizes="40px"
-                      className="object-contain p-1.5"
-                    />
-                  </div>
-                ) : (
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-emerald-50 text-emerald-600">
-                    <Trophy className="h-5 w-5" aria-hidden="true" />
-                  </div>
-                )}
+        {filteredItems.map((item) => {
+          const taken = isTakenOffer(item);
 
-                <div className="min-w-0">
-                  <h2 className="max-w-full truncate text-sm font-semibold text-neutral-900">
-                    {item.company}
-                  </h2>
-                  <p className="mt-0.5 text-sm text-neutral-700">
-                    {item.role}
+          return (
+            <article
+              key={item.id}
+              className={[
+                "group relative flex h-full flex-col rounded-xl border border-emerald-100",
+                "bg-white/80 shadow-sm transition-all",
+                "hover:-translate-y-0.5 hover:shadow-md",
+                "before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl",
+                "before:bg-gradient-to-b before:from-pink-500 before:via-orange-400 before:to-amber-300",
+                "before:opacity-90",
+              ].join(" ")}
+            >
+              <div className="flex-1 px-5 pt-4 pb-5">
+                {/* header */}
+                <div className="relative flex items-start gap-3 pr-20 sm:pr-24">
+                  {item.logoUrl ? (
+                    <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-neutral-200 bg-white ring-1 ring-white/60">
+                      <Image
+                        src={item.logoUrl}
+                        alt={`${item.company} logo`}
+                        fill
+                        sizes="40px"
+                        className="object-contain p-1.5"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-emerald-50 text-emerald-600">
+                      <Trophy className="h-5 w-5" aria-hidden="true" />
+                    </div>
+                  )}
+
+                  <div className="min-w-0">
+                    <h2 className="max-w-full truncate text-sm font-semibold text-neutral-900">
+                      {item.company}
+                    </h2>
+                    <p className="mt-0.5 text-sm text-neutral-700">
+                      {item.role}
+                    </p>
+
+                    {taken && (
+                      <span className="mt-1 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">
+                        <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+                        Accepted
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="absolute right-0 top-1/2 -translate-y-1/2">
+                    <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white/90 px-1.5 py-1 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/80">
+                      <button
+                        type="button"
+                        onClick={() => openTagDialog(item)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 hover:bg-emerald-50 hover:text-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-1 focus-visible:ring-offset-white"
+                        aria-label="Tag offer as accepted or not"
+                        title="Tag accepted"
+                      >
+                        <BadgeCheck className="h-4 w-4" aria-hidden="true" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleEdit(item)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-1 focus-visible:ring-offset-white"
+                        aria-label="Edit offer received"
+                      >
+                        <Pencil className="h-4 w-4" aria-hidden="true" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(item.id)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 hover:bg-rose-50 hover:text-rose-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:ring-offset-1 focus-visible:ring-offset-white"
+                        aria-label="Delete offer received"
+                      >
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  className="mt-3 h-px w-full bg-emerald-100/80"
+                  role="separator"
+                  aria-hidden="true"
+                />
+
+                {/* meta */}
+                <dl className="mt-4 space-y-2 text-sm">
+                  {item.appliedOn && (
+                    <div className="flex items-center gap-2">
+                      <CalendarDays
+                        className="h-4 w-4 text-neutral-500"
+                        aria-hidden="true"
+                      />
+                      <div>
+                        <dt className="text-xs text-neutral-500">
+                          Applied on
+                        </dt>
+                        <dd className="font-medium text-neutral-900">
+                          {item.appliedOn}
+                        </dd>
+                      </div>
+                    </div>
+                  )}
+
+                  {(item.offerReceivedDate || item.decisionDate) && (
+                    <div className="flex items-center gap-2">
+                      <Calendar
+                        className="h-4 w-4 text-emerald-500"
+                        aria-hidden="true"
+                      />
+                      <div>
+                        <dt className="text-xs text-neutral-500">
+                          Offer received on
+                        </dt>
+                        <dd className="font-medium text-neutral-900">
+                          {item.offerReceivedDate ?? item.decisionDate}
+                        </dd>
+                      </div>
+                    </div>
+                  )}
+
+                  {item.offerAcceptedDate && (
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2
+                        className="h-4 w-4 text-emerald-600"
+                        aria-hidden="true"
+                      />
+                      <div>
+                        <dt className="text-xs text-neutral-500">
+                          Offer accepted on
+                        </dt>
+                        <dd className="font-medium text-neutral-900">
+                          {item.offerAcceptedDate}
+                        </dd>
+                      </div>
+                    </div>
+                  )}
+
+                  {item.startDate && (
+                    <div className="flex items-center gap-2">
+                      <Calendar
+                        className="h-4 w-4 text-neutral-500"
+                        aria-hidden="true"
+                      />
+                      <div>
+                        <dt className="text-xs text-neutral-500">
+                          Start date
+                        </dt>
+                        <dd className="font-medium text-neutral-900">
+                          {item.startDate}
+                        </dd>
+                      </div>
+                    </div>
+                  )}
+
+                  {item.employmentType && (
+                    <div className="flex items-center gap-2">
+                      <Briefcase
+                        className="h-4 w-4 text-neutral-500"
+                        aria-hidden="true"
+                      />
+                      <div>
+                        <dt className="text-xs text-neutral-500">
+                          Employment type
+                        </dt>
+                        <dd className="font-medium text-neutral-900">
+                          {item.employmentType}
+                        </dd>
+                      </div>
+                    </div>
+                  )}
+
+                  {item.location && (
+                    <div className="flex items-center gap-2">
+                      <MapPin
+                        className="h-4 w-4 text-neutral-500"
+                        aria-hidden="true"
+                      />
+                      <div>
+                        <dt className="text-xs text-neutral-500">
+                          Location
+                        </dt>
+                        <dd className="font-medium text-neutral-900">
+                          {item.location}
+                        </dd>
+                      </div>
+                    </div>
+                  )}
+
+                  {item.salary && (
+                    <div className="flex items-center gap-2">
+                      <Trophy
+                        className="h-4 w-4 text-amber-500"
+                        aria-hidden="true"
+                      />
+                      <div>
+                        <dt className="text-xs text-neutral-500">
+                          Compensation (approx.)
+                        </dt>
+                        <dd className="font-medium text-neutral-900">
+                          {item.salary}
+                        </dd>
+                      </div>
+                    </div>
+                  )}
+                </dl>
+
+                {item.notes && (
+                  <p className="mt-3 rounded-lg border border-dashed border-neutral-200 bg-neutral-50/80 px-3 py-2 text-xs text-neutral-800">
+                    {item.notes}
                   </p>
-                </div>
-
-                {/* Actions */}
-                <div className="absolute right-0 top-1/2 -translate-y-1/2">
-                  <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white/90 px-1.5 py-1 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/80">
-                    <button
-                      type="button"
-                      onClick={() => handleEdit(item)}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-1 focus-visible:ring-offset-white"
-                      aria-label="Edit offer received"
-                    >
-                      <Pencil className="h-4 w-4" aria-hidden="true" />
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(item.id)}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 hover:bg-rose-50 hover:text-rose-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:ring-offset-1 focus-visible:ring-offset-white"
-                      aria-label="Delete offer received"
-                    >
-                      <Trash2 className="h-4 w-4" aria-hidden="true" />
-                    </button>
-                  </div>
-                </div>
+                )}
               </div>
 
-              <div
-                className="mt-3 h-px w-full bg-emerald-100/80"
-                role="separator"
-                aria-hidden="true"
-              />
-
-              {/* meta */}
-              <dl className="mt-4 space-y-2 text-sm">
-                {item.appliedOn && (
-                  <div className="flex items-center gap-2">
-                    <CalendarDays
-                      className="h-4 w-4 text-neutral-500"
-                      aria-hidden="true"
-                    />
-                    <div>
-                      <dt className="text-xs text-neutral-500">
-                        Applied on
-                      </dt>
-                      <dd className="font-medium text-neutral-900">
-                        {item.appliedOn}
-                      </dd>
-                    </div>
-                  </div>
-                )}
-
-                {item.decisionDate && (
-                  <div className="flex items-center gap-2">
-                    <Calendar
-                      className="h-4 w-4 text-emerald-500"
-                      aria-hidden="true"
-                    />
-                    <div>
-                      <dt className="text-xs text-neutral-500">
-                        Decision date (company)
-                      </dt>
-                      <dd className="font-medium text-neutral-900">
-                        {item.decisionDate}
-                      </dd>
-                    </div>
-                  </div>
-                )}
-
-                {item.startDate && (
-                  <div className="flex items-center gap-2">
-                    <Calendar
-                      className="h-4 w-4 text-neutral-500"
-                      aria-hidden="true"
-                    />
-                    <div>
-                      <dt className="text-xs text-neutral-500">
-                        Start date
-                      </dt>
-                      <dd className="font-medium text-neutral-900">
-                        {item.startDate}
-                      </dd>
-                    </div>
-                  </div>
-                )}
-
-                {item.employmentType && (
-                  <div className="flex items-center gap-2">
-                    <Briefcase
-                      className="h-4 w-4 text-neutral-500"
-                      aria-hidden="true"
-                    />
-                    <div>
-                      <dt className="text-xs text-neutral-500">
-                        Employment type
-                      </dt>
-                      <dd className="font-medium text-neutral-900">
-                        {item.employmentType}
-                      </dd>
-                    </div>
-                  </div>
-                )}
-
-                {item.location && (
-                  <div className="flex items-center gap-2">
-                    <MapPin
-                      className="h-4 w-4 text-neutral-500"
-                      aria-hidden="true"
-                    />
-                    <div>
-                      <dt className="text-xs text-neutral-500">
-                        Location
-                      </dt>
-                      <dd className="font-medium text-neutral-900">
-                        {item.location}
-                      </dd>
-                    </div>
-                  </div>
-                )}
-
-                {item.salary && (
-                  <div className="flex items-center gap-2">
-                    <Trophy
-                      className="h-4 w-4 text-amber-500"
-                      aria-hidden="true"
-                    />
-                    <div>
-                      <dt className="text-xs text-neutral-500">
-                        Compensation (approx.)
-                      </dt>
-                      <dd className="font-medium text-neutral-900">
-                        {item.salary}
-                      </dd>
-                    </div>
-                  </div>
-                )}
-              </dl>
-
-              {item.notes && (
-                <p className="mt-3 rounded-lg border border-dashed border-neutral-200 bg-neutral-50/80 px-3 py-2 text-xs text-neutral-800">
-                  {item.notes}
+              {/* footer */}
+              <div className="border-t border-emerald-100 bg-emerald-50/60 px-5 py-2.5 flex items-center justify-between gap-2">
+                <p className="text-[11px] font-medium text-emerald-900 flex items-center gap-1.5">
+                  <PartyPopper className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>Well done. You earned this. ✨</span>
                 </p>
-              )}
-            </div>
-
-            {/* footer */}
-            <div className="border-t border-emerald-100 bg-emerald-50/60 px-5 py-2.5 flex items-center justify-between gap-2">
-              <p className="text-[11px] font-medium text-emerald-900 flex items-center gap-1.5">
-                <PartyPopper className="h-3.5 w-3.5" aria-hidden="true" />
-                <span>Well done. You earned this. ✨</span>
-              </p>
-              {item.url && (
-                <a
-                  href={item.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-800 hover:underline decoration-emerald-300 underline-offset-2"
-                >
-                  <ExternalLink className="h-3 w-3" aria-hidden="true" />
-                  <span>View offer</span>
-                </a>
-              )}
-            </div>
-          </article>
-        ))}
+                {item.url && (
+                  <a
+                    href={item.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-800 hover:underline decoration-emerald-300 underline-offset-2"
+                  >
+                    <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                    <span>View offer</span>
+                  </a>
+                )}
+              </div>
+            </article>
+          );
+        })}
 
         {!hasItemsInCurrentView && (
           <div className="col-span-full flex flex-col items-center justify-center rounded-xl border border-dashed border-emerald-300 bg-white/80 p-10 text-center backdrop-blur">
