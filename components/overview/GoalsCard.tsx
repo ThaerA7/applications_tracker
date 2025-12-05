@@ -1,196 +1,512 @@
 // app/components/GoalsCard.tsx
+"use client";
 
-import { Flame, Star, Target, Trophy } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Flame, Star, Target, Trophy, Settings2 } from "lucide-react";
 
-const goals = [
-  {
-    id: 1,
-    label: "Applications this week",
-    current: 14,
-    target: 20,
-    accent: "from-sky-500 to-cyan-400",
-  },
-  {
-    id: 2,
-    label: "Follow-ups sent",
-    current: 6,
-    target: 10,
-    accent: "from-amber-500 to-orange-400",
-  },
-  {
-    id: 3,
-    label: "Networking touches",
-    current: 3,
-    target: 5,
-    accent: "from-emerald-500 to-teal-400",
-  },
-];
+import GoalSettingsDialog, {
+  type GoalSettingsMode,
+  type SingleGoalValues,
+  type OverviewGoalValues,
+} from "../dialogs/GoalSettingsDialog";
 
-const streak = {
-  days: 3,
-  weeklyGoal: { target: 10, current: 6 },
-  monthlyGoal: { target: 40, current: 24 },
-  badge: "Nice! You scheduled 2 interviews this week 🎉",
+const INTERVIEWS_STORAGE_KEY = "job-tracker:interviews";
+const OFFERS_RECEIVED_STORAGE_KEY = "job-tracker:offers-received";
+
+// settings for this card
+const GOALS_SETTINGS_KEY = "job-tracker:goals-settings";
+
+type SingleGoalKey = "interviews" | "offers";
+
+type GoalsSettings = {
+  interviews: { target: number; periodDays: number };
+  offers: { target: number; periodDays: number };
+  overview: { weeklyTarget: number; monthlyTarget: number };
 };
 
+const DEFAULT_SETTINGS: GoalsSettings = {
+  interviews: { target: 3, periodDays: 30 },
+  offers: { target: 1, periodDays: 30 },
+  overview: { weeklyTarget: 2, monthlyTarget: 8 },
+};
+
+// --- date helpers (UTC midnight window) ---
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function parseToUtcMidnight(dateLike?: string | null): number | null {
+  if (!dateLike) return null;
+  const [datePart] = String(dateLike).split("T");
+  if (!datePart) return null;
+  const [yStr, mStr, dStr] = datePart.split("-");
+  const y = Number(yStr);
+  const m = Number(mStr);
+  const d = Number(dStr);
+  if (!y || !m || !d) return null;
+  return Date.UTC(y, m - 1, d);
+}
+
+function getTodayUtcMidnight(nowMs: number): number {
+  const now = new Date(nowMs);
+  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+}
+
+function isWithinLastDays(dateLike: string | undefined, nowMs: number, days: number) {
+  const dayMs = parseToUtcMidnight(dateLike);
+  if (dayMs == null) return false;
+  const today = getTodayUtcMidnight(nowMs);
+  const start = today - (Math.max(days, 1) - 1) * MS_PER_DAY; // inclusive window
+  return dayMs >= start && dayMs <= today;
+}
+
+// --- storage shapes (minimal) ---
+
+type StoredInterview = {
+  id: string;
+  company?: string;
+  role?: string;
+  location?: string;
+  date?: string; // ISO
+};
+
+type StoredOfferReceived = {
+  id: string;
+  company?: string;
+  role?: string;
+  offerReceivedDate?: string;
+  decisionDate?: string; // legacy-ish fallback
+};
+
+// --- load helpers ---
+
+function safeReadArray<T = any>(key: string): T[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function loadSettings(): GoalsSettings {
+  if (typeof window === "undefined") return DEFAULT_SETTINGS;
+  try {
+    const raw = window.localStorage.getItem(GOALS_SETTINGS_KEY);
+    if (!raw) return DEFAULT_SETTINGS;
+    const parsed = JSON.parse(raw);
+
+    const next: GoalsSettings = {
+      interviews: {
+        target: Number(parsed?.interviews?.target) || DEFAULT_SETTINGS.interviews.target,
+        periodDays:
+          Number(parsed?.interviews?.periodDays) || DEFAULT_SETTINGS.interviews.periodDays,
+      },
+      offers: {
+        target: Number(parsed?.offers?.target) || DEFAULT_SETTINGS.offers.target,
+        periodDays: Number(parsed?.offers?.periodDays) || DEFAULT_SETTINGS.offers.periodDays,
+      },
+      overview: {
+        weeklyTarget:
+          Number(parsed?.overview?.weeklyTarget) || DEFAULT_SETTINGS.overview.weeklyTarget,
+        monthlyTarget:
+          Number(parsed?.overview?.monthlyTarget) || DEFAULT_SETTINGS.overview.monthlyTarget,
+      },
+    };
+
+    return next;
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
+}
+
+function persistSettings(next: GoalsSettings) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(GOALS_SETTINGS_KEY, JSON.stringify(next));
+  } catch (err) {
+    console.error("Failed to persist goals settings", err);
+  }
+}
+
+// --- counting logic ---
+
+function countInterviewsInLastDays(days: number, nowMs: number) {
+  const list = safeReadArray<StoredInterview>(INTERVIEWS_STORAGE_KEY);
+  return list.filter((i) => isWithinLastDays(i.date, nowMs, days)).length;
+}
+
+function countOffersReceivedInLastDays(days: number, nowMs: number) {
+  const list = safeReadArray<StoredOfferReceived>(OFFERS_RECEIVED_STORAGE_KEY);
+  return list.filter((o) =>
+    isWithinLastDays(o.offerReceivedDate ?? o.decisionDate, nowMs, days)
+  ).length;
+}
+
 export default function GoalsCard() {
+  const [settings, setSettings] = useState<GoalsSettings>(DEFAULT_SETTINGS);
+
+  // counts
+  const [nowMs, setNowMs] = useState<number | null>(null);
+  const [interviewsCount, setInterviewsCount] = useState(0);
+  const [offersCount, setOffersCount] = useState(0);
+  const [weeklyCount, setWeeklyCount] = useState(0);
+  const [monthlyCount, setMonthlyCount] = useState(0);
+
+  // settings dialog state
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsMode, setSettingsMode] =
+    useState<GoalSettingsMode>("single");
+  const [settingsKey, setSettingsKey] =
+    useState<SingleGoalKey | "overview" | null>(null);
+
+  // init clock + load settings
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setNowMs(Date.now());
+
+    const loaded = loadSettings();
+    setSettings(loaded);
+
+    const id = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, 60_000);
+
+    return () => window.clearInterval(id);
+  }, []);
+
+  // recompute counts when time or settings change
+  useEffect(() => {
+    if (!nowMs) return;
+
+    const iCount = countInterviewsInLastDays(settings.interviews.periodDays, nowMs);
+    const oCount = countOffersReceivedInLastDays(settings.offers.periodDays, nowMs);
+
+    const wCount = countInterviewsInLastDays(7, nowMs);
+    const mCount = countInterviewsInLastDays(30, nowMs);
+
+    setInterviewsCount(iCount);
+    setOffersCount(oCount);
+    setWeeklyCount(wCount);
+    setMonthlyCount(mCount);
+  }, [nowMs, settings.interviews.periodDays, settings.offers.periodDays]);
+
+  // top cards definition (2 cards only)
+  const topGoals = useMemo(() => {
+    return [
+      {
+        key: "interviews" as const,
+        label: "Interviews",
+        current: interviewsCount,
+        target: settings.interviews.target,
+        periodDays: settings.interviews.periodDays,
+        accent: "from-sky-500 to-cyan-400",
+        hint: "Counted by interview date",
+      },
+      {
+        key: "offers" as const,
+        label: "Offers received",
+        current: offersCount,
+        target: settings.offers.target,
+        periodDays: settings.offers.periodDays,
+        accent: "from-amber-500 to-orange-400",
+        hint: "Counted by offer received date",
+      },
+    ];
+  }, [interviewsCount, offersCount, settings]);
+
+  const openSingleSettings = (key: SingleGoalKey) => {
+    setSettingsKey(key);
+    setSettingsMode("single");
+    setSettingsOpen(true);
+  };
+
+  const openOverviewSettings = () => {
+    setSettingsKey("overview");
+    setSettingsMode("overview");
+    setSettingsOpen(true);
+  };
+
+  const handleSaveSingle = (values: SingleGoalValues) => {
+    if (!settingsKey || settingsKey === "overview") return;
+
+    const next: GoalsSettings = {
+      ...settings,
+      [settingsKey]: {
+        target: Math.max(1, Math.floor(values.target || 1)),
+        periodDays: Math.max(1, Math.floor(values.periodDays || 1)),
+      },
+    };
+
+    setSettings(next);
+    persistSettings(next);
+  };
+
+  const handleSaveOverview = (values: OverviewGoalValues) => {
+    const next: GoalsSettings = {
+      ...settings,
+      overview: {
+        weeklyTarget: Math.max(1, Math.floor(values.weeklyTarget || 1)),
+        monthlyTarget: Math.max(1, Math.floor(values.monthlyTarget || 1)),
+      },
+    };
+
+    setSettings(next);
+    persistSettings(next);
+  };
+
+  // derived ratios
+  const weeklyRatio = Math.min(
+    weeklyCount / Math.max(settings.overview.weeklyTarget, 1),
+    1
+  );
+  const monthlyRatio = Math.min(
+    monthlyCount / Math.max(settings.overview.monthlyTarget, 1),
+    1
+  );
+
+  const streakBadge = `Nice! You scheduled ${weeklyCount} interview${
+    weeklyCount === 1 ? "" : "s"
+  } this week 🎉`;
+
   return (
-    <section
-      className={[
-        "relative overflow-hidden rounded-2xl border border-neutral-200/70",
-        "bg-gradient-to-br from-amber-50 via-white to-sky-50",
-        "p-6 sm:p-7 shadow-md",
-      ].join(" ")}
-    >
-      <div className="pointer-events-none absolute -top-24 -left-24 h-64 w-64 rounded-full bg-amber-400/20 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-24 -right-24 h-64 w-64 rounded-full bg-sky-400/20 blur-3xl" />
+    <>
+      <GoalSettingsDialog
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        mode={settingsMode}
+        title={
+          settingsMode === "overview"
+            ? "Set weekly & monthly goals"
+            : settingsKey === "offers"
+            ? "Set offers goal"
+            : "Set interviews goal"
+        }
+        description={
+          settingsMode === "overview"
+            ? "These goals power the overview bars below."
+            : "Choose a rolling time window (in days) and a target."
+        }
+        initialValues={
+          settingsMode === "overview"
+            ? {
+                weeklyTarget: settings.overview.weeklyTarget,
+                monthlyTarget: settings.overview.monthlyTarget,
+              }
+            : settingsKey === "offers"
+            ? {
+                target: settings.offers.target,
+                periodDays: settings.offers.periodDays,
+              }
+            : {
+                target: settings.interviews.target,
+                periodDays: settings.interviews.periodDays,
+              }
+        }
+        onSave={(vals) => {
+          if (settingsMode === "overview") {
+            handleSaveOverview(vals as OverviewGoalValues);
+          } else {
+            handleSaveSingle(vals as SingleGoalValues);
+          }
+          setSettingsOpen(false);
+        }}
+      />
 
-      <div className="relative z-10 space-y-5">
-        {/* Header + streak */}
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-amber-100 bg-white/80 px-3 py-1 text-xs font-medium text-amber-700 shadow-sm">
-              <Target className="h-3.5 w-3.5" />
-              <span>Goals & progress</span>
+      <section
+        className={[
+          "relative overflow-hidden rounded-2xl border border-neutral-200/70",
+          "bg-gradient-to-br from-amber-50 via-white to-sky-50",
+          "p-6 sm:p-7 shadow-md",
+        ].join(" ")}
+      >
+        <div className="pointer-events-none absolute -top-24 -left-24 h-64 w-64 rounded-full bg-amber-400/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 -right-24 h-64 w-64 rounded-full bg-sky-400/20 blur-3xl" />
+
+        <div className="relative z-10 space-y-5">
+          {/* Header + streak */}
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-amber-100 bg-white/80 px-3 py-1 text-xs font-medium text-amber-700 shadow-sm">
+                <Target className="h-3.5 w-3.5" />
+                <span>Goals & progress</span>
+              </div>
+              <p className="mt-2 text-sm text-neutral-700">
+                Keep your weekly and monthly goals visible and see how you&apos;re
+                moving towards them.
+              </p>
             </div>
-            <p className="mt-2 text-sm text-neutral-700">
-              Keep your weekly and monthly goals visible and see how you&apos;re
-              moving towards them.
-            </p>
-          </div>
 
-          <div className="rounded-xl border border-emerald-100 bg-white/85 px-3 py-2 text-xs shadow-sm">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
-                <Flame className="h-3.5 w-3.5" />
-              </span>
-              <div className="space-y-0.5">
-                <p className="font-semibold text-neutral-900">
-                  Streak: {streak.days} day{streak.days === 1 ? "" : "s"} in a
-                  row
-                </p>
-                <p className="text-[11px] text-neutral-600">{streak.badge}</p>
+            <div className="rounded-xl border border-emerald-100 bg-white/85 px-3 py-2 text-xs shadow-sm">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+                  <Flame className="h-3.5 w-3.5" />
+                </span>
+                <div className="space-y-0.5">
+                  {/* We keep a friendly “streak” feel, but tie the badge to real weekly data */}
+                  <p className="font-semibold text-neutral-900">
+                    Weekly momentum
+                  </p>
+                  <p className="text-[11px] text-neutral-600">
+                    {streakBadge}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Goals cards + weekly/monthly bars */}
-        <div className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-3">
-            {goals.map((goal) => {
-              const ratio = Math.min(goal.current / goal.target, 1);
-              const pct = Math.round((goal.current / goal.target) * 100);
-              return (
-                <div
-                  key={goal.id}
-                  className="rounded-xl border border-neutral-200 bg-white/90 p-4 shadow-sm backdrop-blur"
-                >
-                  <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">
-                    {goal.label}
-                  </p>
-                  <div className="mt-2 flex items-baseline justify-between gap-2 text-sm">
-                    <span className="font-semibold text-neutral-900">
-                      {goal.current}/{goal.target}
-                    </span>
-                    <span className="text-xs text-neutral-500">{pct}%</span>
+          {/* Top goals cards (Interviews + Offers) */}
+          <div className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-2">
+              {topGoals.map((goal) => {
+                const ratio = Math.min(
+                  goal.current / Math.max(goal.target, 1),
+                  1
+                );
+                const pct = Math.round(
+                  (goal.current / Math.max(goal.target, 1)) * 100
+                );
+
+                return (
+                  <div
+                    key={goal.key}
+                    className="relative rounded-xl border border-neutral-200 bg-white/90 p-4 shadow-sm backdrop-blur"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+                          {goal.label}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-neutral-500">
+                          Last {goal.periodDays} day{goal.periodDays === 1 ? "" : "s"} •{" "}
+                          {goal.hint}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => openSingleSettings(goal.key)}
+                        className={[
+                          "inline-flex items-center gap-1 rounded-lg border border-neutral-200",
+                          "bg-white px-2 py-1 text-[11px] font-medium text-neutral-700",
+                          "shadow-sm hover:bg-neutral-50",
+                          "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300",
+                        ].join(" ")}
+                        aria-label={`Set ${goal.label} goal`}
+                        title={`Set ${goal.label} goal`}
+                      >
+                        <Settings2 className="h-3.5 w-3.5" />
+                        <span>Set</span>
+                      </button>
+                    </div>
+
+                    <div className="mt-2 flex items-baseline justify-between gap-2 text-sm">
+                      <span className="font-semibold text-neutral-900">
+                        {goal.current}/{goal.target}
+                      </span>
+                      <span className="text-xs text-neutral-500">{pct}%</span>
+                    </div>
+
+                    <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-neutral-100">
+                      <div
+                        className={`h-full bg-gradient-to-r ${goal.accent}`}
+                        style={{ width: `${ratio * 100}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-neutral-100">
+                );
+              })}
+            </div>
+
+            {/* Weekly + Monthly goal bars (structure stays, now user-set targets) */}
+            <div className="relative rounded-xl border border-neutral-200 bg-white/90 p-4 shadow-sm backdrop-blur">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+                    Goals overview
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-neutral-900">
+                    Weekly: {weeklyCount}/{settings.overview.weeklyTarget} · Monthly:{" "}
+                    {monthlyCount}/{settings.overview.monthlyTarget}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={openOverviewSettings}
+                    className={[
+                      "inline-flex items-center gap-1 rounded-lg border border-neutral-200",
+                      "bg-white px-2 py-1 text-[11px] font-medium text-neutral-700",
+                      "shadow-sm hover:bg-neutral-50",
+                      "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300",
+                    ].join(" ")}
+                    aria-label="Set weekly and monthly goals"
+                    title="Set weekly and monthly goals"
+                  >
+                    <Settings2 className="h-3.5 w-3.5" />
+                    <span>Set</span>
+                  </button>
+
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+                    <Trophy className="h-4 w-4" />
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-3 space-y-3">
+                {/* Weekly bar */}
+                <div>
+                  <div className="flex items-center justify-between text-[11px] text-neutral-500">
+                    <span>Weekly</span>
+                    <span className="font-medium text-neutral-700">
+                      {weeklyCount}/{settings.overview.weeklyTarget}
+                    </span>
+                  </div>
+                  <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-neutral-100">
                     <div
-                      className={`h-full bg-gradient-to-r ${goal.accent}`}
-                      style={{ width: `${ratio * 100}%` }}
+                      className="h-full bg-gradient-to-r from-indigo-500 via-sky-500 to-emerald-500"
+                      style={{ width: `${weeklyRatio * 100}%` }}
                     />
                   </div>
                 </div>
-              );
-            })}
-          </div>
 
-          {/* Weekly + Monthly goal bars */}
-          <div className="rounded-xl border border-neutral-200 bg-white/90 p-4 shadow-sm backdrop-blur">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">
-                  Goals overview
+                {/* Monthly bar */}
+                <div>
+                  <div className="flex items-center justify-between text-[11px] text-neutral-500">
+                    <span>Monthly</span>
+                    <span className="font-medium text-neutral-700">
+                      {monthlyCount}/{settings.overview.monthlyTarget}
+                    </span>
+                  </div>
+                  <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-neutral-100">
+                    <div
+                      className="h-full bg-gradient-to-r from-violet-500 via-sky-500 to-emerald-500"
+                      style={{ width: `${monthlyRatio * 100}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                <p className="text-neutral-600">
+                  Just{" "}
+                  <span className="font-semibold text-neutral-900">
+                    {Math.max(settings.overview.weeklyTarget - weeklyCount, 0)}
+                  </span>{" "}
+                  more to hit this week&apos;s goal.
                 </p>
-                <p className="mt-1 text-sm font-semibold text-neutral-900">
-                  Weekly: {streak.weeklyGoal.current}/{streak.weeklyGoal.target}{" "}
-                  · Monthly: {streak.monthlyGoal.current}/
-                  {streak.monthlyGoal.target}
-                </p>
-              </div>
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
-                <Trophy className="h-4 w-4" />
-              </span>
-            </div>
-
-            <div className="mt-3 space-y-3">
-              {/* Weekly bar */}
-              <div>
-                <div className="flex items-center justify-between text-[11px] text-neutral-500">
-                  <span>Weekly</span>
-                  <span className="font-medium text-neutral-700">
-                    {streak.weeklyGoal.current}/{streak.weeklyGoal.target}
-                  </span>
+                <div className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                  <Star className="h-3 w-3" />
+                  <span>{streakBadge}</span>
                 </div>
-                <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-neutral-100">
-                  <div
-                    className="h-full bg-gradient-to-r from-indigo-500 via-sky-500 to-emerald-500"
-                    style={{
-                      width: `${Math.min(
-                        (streak.weeklyGoal.current /
-                          streak.weeklyGoal.target) *
-                          100,
-                        100
-                      )}%`,
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Monthly bar */}
-              <div>
-                <div className="flex items-center justify-between text-[11px] text-neutral-500">
-                  <span>Monthly</span>
-                  <span className="font-medium text-neutral-700">
-                    {streak.monthlyGoal.current}/{streak.monthlyGoal.target}
-                  </span>
-                </div>
-                <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-neutral-100">
-                  <div
-                    className="h-full bg-gradient-to-r from-violet-500 via-sky-500 to-emerald-500"
-                    style={{
-                      width: `${Math.min(
-                        (streak.monthlyGoal.current /
-                          streak.monthlyGoal.target) *
-                          100,
-                        100
-                      )}%`,
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px]">
-              <p className="text-neutral-600">
-                Just{" "}
-                <span className="font-semibold text-neutral-900">
-                  {Math.max(
-                    streak.weeklyGoal.target - streak.weeklyGoal.current,
-                    0
-                  )}
-                </span>{" "}
-                more to hit this week&apos;s goal.
-              </p>
-              <div className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
-                <Star className="h-3 w-3" />
-                <span>Nice! 2 interviews this week 🎉</span>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </>
   );
 }
