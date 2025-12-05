@@ -1,7 +1,12 @@
-// app/accepted/page.tsx 
+// app/offers-received/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type ComponentType,
+} from "react";
 import Image from "next/image";
 import {
   PartyPopper,
@@ -14,17 +19,18 @@ import {
   Trash2,
   Plus,
   Pencil,
+  CheckCircle2,
 } from "lucide-react";
 import MoveToAcceptedDialog, {
   type AcceptedDetails,
 } from "../../components/dialogs/MoveToAcceptedDialog";
 
-type AcceptedJob = {
+type OfferReceivedJob = {
   id: string;
   company: string;
   role: string;
   location?: string;
-  startDate?: string; // e.g. "01 Dec 2025"
+  startDate?: string;
   salary?: string;
   url?: string;
   logoUrl?: string;
@@ -34,13 +40,44 @@ type AcceptedJob = {
   appliedOn?: string;
   decisionDate?: string;
   employmentType?: string;
+
+  /**
+   * Whether the user decided to take this offer.
+   * Backwards compatible: missing => treated as not taken.
+   */
+  taken?: boolean;
 };
 
-const ACCEPTED_STORAGE_KEY = "job-tracker:accepted";
+// ✅ new key
+const OFFERS_RECEIVED_STORAGE_KEY = "job-tracker:offers-received";
+// ✅ legacy key (for migration)
+const LEGACY_ACCEPTED_STORAGE_KEY = "job-tracker:accepted";
 
-const DEMO_ACCEPTED_JOBS: AcceptedJob[] = [
+type OffersReceivedView = "received" | "taken";
+
+const VIEW_FILTERS: {
+  id: OffersReceivedView;
+  label: string;
+  shortLabel: string;
+  icon: ComponentType<any>;
+}[] = [
   {
-    id: "a1",
+    id: "received",
+    label: "Offers received",
+    shortLabel: "Received",
+    icon: Trophy,
+  },
+  {
+    id: "taken",
+    label: "Offer you accepted",
+    shortLabel: "Taken",
+    icon: CheckCircle2,
+  },
+];
+
+const DEMO_OFFERS_RECEIVED: OfferReceivedJob[] = [
+  {
+    id: "r1",
     company: "Acme Corp",
     role: "Frontend Engineer",
     location: "Berlin",
@@ -52,9 +89,10 @@ const DEMO_ACCEPTED_JOBS: AcceptedJob[] = [
     url: "https://jobs.example/acme/frontend",
     logoUrl: "/logos/acme.svg",
     notes: "You did it! First big frontend role. 🎉",
+    taken: true,
   },
   {
-    id: "a2",
+    id: "r2",
     company: "Globex",
     role: "Mobile Developer (Flutter)",
     location: "Remote",
@@ -65,59 +103,88 @@ const DEMO_ACCEPTED_JOBS: AcceptedJob[] = [
     salary: "€60,000 / year",
     logoUrl: "/logos/globex.png",
     notes: "Remote-friendly team, strong learning potential.",
+    taken: false,
   },
 ];
 
-export default function AcceptedPage() {
-  const [items, setItems] = useState<AcceptedJob[]>(DEMO_ACCEPTED_JOBS);
+export default function OffersReceivedPage() {
+  const [items, setItems] =
+    useState<OfferReceivedJob[]>(DEMO_OFFERS_RECEIVED);
 
-  // shared dialog for add + edit
+  const [view, setView] =
+    useState<OffersReceivedView>("received");
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<AcceptedJob | null>(null);
+  const [editingItem, setEditingItem] =
+    useState<OfferReceivedJob | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     try {
-      const raw = window.localStorage.getItem(ACCEPTED_STORAGE_KEY);
+      const newRaw = window.localStorage.getItem(
+        OFFERS_RECEIVED_STORAGE_KEY
+      );
+      const legacyRaw = window.localStorage.getItem(
+        LEGACY_ACCEPTED_STORAGE_KEY
+      );
 
-      if (raw) {
-        const parsed = JSON.parse(raw);
+      // 1) Prefer new key if valid
+      if (newRaw) {
+        const parsed = JSON.parse(newRaw);
         if (Array.isArray(parsed)) {
           setItems(parsed);
-        } else {
-          window.localStorage.setItem(
-            ACCEPTED_STORAGE_KEY,
-            JSON.stringify(DEMO_ACCEPTED_JOBS)
-          );
-          setItems(DEMO_ACCEPTED_JOBS);
+          return;
         }
-      } else {
-        window.localStorage.setItem(
-          ACCEPTED_STORAGE_KEY,
-          JSON.stringify(DEMO_ACCEPTED_JOBS)
-        );
-        setItems(DEMO_ACCEPTED_JOBS);
       }
+
+      // 2) Migrate legacy key if present
+      if (legacyRaw) {
+        const parsedLegacy = JSON.parse(legacyRaw);
+        if (Array.isArray(parsedLegacy)) {
+          window.localStorage.setItem(
+            OFFERS_RECEIVED_STORAGE_KEY,
+            JSON.stringify(parsedLegacy)
+          );
+          setItems(parsedLegacy);
+          return;
+        }
+      }
+
+      // 3) Seed demo
+      window.localStorage.setItem(
+        OFFERS_RECEIVED_STORAGE_KEY,
+        JSON.stringify(DEMO_OFFERS_RECEIVED)
+      );
+      setItems(DEMO_OFFERS_RECEIVED);
     } catch (err) {
-      console.error("Failed to load accepted jobs from localStorage", err);
-      setItems(DEMO_ACCEPTED_JOBS);
+      console.error(
+        "Failed to load offers received from localStorage",
+        err
+      );
+      setItems(DEMO_OFFERS_RECEIVED);
     }
   }, []);
 
-  const persist = (next: AcceptedJob[]) => {
+  const persist = (next: OfferReceivedJob[]) => {
     if (typeof window === "undefined") return;
     try {
-      window.localStorage.setItem(ACCEPTED_STORAGE_KEY, JSON.stringify(next));
+      window.localStorage.setItem(
+        OFFERS_RECEIVED_STORAGE_KEY,
+        JSON.stringify(next)
+      );
     } catch (err) {
-      console.error("Failed to persist accepted jobs", err);
+      console.error(
+        "Failed to persist offers received",
+        err
+      );
     }
   };
 
   const handleDelete = (id: string) => {
     if (typeof window !== "undefined") {
       const confirmed = window.confirm(
-        "Remove this accepted offer from your win board?"
+        "Remove this offer from your win board?"
       );
       if (!confirmed) return;
     }
@@ -134,7 +201,7 @@ export default function AcceptedPage() {
     setIsDialogOpen(true);
   };
 
-  const handleEdit = (job: AcceptedJob) => {
+  const handleEdit = (job: OfferReceivedJob) => {
     setEditingItem(job);
     setIsDialogOpen(true);
   };
@@ -144,7 +211,7 @@ export default function AcceptedPage() {
     setEditingItem(null);
   };
 
-  const handleAcceptedCreated = (details: AcceptedDetails) => {
+  const handleOfferCreated = (details: AcceptedDetails) => {
     setItems((prev) => {
       // Edit existing card
       if (editingItem) {
@@ -160,13 +227,16 @@ export default function AcceptedPage() {
                 url: details.url || job.url,
                 logoUrl: details.logoUrl || job.logoUrl,
                 notes:
-                  details.notes !== undefined && details.notes !== ""
+                  details.notes !== undefined &&
+                  details.notes !== ""
                     ? details.notes
                     : job.notes,
                 appliedOn: details.appliedOn || job.appliedOn,
-                decisionDate: details.decisionDate || job.decisionDate,
+                decisionDate:
+                  details.decisionDate || job.decisionDate,
                 employmentType:
                   details.employmentType || job.employmentType,
+                taken: job.taken ?? false,
               }
             : job
         );
@@ -175,8 +245,8 @@ export default function AcceptedPage() {
       }
 
       // Add new card
-      const newItem: AcceptedJob = {
-        id: `accepted-${Date.now()}-${Math.random()
+      const newItem: OfferReceivedJob = {
+        id: `received-${Date.now()}-${Math.random()
           .toString(36)
           .slice(2, 8)}`,
         company: details.company,
@@ -190,6 +260,7 @@ export default function AcceptedPage() {
         appliedOn: details.appliedOn,
         decisionDate: details.decisionDate,
         employmentType: details.employmentType,
+        taken: false,
       };
 
       const next = [newItem, ...prev];
@@ -198,8 +269,17 @@ export default function AcceptedPage() {
     });
   };
 
-  const totalAccepted = items.length;
+  const totalReceived = items.length;
   const firstJob = items[0];
+
+  const filteredItems = useMemo(() => {
+    if (view === "taken") {
+      return items.filter((i) => i.taken);
+    }
+    return items.filter((i) => !i.taken);
+  }, [items, view]);
+
+  const hasItemsInCurrentView = filteredItems.length > 0;
 
   return (
     <section
@@ -209,7 +289,8 @@ export default function AcceptedPage() {
         "p-8 shadow-md overflow-hidden",
       ].join(" ")}
     >
-      {/* Add / edit accepted offer dialog */}
+      {/* Add / edit offer received dialog
+          NOTE: keeping the component name for compatibility. */}
       <MoveToAcceptedDialog
         open={isDialogOpen}
         onClose={handleCloseDialog}
@@ -220,6 +301,7 @@ export default function AcceptedPage() {
                 company: editingItem.company,
                 role: editingItem.role,
                 location: editingItem.location,
+                // Keep internal status string unless your dialog supports a new one
                 status: "Accepted",
                 appliedOn: editingItem.appliedOn,
                 employmentType: editingItem.employmentType,
@@ -229,7 +311,7 @@ export default function AcceptedPage() {
               }
             : null
         }
-        onAcceptedCreated={handleAcceptedCreated}
+        onAcceptedCreated={handleOfferCreated}
         mode="add"
       />
 
@@ -243,17 +325,17 @@ export default function AcceptedPage() {
           <h1 className="text-2xl font-semibold text-neutral-900 flex items-center gap-1">
             <Image
               src="/icons/accepted.png"
-              alt="Accepted icon"
+              alt="Offers received icon"
               width={37}
               height={37}
               className="shrink-0"
             />
-            <span>Accepted</span>
+            <span>Offers Received</span>
           </h1>
           <p className="mt-1 text-sm text-neutral-700">
             This is your win board – every card here is a{" "}
             <span className="font-semibold text-emerald-700">
-              “Yes, you&apos;re hired!”
+              “Yes, here&apos;s your contract!”
             </span>
           </p>
         </div>
@@ -269,12 +351,12 @@ export default function AcceptedPage() {
           ].join(" ")}
         >
           <Plus className="h-4 w-4" aria-hidden="true" />
-          <span className="hidden sm:inline">Add accepted offer</span>
+          <span className="hidden sm:inline">Add offer received</span>
           <span className="sm:hidden">Add</span>
         </button>
       </div>
 
-      {/* Cheerful celebration banner rectangle */}
+      {/* celebration banner */}
       <div className="mt-6 relative z-10">
         <div
           className={[
@@ -290,40 +372,47 @@ export default function AcceptedPage() {
               <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-emerald-700">
                 <PartyPopper className="h-4 w-4" aria-hidden="true" />
                 <span>
-                  {totalAccepted === 0
+                  {totalReceived === 0
                     ? "Future offer celebration"
                     : "Offer celebration zone"}
                 </span>
               </p>
 
               <p className="mt-1 text-sm text-neutral-800">
-                {totalAccepted === 0 && (
+                {totalReceived === 0 && (
                   <>
-                    The first “Yes” you get will land here. Until then, every
-                    application is training for that moment.
+                    The first contract offer you get will land here.
+                    Until then, every application is training
+                    for that moment.
                   </>
                 )}
-                {totalAccepted === 1 && firstJob && (
+                {totalReceived === 1 && firstJob && (
                   <>
                     You already turned your effort into a real offer:{" "}
-                    <span className="font-semibold">{firstJob.role}</span> at{" "}
-                    <span className="font-semibold">{firstJob.company}</span>.
-                    This page is the proof you can do it again.
+                    <span className="font-semibold">
+                      {firstJob.role}
+                    </span>{" "}
+                    at{" "}
+                    <span className="font-semibold">
+                      {firstJob.company}
+                    </span>
+                    . This page is proof you can do it again.
                   </>
                 )}
-                {totalAccepted > 1 && firstJob && (
+                {totalReceived > 1 && firstJob && (
                   <>
                     Look at this stack of wins. From{" "}
-                    <span className="font-semibold">{firstJob.company}</span> to
-                    every card below – each offer is a milestone in your story.
+                    <span className="font-semibold">
+                      {firstJob.company}
+                    </span>{" "}
+                    to every card below – each offer is a milestone.
                   </>
                 )}
               </p>
 
-              {firstJob && totalAccepted > 0 && (
+              {firstJob && totalReceived > 0 && (
                 <p className="mt-1 text-xs text-neutral-500">
-                  Tip: screenshot this page when you doubt yourself – it&apos;s
-                  your personal highlight reel.
+                  Tip: screenshot this page when you doubt yourself.
                 </p>
               )}
             </div>
@@ -336,17 +425,14 @@ export default function AcceptedPage() {
                   "shadow-sm",
                 ].join(" ")}
               >
-                <Trophy
-                  className="h-4 w-4 text-amber-500"
-                  aria-hidden="true"
-                />
+                <Trophy className="h-4 w-4 text-amber-500" aria-hidden="true" />
                 <span>
-                  {totalAccepted === 0 &&
+                  {totalReceived === 0 &&
                     "Your celebration wall is waiting 🎈"}
-                  {totalAccepted === 1 &&
-                    "1 offer secured – huge step forward."}
-                  {totalAccepted > 1 &&
-                    `${totalAccepted} offers secured – keep stacking wins.`}
+                  {totalReceived === 1 &&
+                    "1 offer received – huge step forward."}
+                  {totalReceived > 1 &&
+                    `${totalReceived} offers received – keep stacking wins.`}
                 </span>
               </div>
 
@@ -363,7 +449,6 @@ export default function AcceptedPage() {
             className="pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-pink-500 via-orange-400 to-amber-300"
             aria-hidden="true"
           />
-
           <div
             className="pointer-events-none absolute inset-x-0 bottom-0 h-1.5 bg-gradient-to-r from-pink-500 via-orange-400 to-amber-300"
             aria-hidden="true"
@@ -371,9 +456,58 @@ export default function AcceptedPage() {
         </div>
       </div>
 
+     {/* View toggle */}
+<div className="mt-3 w-full relative z-10">
+  <div
+    className={[
+      // ✅ add relative + overflow-hidden so the stripes clip nicely
+      "relative overflow-hidden",
+      "grid grid-cols-2 gap-2 rounded-xl border border-neutral-200 bg-white/80 p-1.5",
+      "shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/70",
+    ].join(" ")}
+    role="tablist"
+    aria-label="View offers received"
+  >
+    {VIEW_FILTERS.map((option) => {
+      const active = view === option.id;
+      const Icon = option.icon;
+      return (
+        <button
+          key={option.id}
+          type="button"
+          onClick={() => setView(option.id)}
+          className={[
+            "flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-medium transition",
+            active
+              ? "bg-emerald-600 text-white shadow-sm"
+              : "text-neutral-700 hover:bg-neutral-50",
+          ].join(" ")}
+          aria-pressed={active}
+          role="tab"
+        >
+          <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+          <span className="hidden sm:inline">{option.label}</span>
+          <span className="sm:hidden">{option.shortLabel}</span>
+        </button>
+      );
+    })}
+
+    {/* ✅ thinner banner-like top/bottom stripes */}
+    <div
+      className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-pink-500 via-orange-400 to-amber-300"
+      aria-hidden="true"
+    />
+    <div
+      className="pointer-events-none absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-pink-500 via-orange-400 to-amber-300"
+      aria-hidden="true"
+    />
+  </div>
+</div>
+
+
       {/* cards grid */}
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 relative z-10">
-        {items.map((item) => (
+      <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 relative z-10">
+        {filteredItems.map((item) => (
           <article
             key={item.id}
             className={[
@@ -386,7 +520,7 @@ export default function AcceptedPage() {
             ].join(" ")}
           >
             <div className="flex-1 px-5 pt-4 pb-5">
-              {/* header: logo + company/role + actions */}
+              {/* header */}
               <div className="relative flex items-start gap-3 pr-16 sm:pr-20">
                 {item.logoUrl ? (
                   <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-neutral-200 bg-white ring-1 ring-white/60">
@@ -413,25 +547,23 @@ export default function AcceptedPage() {
                   </p>
                 </div>
 
-                {/* Actions – same pill design + positioning as interview card */}
+                {/* Actions */}
                 <div className="absolute right-0 top-1/2 -translate-y-1/2">
                   <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white/90 px-1.5 py-1 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/80">
-                    {/* Edit */}
                     <button
                       type="button"
                       onClick={() => handleEdit(item)}
                       className="inline-flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-1 focus-visible:ring-offset-white"
-                      aria-label="Edit accepted offer"
+                      aria-label="Edit offer received"
                     >
                       <Pencil className="h-4 w-4" aria-hidden="true" />
                     </button>
 
-                    {/* Delete */}
                     <button
                       type="button"
                       onClick={() => handleDelete(item.id)}
                       className="inline-flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 hover:bg-rose-50 hover:text-rose-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:ring-offset-1 focus-visible:ring-offset-white"
-                      aria-label="Delete accepted offer"
+                      aria-label="Delete offer received"
                     >
                       <Trash2 className="h-4 w-4" aria-hidden="true" />
                     </button>
@@ -445,7 +577,7 @@ export default function AcceptedPage() {
                 aria-hidden="true"
               />
 
-              {/* meta fields */}
+              {/* meta */}
               <dl className="mt-4 space-y-2 text-sm">
                 {item.appliedOn && (
                   <div className="flex items-center gap-2">
@@ -454,7 +586,9 @@ export default function AcceptedPage() {
                       aria-hidden="true"
                     />
                     <div>
-                      <dt className="text-xs text-neutral-500">Applied on</dt>
+                      <dt className="text-xs text-neutral-500">
+                        Applied on
+                      </dt>
                       <dd className="font-medium text-neutral-900">
                         {item.appliedOn}
                       </dd>
@@ -486,7 +620,9 @@ export default function AcceptedPage() {
                       aria-hidden="true"
                     />
                     <div>
-                      <dt className="text-xs text-neutral-500">Start date</dt>
+                      <dt className="text-xs text-neutral-500">
+                        Start date
+                      </dt>
                       <dd className="font-medium text-neutral-900">
                         {item.startDate}
                       </dd>
@@ -518,7 +654,9 @@ export default function AcceptedPage() {
                       aria-hidden="true"
                     />
                     <div>
-                      <dt className="text-xs text-neutral-500">Location</dt>
+                      <dt className="text-xs text-neutral-500">
+                        Location
+                      </dt>
                       <dd className="font-medium text-neutral-900">
                         {item.location}
                       </dd>
@@ -551,7 +689,7 @@ export default function AcceptedPage() {
               )}
             </div>
 
-            {/* footer: link + encouragement */}
+            {/* footer */}
             <div className="border-t border-emerald-100 bg-emerald-50/60 px-5 py-2.5 flex items-center justify-between gap-2">
               <p className="text-[11px] font-medium text-emerald-900 flex items-center gap-1.5">
                 <PartyPopper className="h-3.5 w-3.5" aria-hidden="true" />
@@ -572,17 +710,31 @@ export default function AcceptedPage() {
           </article>
         ))}
 
-        {items.length === 0 && (
+        {!hasItemsInCurrentView && (
           <div className="col-span-full flex flex-col items-center justify-center rounded-xl border border-dashed border-emerald-300 bg-white/80 p-10 text-center backdrop-blur">
-            <div className="mb-2 text-5xl">🎉</div>
-            <p className="text-sm text-neutral-800 font-medium">
-              No accepted offers yet – but you&apos;re on your way.
-            </p>
-            <p className="mt-1 text-xs text-neutral-500">
-              When a company says{" "}
-              <span className="font-semibold">&quot;Yes&quot;</span>, move that
-              offer here and celebrate your progress.
-            </p>
+            <div className="mb-2 text-5xl">
+              {view === "received" ? "🎉" : "✅"}
+            </div>
+
+            {view === "received" ? (
+              <>
+                <p className="text-sm text-neutral-800 font-medium">
+                  No offers received yet.
+                </p>
+                <p className="mt-1 text-xs text-neutral-500">
+                  When a company sends you a contract offer, add it here.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-neutral-800 font-medium">
+                  You haven&apos;t marked an offer as taken yet.
+                </p>
+                <p className="mt-1 text-xs text-neutral-500">
+                  This tab is for the one you decide to accept.
+                </p>
+              </>
+            )}
           </div>
         )}
       </div>

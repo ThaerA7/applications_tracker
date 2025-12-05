@@ -8,12 +8,14 @@ type RouteMeta = {
   title: string;
 };
 
-const ROUTES: Record<string, RouteMeta> = {
+const ROUTES: Record<string, { title: string }> = {
   "/": { title: "Overview" },
   "/applied": { title: "Applied" },
   "/interviews": { title: "Interviews" },
-  "/offers": { title: "Offers" },
-  "/accepted": { title: "Accepted" }, // ⭐ NEW
+
+  "/job-search": { title: "Job Search" },
+  "/offers-received": { title: "Offers Received" },
+
   "/rejected": { title: "Rejected" },
   "/withdrawn": { title: "Withdrawn" },
   "/wishlist": { title: "Wishlist" },
@@ -21,6 +23,8 @@ const ROUTES: Record<string, RouteMeta> = {
   "/notes": { title: "Notes" },
   "/settings": { title: "Settings" },
 };
+
+
 
 type Accent = {
   washFrom: string;
@@ -48,19 +52,19 @@ const ACCENTS: Record<string, Accent> = {
     barTo: "after:to-teal-500",
     focus: "focus-visible:ring-emerald-300",
   },
-  "/offers": {
+    "/job-search": {
     washFrom: "from-amber-50",
     barFrom: "after:from-amber-500",
     barTo: "after:to-orange-500",
     focus: "focus-visible:ring-amber-300",
   },
-  "/accepted": {
-    // 🎉 Positive, cheering vibe
+  "/offers-received": {
     washFrom: "from-lime-50",
     barFrom: "after:from-lime-500",
     barTo: "after:to-emerald-500",
     focus: "focus-visible:ring-lime-300",
   },
+
   "/rejected": {
     washFrom: "from-rose-50",
     barFrom: "after:from-rose-500",
