@@ -2,18 +2,28 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FC, type FormEvent } from "react";
-import { X, CheckCircle2, Circle, CalendarDays } from "lucide-react";
+import {
+  X,
+  CheckCircle2,
+  Circle,
+  CalendarDays,
+  XCircle,
+} from "lucide-react";
 
 type OfferReceivedJobLite = {
   id: string;
   company: string;
   role: string;
   offerAcceptedDate?: string;
+  offerDeclinedDate?: string;
 };
 
+export type OfferDecisionStatus = "received" | "accepted" | "declined";
+
 export type OfferAcceptanceTagDetails = {
-  accepted: boolean;
+  status: OfferDecisionStatus;
   offerAcceptedDate?: string;
+  offerDeclinedDate?: string;
 };
 
 type OfferAcceptanceTagDialogProps = {
@@ -29,8 +39,9 @@ const OfferAcceptanceTagDialog: FC<OfferAcceptanceTagDialogProps> = ({
   offer,
   onSave,
 }) => {
-  const [accepted, setAccepted] = useState(false);
+  const [status, setStatus] = useState<OfferDecisionStatus>("received");
   const [offerAcceptedDate, setOfferAcceptedDate] = useState("");
+  const [offerDeclinedDate, setOfferDeclinedDate] = useState("");
 
   const todayIso = useMemo(() => {
     const today = new Date();
@@ -43,33 +54,66 @@ const OfferAcceptanceTagDialog: FC<OfferAcceptanceTagDialogProps> = ({
   useEffect(() => {
     if (!open) return;
 
-    const initialAccepted = Boolean(offer?.offerAcceptedDate);
-    setAccepted(initialAccepted);
+    const initialStatus: OfferDecisionStatus = offer?.offerAcceptedDate
+      ? "accepted"
+      : offer?.offerDeclinedDate
+      ? "declined"
+      : "received";
+
+    setStatus(initialStatus);
     setOfferAcceptedDate(offer?.offerAcceptedDate ?? "");
+    setOfferDeclinedDate(offer?.offerDeclinedDate ?? "");
   }, [open, offer]);
 
   if (!open || !offer) return null;
 
-  const handleToggle = (value: boolean) => {
-    setAccepted(value);
+  const handleStatusChange = (next: OfferDecisionStatus) => {
+    setStatus(next);
 
-    if (value && !offerAcceptedDate) {
-      setOfferAcceptedDate(todayIso);
+    if (next === "accepted") {
+      if (!offerAcceptedDate) setOfferAcceptedDate(todayIso);
+      setOfferDeclinedDate("");
     }
 
-    if (!value) {
+    if (next === "declined") {
+      if (!offerDeclinedDate) setOfferDeclinedDate(todayIso);
       setOfferAcceptedDate("");
     }
+
+    if (next === "received") {
+      setOfferAcceptedDate("");
+      setOfferDeclinedDate("");
+    }
   };
+
+  const activeDate =
+    status === "accepted"
+      ? offerAcceptedDate
+      : status === "declined"
+      ? offerDeclinedDate
+      : "";
+
+  const handleDateChange = (value: string) => {
+    if (status === "accepted") setOfferAcceptedDate(value);
+    if (status === "declined") setOfferDeclinedDate(value);
+  };
+
+  const dateLabel =
+    status === "accepted"
+      ? "Offer accepted date"
+      : status === "declined"
+      ? "Offer declined date"
+      : "Decision date";
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
 
     onSave({
-      accepted,
-      offerAcceptedDate: accepted
-        ? offerAcceptedDate.trim() || todayIso
-        : undefined,
+      status,
+      offerAcceptedDate:
+        status === "accepted" ? offerAcceptedDate.trim() || todayIso : undefined,
+      offerDeclinedDate:
+        status === "declined" ? offerDeclinedDate.trim() || todayIso : undefined,
     });
   };
 
@@ -113,7 +157,8 @@ const OfferAcceptanceTagDialog: FC<OfferAcceptanceTagDialogProps> = ({
                 Tag offer status
               </h2>
               <p className="mt-0.5 text-xs text-neutral-600">
-                Mark this offer as accepted or not, and set the accepted date.
+                Mark this offer as received, accepted, or declined and set the
+                relevant date.
               </p>
             </div>
           </div>
@@ -133,56 +178,66 @@ const OfferAcceptanceTagDialog: FC<OfferAcceptanceTagDialogProps> = ({
         </div>
 
         {/* Body */}
-        <form
-          onSubmit={handleSubmit}
-          className="relative z-10 px-5 py-4"
-        >
+        <form onSubmit={handleSubmit} className="relative z-10 px-5 py-4">
           {/* Summary */}
           <div className="rounded-xl border border-emerald-100/80 bg-white/90 p-3 text-xs text-neutral-800 shadow-sm">
             <div className="font-medium text-neutral-900">{offer.role}</div>
             <div className="text-neutral-600">{offer.company}</div>
           </div>
 
-          {/* Toggle style options */}
-          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          {/* 3-way toggle */}
+          <div className="mt-4 grid gap-2 sm:grid-cols-3">
             <button
               type="button"
-              onClick={() => handleToggle(false)}
+              onClick={() => handleStatusChange("received")}
               className={[
                 "flex items-center gap-2 rounded-xl border px-3 py-3 text-left text-sm shadow-sm transition",
-                !accepted
+                status === "received"
                   ? "border-emerald-200 bg-emerald-50/70"
                   : "border-neutral-200 bg-white/80 hover:bg-white",
               ].join(" ")}
-              aria-pressed={!accepted}
+              aria-pressed={status === "received"}
             >
               <Circle className="h-4 w-4 text-neutral-500" />
-              <span className="font-medium text-neutral-900">
-                Not accepted
-              </span>
+              <span className="font-medium text-neutral-900">Received</span>
             </button>
 
             <button
               type="button"
-              onClick={() => handleToggle(true)}
+              onClick={() => handleStatusChange("accepted")}
               className={[
                 "flex items-center gap-2 rounded-xl border px-3 py-3 text-left text-sm shadow-sm transition",
-                accepted
+                status === "accepted"
                   ? "border-emerald-200 bg-emerald-50/70"
                   : "border-neutral-200 bg-white/80 hover:bg-white",
               ].join(" ")}
-              aria-pressed={accepted}
+              aria-pressed={status === "accepted"}
             >
               <CheckCircle2 className="h-4 w-4 text-emerald-600" />
               <span className="font-medium text-neutral-900">Accepted</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => handleStatusChange("declined")}
+              className={[
+                "flex items-center gap-2 rounded-xl border px-3 py-3 text-left text-sm shadow-sm transition",
+                status === "declined"
+                  ? "border-rose-200 bg-rose-50/70"
+                  : "border-neutral-200 bg-white/80 hover:bg-white",
+              ].join(" ")}
+              aria-pressed={status === "declined"}
+            >
+              <XCircle className="h-4 w-4 text-rose-600" />
+              <span className="font-medium text-neutral-900">Declined</span>
+            </button>
           </div>
 
-          {/* ✅ Small, controlled top gap here */}
-          <label className="mt-5 space-y-1 text-sm">
-            <span className="font-medium text-neutral-800">
-              Offer accepted date
-            </span>
+          {/* Date */}
+          
+          <label className="mt-3 block space-y-1 text-sm">
+
+            <span className="font-medium text-neutral-800">{dateLabel}</span>
             <div className="relative">
               <CalendarDays
                 className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
@@ -190,12 +245,12 @@ const OfferAcceptanceTagDialog: FC<OfferAcceptanceTagDialogProps> = ({
               />
               <input
                 type="date"
-                value={offerAcceptedDate}
-                onChange={(e) => setOfferAcceptedDate(e.target.value)}
-                disabled={!accepted}
+                value={activeDate}
+                onChange={(e) => handleDateChange(e.target.value)}
+                disabled={status === "received"}
                 className={[
                   "h-9 w-full rounded-lg border px-3 pl-8 pr-3 text-sm shadow-sm focus:outline-none focus:ring-2",
-                  accepted
+                  status !== "received"
                     ? "border-neutral-200 bg-white/80 text-neutral-900 focus:ring-emerald-300 focus:border-emerald-300"
                     : "border-neutral-200 bg-neutral-50 text-neutral-400 cursor-not-allowed",
                 ].join(" ")}
