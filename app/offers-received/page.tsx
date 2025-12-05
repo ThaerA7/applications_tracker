@@ -599,7 +599,7 @@ export default function OffersReceivedPage() {
                 type="button"
                 onClick={() => setView(option.id)}
                 className={[
-                  "flex items-center justify-center gap-1.5 rounded-lg px-3 py-3 text-[14px] font-medium transition",
+                  "flex items-center justify-center gap-1 rounded-lg px-3 py-3 text-[15px] font-medium transition",
                   active
                     ? option.id === "declined"
                       ? "bg-rose-600 text-white shadow-sm"
@@ -609,7 +609,7 @@ export default function OffersReceivedPage() {
                 aria-pressed={active}
                 role="tab"
               >
-                <Icon className="h-4 w-4" aria-hidden="true" />
+                <Icon className="h-4.5 w-4.5" aria-hidden="true" />
                 <span className="hidden sm:inline">{option.label}</span>
                 <span className="sm:hidden">{option.shortLabel}</span>
               </button>
