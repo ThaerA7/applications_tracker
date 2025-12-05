@@ -14,7 +14,7 @@ const ROUTES: Record<string, { title: string }> = {
   "/interviews": { title: "Interviews" },
 
   "/job-search": { title: "Job Search" },
-  "/offers-received": { title: "Offers Received" },
+  "/offers-received": { title: "Offers" },
 
   "/rejected": { title: "Rejected" },
   "/withdrawn": { title: "Withdrawn" },
