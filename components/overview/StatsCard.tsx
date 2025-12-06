@@ -17,7 +17,6 @@ import {
 import {
   CalendarDays,
   Clock,
-  FileText,
   ListChecks,
   Plus,
   TrendingUp,
@@ -297,10 +296,7 @@ function buildConversionOverTime(params: {
   }
 
   for (const o of offers) {
-    const d =
-      toDate(o.offerReceivedDate) ||
-      toDate(o.decisionDate) ||
-      null;
+    const d = toDate(o.offerReceivedDate) || toDate(o.decisionDate) || null;
 
     if (!d) continue;
 
@@ -496,21 +492,28 @@ export default function JobSearchOverviewCard() {
     };
   }, [now, applied, interviews, rejected, withdrawn, offers]);
 
+  const quickActionLabels = useMemo(
+    () => [
+      "Add application",
+      "Add interview",
+      "Add rejected app",
+      "Add withdrawn app",
+      "Add received offer",
+      "Add note",
+    ],
+    []
+  );
+
   return (
-    // outer section
     <section
       className={[
         "relative overflow-hidden rounded-2xl border border-neutral-200/70",
-        // was: from-sky-50 via-white to-emerald-50
-        "bg-gradient-to-br from-indigo-50 via-white to-sky-50",
+        "bg-gradient-to-br from-sky-50 via-white to-emerald-50",
         "p-6 sm:p-7 shadow-md",
       ].join(" ")}
     >
-      {/* blobs */}
-      {/* was: sky + emerald */}
-      <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-indigo-400/15 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-sky-400/15 blur-3xl" />
-
+      <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-sky-400/15 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-emerald-400/15 blur-3xl" />
 
       <div className="relative z-10 space-y-5">
         {/* Header row: title + quick actions aligned */}
@@ -529,44 +532,28 @@ export default function JobSearchOverviewCard() {
             </p>
           </div>
 
-          {/* Quick actions (kept UI-only here) */}
+          {/* Quick actions – styled like Notes/Upcoming pills */}
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              className={[
-                "inline-flex items-center gap-2 rounded-lg border border-sky-200 px-3 py-1.5 text-xs font-medium",
-                "bg-sky-50 text-sky-800 shadow-sm hover:bg-sky-100",
-              ].join(" ")}
-            >
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/90">
-                <Plus className="h-3.5 w-3.5" />
-              </span>
-              <span>Add application</span>
-            </button>
-            <button
-              type="button"
-              className={[
-                "inline-flex items-center gap-2 rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-medium",
-                "bg-emerald-50 text-emerald-800 shadow-sm hover:bg-emerald-100",
-              ].join(" ")}
-            >
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/90">
-                <CalendarDays className="h-3.5 w-3.5" />
-              </span>
-              <span>Add interview</span>
-            </button>
-            <button
-              type="button"
-              className={[
-                "inline-flex items-center gap-2 rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-medium",
-                "bg-white text-neutral-800 shadow-sm hover:bg-neutral-50",
-              ].join(" ")}
-            >
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-neutral-50">
-                <FileText className="h-3.5 w-3.5" />
-              </span>
-              <span>Add note</span>
-            </button>
+            {quickActionLabels.map((label) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => {
+                  // UI-only for now.
+                  // Wire to dialogs/routes when ready.
+                }}
+                className={[
+                  "inline-flex items-center gap-1.5 rounded-full border border-emerald-100",
+                  "bg-white/80 px-2.5 py-1 text-[11px] font-medium text-emerald-700 shadow-sm",
+                  "hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300",
+                ].join(" ")}
+                aria-label={label}
+                title={label}
+              >
+                <Plus className="h-3 w-3" aria-hidden="true" />
+                <span>{label}</span>
+              </button>
+            ))}
           </div>
         </div>
 
