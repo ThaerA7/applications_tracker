@@ -381,8 +381,8 @@ export default function OffersReceivedCards({
         <div className="col-span-full flex flex-col items-center justify-center rounded-xl border border-dashed border-emerald-300 bg-white/80 p-10 text-center backdrop-blur">
           <div className="mb-2 text-5xl">
             {view === "received" && "🎉"}
-            {view === "accepted" && "✅"}
-            {view === "declined" && "🧠"}
+            {view === "accepted" && "✍️"}
+            {view === "declined" && "❌"}
           </div>
 
           {view === "received" && (

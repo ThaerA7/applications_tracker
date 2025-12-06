@@ -1,5 +1,6 @@
 // app/notes/page.tsx
 "use client";
+
 import { useMemo, useState } from "react";
 import {
   Search,
@@ -163,7 +164,12 @@ export default function NotesPage() {
   const [draftColor, setDraftColor] = useState<ColorKey>("gray");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  const [expandedNote, setExpandedNote] = useState<Record<string, boolean>>({});
+  const [expandedNote, setExpandedNote] = useState<Record<string, boolean>>(
+    {}
+  );
+
+  // ✅ delete confirmation state
+  const [deleteTarget, setDeleteTarget] = useState<Note | null>(null);
 
   const allTags = useMemo(() => {
     const s = new Set<string>();
@@ -184,9 +190,7 @@ export default function NotesPage() {
     });
     res.sort((a, b) => {
       if (!!b.pinned === !!a.pinned) {
-        return (
-          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-        );
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
       }
       return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
     });
@@ -237,13 +241,13 @@ export default function NotesPage() {
       return prev.map((n) =>
         n.id === editingId
           ? {
-              ...n,
-              title: draftTitle || "Untitled note",
-              content: draftContent,
-              tags,
-              color: draftColor,
-              updatedAt: new Date().toISOString(),
-            }
+            ...n,
+            title: draftTitle || "Untitled note",
+            content: draftContent,
+            tags,
+            color: draftColor,
+            updatedAt: new Date().toISOString(),
+          }
           : n
       );
     });
@@ -263,8 +267,20 @@ export default function NotesPage() {
     );
   }
 
-  function removeNote(id: string) {
+  // ✅ open confirm dialog instead of deleting immediately
+  function requestDelete(note: Note) {
+    setDeleteTarget(note);
+  }
+
+  function confirmDelete() {
+    if (!deleteTarget) return;
+    const id = deleteTarget.id;
     setNotes((prev) => prev.filter((n) => n.id !== id));
+    setDeleteTarget(null);
+  }
+
+  function cancelDelete() {
+    setDeleteTarget(null);
   }
 
   function addNote() {
@@ -446,10 +462,12 @@ export default function NotesPage() {
                     >
                       <Edit3 className="h-4 w-4" aria-hidden="true" />
                     </button>
+
+                    {/* ✅ delete now opens confirmation dialog */}
                     <button
                       type="button"
-                      onClick={() => removeNote(n.id)}
-                      className="rounded-md border border-neutral-200 bg-white/70 p-1 text-neutral-700 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-300"
+                      onClick={() => requestDelete(n)}
+                      className="rounded-md border border-neutral-200 bg-white/70 p-1 text-neutral-700 shadow-sm hover:bg-white hover:text-rose-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
                       aria-label="Delete note"
                       title="Delete"
                     >
@@ -461,10 +479,7 @@ export default function NotesPage() {
                 {/* Meta */}
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-neutral-600">
                   <span className="inline-flex items-center gap-1">
-                    <CalendarDays
-                      className="h-3.5 w-3.5"
-                      aria-hidden="true"
-                    />
+                    <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
                     <span>Updated</span>
                     <time dateTime={n.updatedAt}>{fmtDate(n.updatedAt)}</time>
                   </span>
@@ -513,6 +528,75 @@ export default function NotesPage() {
           )}
         </div>
       </section>
+
+      {/* =============================== */}
+      {/* ✅ DELETE CONFIRMATION DIALOG */}
+      {/* =============================== */}
+      {deleteTarget && (
+        <div
+          className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[12450] flex items-center justify-center px-4 py-8"
+          role="dialog"
+          aria-modal="true"
+          onClick={cancelDelete}
+        >
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-fuchsia-950/40 backdrop-blur-sm"
+            aria-hidden="true"
+          />
+
+          {/* Panel */}
+          <div
+            className="relative z-10 w-full max-w-sm"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <article
+              className={[
+                "relative overflow-hidden rounded-2xl border border-neutral-200/80",
+                "bg-white shadow-2xl p-5",
+              ].join(" ")}
+            >
+              <p className="text-sm font-semibold text-neutral-900">
+                Delete this note?
+              </p>
+              <p className="mt-1 text-sm text-neutral-700">
+                <span className="font-medium">{deleteTarget.title}</span> will
+                be permanently removed.
+              </p>
+              <p className="mt-1 text-xs text-neutral-500">
+                This action cannot be undone.
+              </p>
+
+              <div className="mt-4 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={cancelDelete}
+                  className={[
+                    "inline-flex items-center gap-1 rounded-md border border-neutral-200",
+                    "bg-white/80 px-3 py-1.5 text-xs font-medium text-neutral-700 shadow-sm hover:bg-white",
+                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-300",
+                  ].join(" ")}
+                >
+                  <X className="h-3 w-3" aria-hidden="true" />
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDelete}
+                  className={[
+                    "inline-flex items-center gap-1 rounded-md border border-rose-600",
+                    "bg-rose-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-rose-500",
+                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300",
+                  ].join(" ")}
+                >
+                  <Trash2 className="h-3 w-3" aria-hidden="true" />
+                  Delete
+                </button>
+              </div>
+            </article>
+          </div>
+        </div>
+      )}
 
       {/* NOTE DIALOG – same style idea as ScheduleInterviewDialog / overview note dialog */}
       {isDialogOpen && (
@@ -592,13 +676,11 @@ export default function NotesPage() {
                         onClick={() => setDraftColor(c)}
                         aria-label={`Set note color: ${c}`}
                         aria-pressed={selected}
-                        className={`h-7 w-7 rounded-full border transition ${
-                          selected ? `ring-2 ${COLOR_STYLES[c].ring}` : "ring-0"
-                        } ${
-                          c === "yellow" || c === "gray"
+                        className={`h-7 w-7 rounded-full border transition ${selected ? `ring-2 ${COLOR_STYLES[c].ring}` : "ring-0"
+                          } ${c === "yellow" || c === "gray"
                             ? "border-neutral-300"
                             : "border-transparent"
-                        }`}
+                          }`}
                         style={{ background: getColorHex(c) }}
                         title={c}
                       />

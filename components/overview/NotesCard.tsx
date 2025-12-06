@@ -2,10 +2,10 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FileText, Palette, Plus, Tag, Save, X } from "lucide-react";
 
-type ColorKey =
+export type ColorKey =
   | "gray"
   | "blue"
   | "green"
@@ -15,40 +15,123 @@ type ColorKey =
   | "pink"
   | "purple";
 
-type OverviewNote = {
-  id: number;
+/**
+ * ✅ Shared note shape (matches your Notes page style)
+ */
+export type NoteItem = {
+  id: string;
   title: string;
-  preview: string;
+  content: string;
   tags: string[];
-  color: ColorKey;
+  updatedAt: string; // ISO
+  pinned?: boolean;
+  color?: ColorKey;
 };
 
-const INITIAL_OVERVIEW_NOTES: OverviewNote[] = [
+export const NOTES_STORAGE_KEY = "job-tracker:notes";
+
+const INITIAL_OVERVIEW_NOTES = [
   {
-    id: 1,
+    id: "seed-1",
     title: "Globex — Phone screen prep",
-    preview:
+    content:
       "Review behavioral stories (STAR), brush up on async patterns in TS, and common React perf pitfalls.\n\nQuestions to ask: team structure, on-call, growth path.",
     tags: ["Interview", "Prep", "Phone screen"],
-    color: "yellow",
+    color: "yellow" as ColorKey,
+    updatedAt: "2025-11-02T09:15:00.000Z",
   },
   {
-    id: 2,
+    id: "seed-2",
     title: "Acme — Frontend system design",
-    preview:
+    content:
       "Component architecture, state boundaries, data fetching patterns (React Server Components + caching). Consider monitoring/observability.",
     tags: ["System design", "Frontend", "Architecture"],
-    color: "blue",
+    color: "blue" as ColorKey,
+    updatedAt: "2025-10-31T17:42:00.000Z",
   },
   {
-    id: 3,
+    id: "seed-3",
     title: "Research: Stripe career site",
-    preview:
+    content:
       "Look for roles aligned with DX and UI platforms. Note interview format; collect links to recent posts.",
     tags: ["Research", "Stripe", "Career site"],
-    color: "gray",
+    color: "gray" as ColorKey,
+    updatedAt: "2025-10-28T14:03:00.000Z",
   },
-];
+] satisfies NoteItem[];
+
+/**
+ * ✅ Helpers shared with Stats card
+ */
+export function readNotesFromStorage(): NoteItem[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(NOTES_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as NoteItem[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function writeNotesToStorage(list: NoteItem[]) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(list));
+  } catch (err) {
+    console.error("Failed to persist notes", err);
+  }
+}
+
+/**
+ * Upsert helper for external callers (Stats card)
+ */
+export function upsertNoteToStorage(input: {
+  id?: string;
+  title: string;
+  content: string;
+  tags: string[];
+  color?: ColorKey;
+}) {
+  const existing = readNotesFromStorage();
+  const id =
+    input.id ??
+    (typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}`);
+
+  const nowIso = new Date().toISOString();
+
+  const idx = existing.findIndex((n) => n.id === id);
+
+  let next: NoteItem[];
+  if (idx >= 0) {
+    next = [...existing];
+    next[idx] = {
+      ...next[idx],
+      title: input.title,
+      content: input.content,
+      tags: input.tags,
+      color: input.color ?? next[idx].color,
+      updatedAt: nowIso,
+    };
+  } else {
+    const newNote: NoteItem = {
+      id,
+      title: input.title,
+      content: input.content,
+      tags: input.tags,
+      color: input.color ?? "gray",
+      updatedAt: nowIso,
+      pinned: false,
+    };
+    next = [newNote, ...existing];
+  }
+
+  writeNotesToStorage(next);
+  return next;
+}
 
 const COLORS: ColorKey[] = [
   "gray",
@@ -115,36 +198,255 @@ function parseTags(raw: string): string[] {
   return tags.length ? tags : ["Note"];
 }
 
-export default function NotesOverviewCard() {
-  const [overviewNotes, setOverviewNotes] =
-    useState<OverviewNote[]>(INITIAL_OVERVIEW_NOTES);
+/**
+ * ✅ Reusable dialog exported for Stats card use
+ */
+export function AddNoteDialog(props: {
+  open: boolean;
+  onClose: () => void;
+  onSave: (payload: {
+    id?: string;
+    title: string;
+    content: string;
+    tags: string[];
+    color: ColorKey;
+  }) => void;
+  initialNote?: NoteItem | null;
+}) {
+  const { open, onClose, onSave, initialNote } = props;
 
-  const [isNoteDialogOpen, setIsNoteDialogOpen] = useState(false);
   const [dialogTitle, setDialogTitle] = useState("");
   const [dialogContent, setDialogContent] = useState("");
   const [dialogTags, setDialogTags] = useState("");
   const [dialogColor, setDialogColor] = useState<ColorKey>("gray");
 
-  const [editingNote, setEditingNote] = useState<OverviewNote | null>(null);
+  useEffect(() => {
+    if (!open) return;
+
+    if (initialNote) {
+      setDialogTitle(initialNote.title ?? "");
+      setDialogContent(initialNote.content ?? "");
+      setDialogTags((initialNote.tags ?? []).join(", "));
+      setDialogColor(initialNote.color ?? "gray");
+    } else {
+      setDialogTitle("");
+      setDialogContent("");
+      setDialogTags("");
+      setDialogColor("gray");
+    }
+  }, [open, initialNote]);
+
+  if (!open) return null;
+
+  const handleSave = () => {
+    const title = dialogTitle.trim() || "Untitled note";
+    const content = dialogContent.trim() || "Empty note";
+    const tags = parseTags(dialogTags);
+
+    onSave({
+      id: initialNote?.id,
+      title,
+      content,
+      tags,
+      color: dialogColor,
+    });
+
+    onClose();
+  };
+
+  return (
+    <div
+      className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[12500] flex items-center justify-center px-4 py-8"
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+    >
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-emerald-950/40" aria-hidden="true" />
+
+      {/* Panel */}
+      <div
+        className="relative z-10 w-full max-w-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <article
+          style={{
+            borderLeftWidth: 4,
+            borderLeftColor: getColorHex(dialogColor),
+          }}
+          className={[
+            "relative flex flex-col rounded-xl border p-4 sm:p-5 shadow-2xl transition-all",
+            "bg-gradient-to-br from-white via-white to-neutral-50",
+            "backdrop-blur supports-[backdrop-filter]:bg-white/90",
+            "border-neutral-100/80",
+          ].join(" ")}
+        >
+          {/* Header – dot + title */}
+          <div className="flex items-center gap-2">
+            <span
+              className={`inline-block h-2.5 w-2.5 rounded-full ${COLOR_STYLES[dialogColor].dot}`}
+              aria-hidden="true"
+            />
+            <input
+              value={dialogTitle}
+              onChange={(e) => setDialogTitle(e.target.value)}
+              aria-label="Note title"
+              placeholder="Note title"
+              className="h-9 w-full rounded-md border border-neutral-300 bg-white px-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-300/40"
+            />
+          </div>
+
+          {/* Content */}
+          <div className="mt-3">
+            <label htmlFor="overview-dialog-content" className="sr-only">
+              Note content
+            </label>
+            <textarea
+              id="overview-dialog-content"
+              value={dialogContent}
+              onChange={(e) => setDialogContent(e.target.value)}
+              rows={6}
+              className="w-full rounded-md border border-neutral-300 bg-white p-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-300/40"
+              placeholder="Write your note…"
+            />
+          </div>
+
+          {/* Color picker */}
+          <div className="mt-3">
+            <div className="mb-1 inline-flex items-center gap-2 text-xs text-neutral-600">
+              <Palette className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>Color</span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {COLORS.map((c) => {
+                const selected = dialogColor === c;
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setDialogColor(c)}
+                    aria-label={`Set note color: ${c}`}
+                    aria-pressed={selected}
+                    className={`h-7 w-7 rounded-full border transition ${
+                      selected ? `ring-2 ${COLOR_STYLES[c].ring}` : "ring-0"
+                    } ${
+                      c === "yellow" || c === "gray"
+                        ? "border-neutral-300"
+                        : "border-transparent"
+                    }`}
+                    style={{ background: getColorHex(c) }}
+                    title={c}
+                  />
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Tags */}
+          <div className="mt-3">
+            <label
+              htmlFor="overview-dialog-tags"
+              className="block text-xs text-neutral-600"
+            >
+              Tags (comma-separated)
+            </label>
+            <input
+              id="overview-dialog-tags"
+              value={dialogTags}
+              onChange={(e) => setDialogTags(e.target.value)}
+              className="mt-1 h-9 w-full rounded-md border border-neutral-300 bg-white px-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-300/40"
+              placeholder="e.g. interview, prep, phone screen"
+            />
+          </div>
+
+          {/* Footer */}
+          <div className="mt-4 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className={[
+                "inline-flex items-center gap-1 rounded-md border border-neutral-200 bg-white/80 px-3 py-1.5 text-xs font-medium text-neutral-700 shadow-sm hover:bg-white",
+                "focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-300",
+              ].join(" ")}
+              aria-label="Cancel"
+              title="Cancel"
+            >
+              <X className="h-3 w-3" aria-hidden="true" />
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              className="inline-flex items-center gap-1 rounded-md border border-neutral-900 bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-neutral-800"
+              aria-label="Save note"
+              title="Save"
+            >
+              <Save className="h-3 w-3" aria-hidden="true" />
+              Save
+            </button>
+          </div>
+        </article>
+      </div>
+    </div>
+  );
+}
+
+export default function NotesOverviewCard() {
+  const [notes, setNotes] = useState<NoteItem[]>(() => {
+    if (typeof window === "undefined") return INITIAL_OVERVIEW_NOTES;
+    const stored = readNotesFromStorage();
+    return stored.length ? stored : INITIAL_OVERVIEW_NOTES;
+  });
+
+  const [isNoteDialogOpen, setIsNoteDialogOpen] = useState(false);
+  const [editingNote, setEditingNote] = useState<NoteItem | null>(null);
+
   const [longPressTimeoutId, setLongPressTimeoutId] = useState<number | null>(
     null
   );
 
+  // Seed storage one-time if empty
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const existing = readNotesFromStorage();
+    if (!existing.length) {
+      writeNotesToStorage(INITIAL_OVERVIEW_NOTES);
+    }
+  }, []);
+
+  // Keep local state synced if something else writes notes
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === NOTES_STORAGE_KEY) {
+        const next = readNotesFromStorage();
+        setNotes(next.length ? next : INITIAL_OVERVIEW_NOTES);
+      }
+    };
+
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  const overviewNotes = useMemo(() => {
+    const sorted = [...notes].sort((a, b) => {
+      const ap = a.pinned ? 1 : 0;
+      const bp = b.pinned ? 1 : 0;
+      if (ap !== bp) return bp - ap;
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    });
+    return sorted.slice(0, 3);
+  }, [notes]);
+
   const openAddDialog = () => {
     setEditingNote(null);
-    setDialogTitle("");
-    setDialogContent("");
-    setDialogTags("");
-    setDialogColor("gray");
     setIsNoteDialogOpen(true);
   };
 
-  const openEditDialog = (note: OverviewNote) => {
+  const openEditDialog = (note: NoteItem) => {
     setEditingNote(note);
-    setDialogTitle(note.title);
-    setDialogContent(note.preview);
-    setDialogTags(note.tags.join(", "));
-    setDialogColor(note.color);
     setIsNoteDialogOpen(true);
   };
 
@@ -153,43 +455,18 @@ export default function NotesOverviewCard() {
     setEditingNote(null);
   };
 
-  const handleSaveNote = () => {
-    const title = dialogTitle.trim() || "Untitled note";
-    const content = dialogContent.trim() || "Empty note";
-    const tags = parseTags(dialogTags);
-
-    setOverviewNotes((prev) => {
-      if (editingNote) {
-        // Update existing note
-        return prev.map((n) =>
-          n.id === editingNote.id
-            ? {
-              ...editingNote,
-              title,
-              preview: content,
-              tags,
-              color: dialogColor,
-            }
-            : n
-        );
-      }
-
-      // Add new note
-      const newNote: OverviewNote = {
-        id: Date.now(),
-        title,
-        preview: content,
-        tags,
-        color: dialogColor,
-      };
-
-      return [newNote, ...prev].slice(0, 3);
-    });
-
-    closeNoteDialog();
+  const handleSaveNote = (payload: {
+    id?: string;
+    title: string;
+    content: string;
+    tags: string[];
+    color: ColorKey;
+  }) => {
+    const next = upsertNoteToStorage(payload);
+    setNotes(next);
   };
 
-  const startLongPress = (note: OverviewNote) => {
+  const startLongPress = (note: NoteItem) => {
     const id = window.setTimeout(() => {
       openEditDialog(note);
     }, LONG_PRESS_MS);
@@ -208,13 +485,10 @@ export default function NotesOverviewCard() {
       <section
         className={[
           "relative overflow-hidden rounded-2xl border border-neutral-200/70",
-          // was: from-white via-slate-50 to-amber-50
           "bg-gradient-to-br from-indigo-50 via-white to-violet-50",
           "p-5 shadow-md",
         ].join(" ")}
       >
-        {/* blob */}
-        {/* was amber */}
         <div className="pointer-events-none absolute -top-16 -left-20 h-48 w-48 rounded-full bg-indigo-400/15 blur-3xl" />
 
         <div className="relative z-10">
@@ -233,7 +507,7 @@ export default function NotesOverviewCard() {
               </p>
             </div>
 
-            {/* EXACT same button style as "Add interview", only text differs */}
+            {/* Same pill style as your other quick buttons */}
             <button
               type="button"
               onClick={openAddDialog}
@@ -249,180 +523,59 @@ export default function NotesOverviewCard() {
           </div>
 
           <div className="mt-3 space-y-3">
-            {overviewNotes.map((note) => (
-              <article
-                key={note.id}
-                className={[
-                  "relative flex flex-col rounded-xl border p-3 text-sm shadow-sm transition-all",
-                  "bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90",
-                  "border-neutral-200/80 hover:-translate-y-0.5 hover:shadow-md",
-                  "before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl before:bg-gradient-to-b before:opacity-90",
-                  "cursor-pointer",
-                  COLOR_ACCENT[note.color],
-                ].join(" ")}
-                onMouseDown={() => startLongPress(note)}
-                onMouseUp={cancelLongPress}
-                onMouseLeave={cancelLongPress}
-                onTouchStart={() => startLongPress(note)}
-                onTouchEnd={cancelLongPress}
-                onTouchCancel={cancelLongPress}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-[13px] font-semibold text-neutral-900">
-                    {note.title}
+            {overviewNotes.map((note) => {
+              const color = note.color ?? "gray";
+
+              return (
+                <article
+                  key={note.id}
+                  className={[
+                    "relative flex flex-col rounded-xl border p-3 text-sm shadow-sm transition-all",
+                    "bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90",
+                    "border-neutral-200/80 hover:-translate-y-0.5 hover:shadow-md",
+                    "before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl before:bg-gradient-to-b before:opacity-90",
+                    "cursor-pointer",
+                    COLOR_ACCENT[color],
+                  ].join(" ")}
+                  onMouseDown={() => startLongPress(note)}
+                  onMouseUp={cancelLongPress}
+                  onMouseLeave={cancelLongPress}
+                  onTouchStart={() => startLongPress(note)}
+                  onTouchEnd={cancelLongPress}
+                  onTouchCancel={cancelLongPress}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[13px] font-semibold text-neutral-900">
+                      {note.title}
+                    </p>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-neutral-50 px-2 py-0.5 text-[10px] font-medium text-neutral-600">
+                      <Tag className="h-3 w-3" />
+                      <span>{note.tags.slice(0, 3).join(" · ")}</span>
+                    </span>
+                  </div>
+                  <p className="mt-1 line-clamp-2 text-[12px] text-neutral-600 whitespace-pre-line">
+                    {note.content}
                   </p>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-neutral-50 px-2 py-0.5 text-[10px] font-medium text-neutral-600">
-                    <Tag className="h-3 w-3" />
-                    <span>{note.tags.slice(0, 3).join(" · ")}</span>
-                  </span>
-                </div>
-                <p className="mt-1 line-clamp-2 text-[12px] text-neutral-600 whitespace-pre-line">
-                  {note.preview}
-                </p>
-              </article>
-            ))}
+                </article>
+              );
+            })}
+
+            {overviewNotes.length === 0 && (
+              <div className="rounded-xl border border-dashed border-neutral-300 bg-white/70 p-4 text-center text-[11px] text-neutral-600">
+                No notes yet.
+              </div>
+            )}
           </div>
         </div>
       </section>
 
-      {/* NOTE DIALOG – positioned like ScheduleInterviewDialog */}
-      {isNoteDialogOpen && (
-        <div
-          className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[12500] flex items-center justify-center px-4 py-8"
-          role="dialog"
-          aria-modal="true"
-          onClick={closeNoteDialog}
-        >
-          {/* Backdrop (click to close) */}
-          <div
-            className="absolute inset-0 bg-emerald-950/40"
-            aria-hidden="true"
-          />
-
-          {/* Panel */}
-          <div
-            className="relative z-10 w-full max-w-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <article
-              style={{
-                borderLeftWidth: 4,
-                borderLeftColor: getColorHex(dialogColor),
-              }}
-              className={[
-                "relative flex flex-col rounded-xl border p-4 sm:p-5 shadow-2xl transition-all",
-                "bg-gradient-to-br from-white via-white to-neutral-50",
-                "backdrop-blur supports-[backdrop-filter]:bg-white/90",
-                "border-neutral-100/80",
-              ].join(" ")}
-            >
-              {/* Header – dot + title */}
-              <div className="flex items-center gap-2">
-                <span
-                  className={`inline-block h-2.5 w-2.5 rounded-full ${COLOR_STYLES[dialogColor].dot}`}
-                  aria-hidden="true"
-                />
-                <input
-                  value={dialogTitle}
-                  onChange={(e) => setDialogTitle(e.target.value)}
-                  aria-label="Note title"
-                  placeholder="Note title"
-                  className="h-9 w-full rounded-md border border-neutral-300 bg-white px-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-300/40"
-                />
-              </div>
-
-              {/* Content */}
-              <div className="mt-3">
-                <label htmlFor="overview-dialog-content" className="sr-only">
-                  Note content
-                </label>
-                <textarea
-                  id="overview-dialog-content"
-                  value={dialogContent}
-                  onChange={(e) => setDialogContent(e.target.value)}
-                  rows={6}
-                  className="w-full rounded-md border border-neutral-300 bg-white p-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-300/40"
-                  placeholder="Write your note…"
-                />
-              </div>
-
-              {/* Color picker */}
-              <div className="mt-3">
-                <div className="mb-1 inline-flex items-center gap-2 text-xs text-neutral-600">
-                  <Palette className="h-3.5 w-3.5" aria-hidden="true" />
-                  <span>Color</span>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  {COLORS.map((c) => {
-                    const selected = dialogColor === c;
-                    return (
-                      <button
-                        key={c}
-                        type="button"
-                        onClick={() => setDialogColor(c)}
-                        aria-label={`Set note color: ${c}`}
-                        aria-pressed={selected}
-                        className={`h-7 w-7 rounded-full border transition ${selected ? `ring-2 ${COLOR_STYLES[c].ring}` : "ring-0"
-                          } ${c === "yellow" || c === "gray"
-                            ? "border-neutral-300"
-                            : "border-transparent"
-                          }`}
-                        style={{ background: getColorHex(c) }}
-                        title={c}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Tags */}
-              <div className="mt-3">
-                <label
-                  htmlFor="overview-dialog-tags"
-                  className="block text-xs text-neutral-600"
-                >
-                  Tags (comma-separated)
-                </label>
-                <input
-                  id="overview-dialog-tags"
-                  value={dialogTags}
-                  onChange={(e) => setDialogTags(e.target.value)}
-                  className="mt-1 h-9 w-full rounded-md border border-neutral-300 bg-white px-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-300/40"
-                  placeholder="e.g. interview, prep, phone screen"
-                />
-              </div>
-
-              {/* Footer – Cancel / Save at the bottom */}
-              <div className="mt-4 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={closeNoteDialog}
-                  className={[
-                    "inline-flex items-center gap-1 rounded-md border border-neutral-200 bg-white/80 px-3 py-1.5 text-xs font-medium text-neutral-700 shadow-sm hover:bg-white",
-                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-300",
-                  ].join(" ")}
-                  aria-label="Cancel"
-                  title="Cancel"
-                >
-                  <X className="h-3 w-3" aria-hidden="true" />
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveNote}
-                  className="inline-flex items-center gap-1 rounded-md border border-neutral-900 bg-neutral-900 px-3 py-1.5 text-xs font-medium text:white shadow-sm hover:bg-neutral-800"
-                  aria-label="Save note"
-                  title="Save"
-                >
-                  <Save className="h-3 w-3" aria-hidden="true" />
-                  Save
-                </button>
-              </div>
-            </article>
-          </div>
-        </div>
-      )}
+      {/* ✅ Reused exported dialog */}
+      <AddNoteDialog
+        open={isNoteDialogOpen}
+        onClose={closeNoteDialog}
+        onSave={handleSaveNote}
+        initialNote={editingNote}
+      />
     </>
   );
 }
