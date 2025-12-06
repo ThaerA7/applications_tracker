@@ -70,6 +70,18 @@ type MoveToAcceptedDialogProps = {
   mode?: MoveToAcceptedDialogMode;
 };
 
+const EMPLOYMENT_OPTIONS: string[] = [
+  "Full-time",
+  "Part-time",
+  "Internship",
+  "Working student",
+  "Contract",
+  "Temporary",
+  "Mini-job",
+  "Freelance",
+  "Ausbildung",
+];
+
 const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
   open,
   onClose,
@@ -109,10 +121,7 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
       setUrl(application.offerUrl ?? "");
       setNotes(application.notes ?? "");
 
-      const received =
-        application.offerReceivedDate ??
-        application.decisionDate ??
-        "";
+      const received = application.offerReceivedDate ?? application.decisionDate ?? "";
 
       setOfferReceivedDate(received);
       setOfferAcceptedDate(application.offerAcceptedDate ?? "");
@@ -136,8 +145,7 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
   if (!open) return null;
   if (mode === "move" && !application) return null;
 
-  const canSubmit =
-    company.trim().length > 0 && role.trim().length > 0;
+  const canSubmit = company.trim().length > 0 && role.trim().length > 0;
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -170,11 +178,7 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
   const isAddMode = mode === "add";
   const isEditMode = mode === "edit";
 
-  const title = isEditMode
-    ? "Edit offer"
-    : isAddMode
-    ? "Add offer"
-    : "Move offer";
+  const title = isEditMode ? "Edit offer" : isAddMode ? "Add offer" : "Move offer";
 
   const description = isEditMode
     ? "Update the details of this offer."
@@ -182,11 +186,7 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
     ? "Manually add an offer you received."
     : "Capture the final offer details and celebrate this win.";
 
-  const submitLabel = isEditMode
-    ? "Save changes"
-    : isAddMode
-    ? "Add offer"
-    : "Move offer";
+  const submitLabel = isEditMode ? "Save changes" : isAddMode ? "Add offer" : "Move offer";
 
   return (
     <div className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[12000] flex items-center justify-center px-4 py-8">
@@ -227,9 +227,7 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
               >
                 {title}
               </h2>
-              <p className="mt-0.5 text-xs text-neutral-600">
-                {description}
-              </p>
+              <p className="mt-0.5 text-xs text-neutral-600">{description}</p>
             </div>
           </div>
 
@@ -256,9 +254,7 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
                   <div className="font-medium text-neutral-900">
                     {application.role || "Role not set"}
                   </div>
-                  <div className="text-neutral-600">
-                    {application.company}
-                  </div>
+                  <div className="text-neutral-600">{application.company}</div>
                 </div>
                 {application.status && (
                   <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-800">
@@ -345,23 +341,26 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
               </div>
             </label>
 
-            {/* Employment type */}
+            {/* Employment type (✅ dropdown) */}
             <label className="space-y-1 text-sm">
-              <span className="font-medium text-neutral-800">
-                Employment type
-              </span>
+              <span className="font-medium text-neutral-800">Employment type</span>
               <div className="relative">
                 <Briefcase
                   className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
                   aria-hidden="true"
                 />
-                <input
-                  type="text"
+                <select
                   value={employmentType}
                   onChange={(e) => setEmploymentType(e.target.value)}
-                  placeholder="Full-time / Ausbildung / Internship…"
-                  className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
-                />
+                  className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
+                >
+                  <option value="">Select type…</option>
+                  {EMPLOYMENT_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
               </div>
             </label>
 
@@ -405,9 +404,7 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
 
             {/* Start date */}
             <label className="space-y-1 text-sm">
-              <span className="font-medium text-neutral-800">
-                Start date
-              </span>
+              <span className="font-medium text-neutral-800">Start date</span>
               <div className="relative">
                 <CalendarDays
                   className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
@@ -424,9 +421,7 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
 
             {/* Applied on */}
             <label className="space-y-1 text-sm">
-              <span className="font-medium text-neutral-800">
-                Applied on
-              </span>
+              <span className="font-medium text-neutral-800">Applied on</span>
               <div className="relative">
                 <CalendarDays
                   className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"

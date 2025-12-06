@@ -6,7 +6,8 @@ export type ActivityVariant =
   | "applied"
   | "interviews"
   | "rejected"
-  | "withdrawn";
+  | "withdrawn"
+  | "offers";
 
 export type ActivityType =
   | "added"
@@ -27,7 +28,22 @@ export type ActivityItem = {
   fromStatus?: string;
   toStatus?: string;
   note?: string;
+
+  /**
+   * Generic date field used across variants.
+   * Historically "applied on".
+   * For offers old records may still rely on this.
+   */
   appliedOn?: string;
+
+  /**
+   * ✅ Offer-specific dates
+   * We store these in offers activity so the sidebar can show
+   * the correct accepted/declined/received date.
+   */
+  offerReceivedDate?: string;
+  offerAcceptedDate?: string;
+  offerDeclinedDate?: string;
 };
 
 function fmtActivityTime(d: string) {
@@ -67,11 +83,15 @@ function getActivityIconSrc(type: ActivityType): string {
   }
 }
 
-// label text depends a bit on variant
+/**
+ * ✅ Item-aware labels
+ */
 function getActivityLabel(
   variant: ActivityVariant,
-  type: ActivityType
+  item: ActivityItem
 ): string {
+  const type = item.type;
+
   switch (variant) {
     case "applied":
       switch (type) {
@@ -90,6 +110,7 @@ function getActivityLabel(
         default:
           return "Activity";
       }
+
     case "interviews":
       switch (type) {
         case "added":
@@ -99,7 +120,8 @@ function getActivityLabel(
         case "deleted":
           return "Interview deleted";
         case "moved_to_interviews":
-          return "Moved to interviews";
+          // ✅ move from applied → interviews
+          return "Interview scheduled";
         case "moved_to_rejected":
           return "Moved to rejected";
         case "moved_to_withdrawn":
@@ -107,6 +129,7 @@ function getActivityLabel(
         default:
           return "Activity";
       }
+
     case "rejected":
       switch (type) {
         case "added":
@@ -124,6 +147,7 @@ function getActivityLabel(
         default:
           return "Activity";
       }
+
     case "withdrawn":
       switch (type) {
         case "added":
@@ -141,9 +165,72 @@ function getActivityLabel(
         default:
           return "Activity";
       }
+
+    case "offers": {
+      // ✅ Requested uppercase labels
+      if (type === "added") return "OFFER RECEIVED";
+      if (type === "deleted") return "OFFER DELETED";
+
+      if (type === "edited") {
+        const st = (item.toStatus || "").toLowerCase();
+
+        if (st === "accepted") return "OFFER ACCEPTED";
+        if (st === "declined") return "OFFER DECLINED";
+        if (st === "received") return "OFFER RECEIVED";
+
+        return "OFFER UPDATED";
+      }
+
+      return "OFFER UPDATED";
+    }
+
     default:
       return "Activity";
   }
+}
+
+/**
+ * ✅ For offers: choose the correct primary date & label per activity item.
+ */
+function getOffersPrimaryDate(item: ActivityItem): {
+  label: string;
+  value?: string;
+} {
+  const to = (item.toStatus || "").toLowerCase();
+
+  if (to === "accepted") {
+    return {
+      label: "Offer accepted on",
+      value: item.offerAcceptedDate ?? item.appliedOn,
+    };
+  }
+
+  if (to === "declined") {
+    return {
+      label: "Offer declined on",
+      value: item.offerDeclinedDate ?? item.appliedOn,
+    };
+  }
+
+  if (to === "received") {
+    return {
+      label: "Offer received on",
+      value: item.offerReceivedDate ?? item.appliedOn,
+    };
+  }
+
+  // Fallbacks based on type
+  if (item.type === "added") {
+    return {
+      label: "Offer received on",
+      value: item.offerReceivedDate ?? item.appliedOn,
+    };
+  }
+
+  return {
+    label: "Offer received on",
+    value: item.offerReceivedDate ?? item.appliedOn,
+  };
 }
 
 type VariantConfig = {
@@ -181,6 +268,7 @@ const VARIANT_CONFIG: Record<ActivityVariant, VariantConfig> = {
     closeButtonFocusRingClass:
       "focus-visible:ring-2 focus-visible:ring-sky-300",
   },
+
   interviews: {
     backdrop: "bg-emerald-950/40",
     panelGradient:
@@ -201,6 +289,7 @@ const VARIANT_CONFIG: Record<ActivityVariant, VariantConfig> = {
     closeButtonFocusRingClass:
       "focus-visible:ring-2 focus-visible:ring-emerald-300",
   },
+
   rejected: {
     backdrop: "bg-neutral-900/40",
     panelGradient: "bg-gradient-to-b from-white via-rose-50/70 to-pink-50/70",
@@ -221,6 +310,7 @@ const VARIANT_CONFIG: Record<ActivityVariant, VariantConfig> = {
     closeButtonFocusRingClass:
       "focus-visible:ring-2 focus-visible:ring-rose-300",
   },
+
   withdrawn: {
     backdrop: "bg-neutral-900/40",
     panelGradient: "bg-gradient-to-b from-white via-amber-50/70 to-rose-50/70",
@@ -239,6 +329,27 @@ const VARIANT_CONFIG: Record<ActivityVariant, VariantConfig> = {
     headerIconAlt: "Withdrawn activity",
     closeButtonFocusRingClass:
       "focus-visible:ring-2 focus-visible:ring-amber-300",
+  },
+
+  offers: {
+    backdrop: "bg-emerald-950/40",
+    panelGradient:
+      "bg-gradient-to-b from-white via-emerald-50/70 to-lime-50/70",
+    topBarGradient:
+      "bg-gradient-to-r from-pink-500 via-orange-400 to-amber-300",
+    appliedBoxClass:
+      "rounded-lg border border-neutral-200/80 bg-emerald-50/60 px-2.5 py-1.5",
+    actionBoxClass:
+      "rounded-lg border border-emerald-100/80 bg-emerald-50/60 px-2.5 py-1.5",
+    actionLabelClass:
+      "text-[10px] font-semibold uppercase tracking-wide text-emerald-700",
+    hoverBorderClass: "hover:border-emerald-200",
+    emptyBorderClass: "border-emerald-100/80",
+    headerTitle: "Offers activity",
+    headerSubtitle: "Created, updated, tagged and deleted offer cards.",
+    headerIconAlt: "Offers activity",
+    closeButtonFocusRingClass:
+      "focus-visible:ring-2 focus-visible:ring-emerald-300",
   },
 };
 
@@ -339,12 +450,14 @@ export default function ActivityLogSidebar({
                   "No rejected activity yet. Creating, editing, moving or deleting rejected applications will show up here."}
                 {variant === "withdrawn" &&
                   "No withdrawn activity yet. Creating, editing or deleting withdrawn applications will show up here."}
+                {variant === "offers" &&
+                  "No offers activity yet. Adding, editing, tagging or deleting offers will show up here."}
               </p>
             </div>
           ) : (
             <ul className="space-y-2.5">
               {items.map((item) => {
-                const baseLabel = getActivityLabel(variant, item.type);
+                const baseLabel = getActivityLabel(variant, item);
                 const iconSrc = getActivityIconSrc(item.type);
 
                 const isMoveType =
@@ -356,6 +469,11 @@ export default function ActivityLogSidebar({
                   isMoveType && item.fromStatus
                     ? `${baseLabel} from ${item.fromStatus}`
                     : baseLabel;
+
+                const primaryDate =
+                  variant === "offers"
+                    ? getOffersPrimaryDate(item)
+                    : { label: "Applied on", value: item.appliedOn };
 
                 return (
                   <li
@@ -395,6 +513,8 @@ export default function ActivityLogSidebar({
                               {item.role ||
                                 (variant === "interviews"
                                   ? "Interview"
+                                  : variant === "offers"
+                                  ? "Offer"
                                   : "Application")}
                             </span>
                             <span className="text-xs font-semibold text-neutral-700">
@@ -413,10 +533,10 @@ export default function ActivityLogSidebar({
                       <div className="grid gap-2 text-[11px] text-neutral-600 sm:grid-cols-2">
                         <div className={config.appliedBoxClass}>
                           <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
-                            Applied on
+                            {primaryDate.label}
                           </div>
                           <div className="mt-0.5 text-xs text-neutral-900">
-                            {fmtAppliedDate(item.appliedOn)}
+                            {fmtAppliedDate(primaryDate.value)}
                           </div>
                         </div>
 
