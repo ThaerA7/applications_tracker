@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import Sidebar from '@/components/sidebar';
 import TopBar from '@/components/topbar';
+import SignInGateDialog from '@/components/dialogs/SignInGateDialog'; // ✅ add
 
 const STORAGE_KEY = 'job-tracker:sidebar-collapsed';
 
@@ -31,6 +32,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <>
+      {/* ✅ UI-only sign in gate */}
+      <SignInGateDialog />
+
       <Sidebar collapsed={collapsed} />
       <div className="min-h-screen pl-[var(--sidebar-width)] transition-[padding-left] duration-200">
         <TopBar
