@@ -1,8 +1,10 @@
-// components/topbar.tsx
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
-import { LogOut, Menu } from "lucide-react";
+import { LogOut, Menu, UserRound } from "lucide-react";
+import type { User } from "@supabase/supabase-js";
+import { getSupabaseClient } from "@/lib/supabase/client";
 
 type RouteMeta = {
   title: string;
@@ -23,8 +25,6 @@ const ROUTES: Record<string, { title: string }> = {
   "/notes": { title: "Notes" },
   "/settings": { title: "Settings" },
 };
-
-
 
 type Accent = {
   washFrom: string;
@@ -52,7 +52,7 @@ const ACCENTS: Record<string, Accent> = {
     barTo: "after:to-teal-500",
     focus: "focus-visible:ring-emerald-300",
   },
-    "/job-search": {
+  "/job-search": {
     washFrom: "from-amber-50",
     barFrom: "after:from-amber-500",
     barTo: "after:to-orange-500",
@@ -119,6 +119,60 @@ export default function TopBar({ collapsed, onToggleSidebar }: TopBarProps) {
   const { title } = ROUTES[activeKey];
   const accent = ACCENTS[activeKey];
 
+  const [user, setUser] = useState<User | null>(null);
+
+  // Load session + subscribe
+  useEffect(() => {
+    const supabase = getSupabaseClient();
+    let active = true;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      setUser(data.session?.user ?? null);
+    });
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => {
+      active = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
+  const avatarLabel = useMemo(() => {
+    if (!user) return "Guest";
+    const meta = user.user_metadata as Record<string, any> | undefined;
+    return (
+      meta?.full_name ||
+      meta?.name ||
+      user.email ||
+      "User"
+    );
+  }, [user]);
+
+  const avatarInitial = useMemo(() => {
+    const txt = (avatarLabel || "").trim();
+    return txt ? txt[0].toUpperCase() : "U";
+  }, [avatarLabel]);
+
+  const handleGoogleSignIn = async () => {
+    const supabase = getSupabaseClient();
+    const redirectTo = `${window.location.origin}/auth/callback`;
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo },
+    });
+    if (error) console.error("Google sign-in failed:", error.message);
+  };
+
+  const handleLogout = async () => {
+    const supabase = getSupabaseClient();
+    const { error } = await supabase.auth.signOut();
+    if (error) console.error("Sign out failed:", error.message);
+  };
+
   return (
     <header
       className={[
@@ -136,43 +190,71 @@ export default function TopBar({ collapsed, onToggleSidebar }: TopBarProps) {
             type="button"
             onClick={onToggleSidebar}
             className={[
-              // 🔹 no bg / border / shadow, just the icon
               "inline-flex items-center justify-center p-1.5",
               "text-neutral-700 hover:text-neutral-900",
-              "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-300",
+              "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+              accent.focus,
             ].join(" ")}
             aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
           >
             <Menu className="h-6 w-6" aria-hidden="true" />
           </button>
 
-          <h1 className="text-lg font-semibold text-neutral-900">
-            {title}
-          </h1>
+          <h1 className="text-lg font-semibold text-neutral-900">{title}</h1>
         </div>
 
-        {/* Right: avatar + logout */}
+        {/* Right: auth-aware area */}
         <div className="flex items-center gap-3">
+          {/* Avatar / Guest badge */}
           <div
-            className="grid h-8 w-8 place-items-center rounded-full bg-neutral-200/80 text-sm font-semibold text-neutral-700 ring-1 ring-neutral-300"
-            aria-label="User avatar"
-          >
-            T
-          </div>
-          <button
-            type="button"
             className={[
-              "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium",
-              "text-red-600 hover:text-red-700",
-              "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
-              "border border-red-200/60 shadow-sm",
-              "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-300",
+              "grid h-8 w-8 place-items-center rounded-full",
+              user
+                ? "bg-neutral-200/80 text-neutral-700 ring-1 ring-neutral-300"
+                : "bg-amber-100/80 text-amber-800 ring-1 ring-amber-200",
+              "text-sm font-semibold",
             ].join(" ")}
-            aria-label="Log out"
+            aria-label={user ? "User avatar" : "Guest mode"}
+            title={avatarLabel}
           >
-            <LogOut className="h-4 w-4" aria-hidden="true" />
-            Log out
-          </button>
+            {user ? avatarInitial : "G"}
+          </div>
+
+          {user ? (
+            <button
+              type="button"
+              onClick={handleLogout}
+              className={[
+                "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium",
+                "text-red-600 hover:text-red-700",
+                "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
+                "border border-red-200/60 shadow-sm",
+                "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-300",
+              ].join(" ")}
+              aria-label="Log out"
+            >
+              <LogOut className="h-4 w-4" aria-hidden="true" />
+              Log out
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              className={[
+                "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium",
+                "text-neutral-900",
+                "bg-white/80",
+                "border border-neutral-200 shadow-sm",
+                "hover:bg-neutral-50",
+                "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+                accent.focus,
+              ].join(" ")}
+              aria-label="Sign in with Google"
+            >
+              <UserRound className="h-4 w-4" aria-hidden="true" />
+              Sign in
+            </button>
+          )}
         </div>
       </div>
     </header>
