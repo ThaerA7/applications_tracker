@@ -33,7 +33,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <>
       {/* ✅ UI-only sign in gate */}
-      <SignInGateDialog />
+      <SignInGateDialog defaultOpen={false} />
 
       <Sidebar collapsed={collapsed} />
       <div className="min-h-screen pl-[var(--sidebar-width)] transition-[padding-left] duration-200">

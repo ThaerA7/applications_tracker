@@ -1,3 +1,4 @@
+// app/auth/callback/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -7,15 +8,18 @@ export async function GET(request: Request) {
   const next = url.searchParams.get("next") ?? "/";
   const origin = url.origin;
 
-  if (code) {
-    const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-
-    if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
-    }
+  // If no code, this was likely implicit flow (hash tokens).
+  // Your UI client will handle session from the hash automatically.
+  if (!code) {
+    return NextResponse.redirect(`${origin}${next}`);
   }
 
-  // If something went wrong, send user somewhere safe
+  const supabase = await createClient();
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
+
+  if (!error) {
+    return NextResponse.redirect(`${origin}${next}`);
+  }
+
   return NextResponse.redirect(`${origin}/?auth=error`);
 }

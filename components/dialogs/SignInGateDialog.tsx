@@ -1,7 +1,9 @@
+// components/dialogs/SignInGateDialog.tsx
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import {
   X,
   UserRound,
@@ -10,6 +12,7 @@ import {
   Cloud,
   CheckCircle2,
 } from "lucide-react";
+import { getSupabaseClient } from "@/lib/supabase/client";
 
 type SignInGateDialogProps = {
   defaultOpen?: boolean;
@@ -17,14 +20,11 @@ type SignInGateDialogProps = {
   onGoogleSignIn?: () => void;
 };
 
+const GUEST_ACCEPTED_KEY = "job-tracker:guest-accepted";
+
 function GoogleIcon({ className = "h-4 w-4" }: { className?: string }) {
   return (
-    <svg
-      className={className}
-      viewBox="0 0 48 48"
-      aria-hidden="true"
-      focusable="false"
-    >
+    <svg className={className} viewBox="0 0 48 48" aria-hidden="true">
       <path
         fill="#FFC107"
         d="M43.611 20.083H42V20H24v8h11.303C33.657 32.657 29.304 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.651-.389-3.917z"
@@ -50,10 +50,38 @@ export default function SignInGateDialog({
   onContinueAsGuest,
   onGoogleSignIn,
 }: SignInGateDialogProps) {
-  const [open, setOpen] = useState(defaultOpen);
+  const router = useRouter();
+
+  const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
+
+  // Decide whether to open:
+  // - don't open if user already has a session
+  // - don't open if they already accepted guest mode
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const run = async () => {
+      const guestAccepted =
+        window.localStorage.getItem(GUEST_ACCEPTED_KEY) === "1";
+
+      const supabase = getSupabaseClient();
+      const { data } = await supabase.auth.getSession();
+      const hasSession = !!data.session;
+
+      setOpen(defaultOpen && !guestAccepted && !hasSession);
+    };
+
+    run();
+  }, [defaultOpen]);
+useEffect(() => {
+  const handler = () => setOpen(true);
+  window.addEventListener("job-tracker:open-signin-gate", handler);
+  return () =>
+    window.removeEventListener("job-tracker:open-signin-gate", handler);
+}, []);
 
   // ESC to close
   useEffect(() => {
@@ -75,37 +103,47 @@ export default function SignInGateDialog({
     };
   }, [open]);
 
+  const handleGuest = useCallback(() => {
+    try {
+      window.localStorage.setItem(GUEST_ACCEPTED_KEY, "1");
+    } catch {}
+
+    onContinueAsGuest?.();
+    setOpen(false);
+    router.push("/"); // ✅ always go to Overview
+  }, [onContinueAsGuest, router]);
+
+  const handleGoogle = useCallback(async () => {
+    if (onGoogleSignIn) return onGoogleSignIn();
+
+    const supabase = getSupabaseClient();
+    const redirectTo = `${window.location.origin}/auth/callback?next=/`; // ✅ force Overview
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo },
+    });
+
+    if (error) console.error("Google sign-in failed:", error.message);
+  }, [onGoogleSignIn]);
+
   const content = useMemo(() => {
     if (!open) return null;
 
     const handleBackdrop = () => setOpen(false);
 
-    const handleGuest = () => {
-      onContinueAsGuest?.();
-      setOpen(false);
-    };
-
-    const handleGoogle = () => {
-      onGoogleSignIn?.();
-      // keep open until auth finishes if you want
-      // setOpen(false);
-    };
-
     return (
       <div className="fixed inset-0 z-[60]">
-        {/* Backdrop */}
         <div
           className="absolute inset-0 bg-black/40 backdrop-blur-md"
           onClick={handleBackdrop}
         />
 
-        {/* Dialog */}
         <div className="absolute inset-0 flex items-center justify-center p-3 sm:p-6">
-          {/* Outer shell adds subtle gradient border */}
           <div
             className={[
               "relative w-full",
-              "max-w-[800px]", // bigger width
+              "max-w-[800px]",
               "rounded-[28px] p-[1px]",
               "bg-gradient-to-br from-indigo-200/70 via-sky-200/40 to-fuchsia-200/50",
               "shadow-[0_20px_80px_-20px_rgba(0,0,0,0.35)]",
@@ -123,11 +161,9 @@ export default function SignInGateDialog({
                 "ring-1 ring-black/5",
               ].join(" ")}
             >
-              {/* Decorative background */}
               <div className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-indigo-500/10 blur-3xl" />
               <div className="pointer-events-none absolute -bottom-28 -right-24 h-80 w-80 rounded-full bg-sky-500/10 blur-3xl" />
 
-              {/* Close button */}
               <button
                 type="button"
                 onClick={() => setOpen(false)}
@@ -145,7 +181,6 @@ export default function SignInGateDialog({
                 <X className="h-4.5 w-4.5" />
               </button>
 
-              {/* Layout */}
               <div
                 className={[
                   "grid",
@@ -153,7 +188,6 @@ export default function SignInGateDialog({
                   "min-h-[440px]",
                 ].join(" ")}
               >
-                {/* Left hero panel */}
                 <div className="relative overflow-hidden px-6 py-8 sm:px-10 sm:py-12">
                   <div className="inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-[11px] font-medium text-indigo-700">
                     <Sparkles className="h-3.5 w-3.5" />
@@ -175,7 +209,6 @@ export default function SignInGateDialog({
                     guest with local-only data.
                   </p>
 
-                  {/* Feature list (cleaner than 3 mini cards) */}
                   <div className="mt-6 space-y-3">
                     <div className="flex items-start gap-3">
                       <CheckCircle2 className="mt-0.5 h-5 w-5 text-emerald-600" />
@@ -212,11 +245,9 @@ export default function SignInGateDialog({
                     </div>
                   </div>
 
-                  {/* Subtle bottom accent */}
                   <div className="pointer-events-none absolute -bottom-24 left-10 h-56 w-56 rounded-full bg-indigo-600/5 blur-2xl" />
                 </div>
 
-                {/* Right action panel */}
                 <div className="relative border-t border-neutral-100 sm:border-t-0 sm:border-l px-6 py-8 sm:px-10 sm:py-12">
                   <h3 className="mt-0 text-sm font-semibold tracking-tight text-neutral-900">
                     Choose how to continue:
@@ -265,7 +296,6 @@ export default function SignInGateDialog({
                     <span className="h-px flex-1 bg-neutral-200" />
                   </div>
 
-                  {/* More reasons, same original style */}
                   <div className="grid gap-2">
                     <div className="rounded-xl border border-neutral-200/70 bg-neutral-50 p-3">
                       <div className="flex items-center gap-2 text-xs font-medium text-neutral-800">
@@ -306,7 +336,7 @@ export default function SignInGateDialog({
         </div>
       </div>
     );
-  }, [open, onContinueAsGuest, onGoogleSignIn]);
+  }, [open, handleGoogle, handleGuest]);
 
   if (!mounted) return null;
   return createPortal(content, document.body);

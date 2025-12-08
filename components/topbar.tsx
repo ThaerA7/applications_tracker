@@ -141,16 +141,25 @@ export default function TopBar({ collapsed, onToggleSidebar }: TopBarProps) {
     };
   }, []);
 
-  const avatarLabel = useMemo(() => {
-    if (!user) return "Guest";
-    const meta = user.user_metadata as Record<string, any> | undefined;
-    return (
-      meta?.full_name ||
-      meta?.name ||
-      user.email ||
-      "User"
-    );
-  }, [user]);
+ const avatarLabel = useMemo(() => {
+  if (!user) return "Guest";
+  const meta = user.user_metadata as Record<string, any> | undefined;
+
+  const name =
+    meta?.full_name ||
+    meta?.name ||
+    meta?.given_name ||
+    meta?.first_name;
+
+  if (name) return name;
+
+  if (user.email) {
+    const local = user.email.split("@")[0] ?? "";
+    return local.replace(/[._-]+/g, " ").trim() || user.email;
+  }
+
+  return "User";
+}, [user]);
 
   const avatarInitial = useMemo(() => {
     const txt = (avatarLabel || "").trim();
@@ -158,14 +167,18 @@ export default function TopBar({ collapsed, onToggleSidebar }: TopBarProps) {
   }, [avatarLabel]);
 
   const handleGoogleSignIn = async () => {
-    const supabase = getSupabaseClient();
-    const redirectTo = `${window.location.origin}/auth/callback`;
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo },
-    });
-    if (error) console.error("Google sign-in failed:", error.message);
-  };
+  const supabase = getSupabaseClient();
+  const redirectTo = `${window.location.origin}/auth/callback?next=/`; // ✅ force Overview
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo },
+  });
+  if (error) console.error("Google sign-in failed:", error.message);
+};
+const openSignInGate = () => {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event("job-tracker:open-signin-gate"));
+};
 
   const handleLogout = async () => {
     const supabase = getSupabaseClient();
@@ -238,22 +251,22 @@ export default function TopBar({ collapsed, onToggleSidebar }: TopBarProps) {
             </button>
           ) : (
             <button
-              type="button"
-              onClick={handleGoogleSignIn}
-              className={[
-                "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium",
-                "text-neutral-900",
-                "bg-white/80",
-                "border border-neutral-200 shadow-sm",
-                "hover:bg-neutral-50",
-                "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
-                accent.focus,
-              ].join(" ")}
-              aria-label="Sign in with Google"
-            >
-              <UserRound className="h-4 w-4" aria-hidden="true" />
-              Sign in
-            </button>
+  type="button"
+  onClick={openSignInGate} // ✅ open dialog instead of direct OAuth
+  className={[
+    "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium",
+    "text-neutral-900",
+    "bg-white/80",
+    "border border-neutral-200 shadow-sm",
+    "hover:bg-neutral-50",
+    "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+    accent.focus,
+  ].join(" ")}
+  aria-label="Sign in"
+>
+  <UserRound className="h-4 w-4" aria-hidden="true" />
+  Sign in
+</button>
           )}
         </div>
       </div>

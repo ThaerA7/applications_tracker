@@ -1,4 +1,6 @@
+// lib/supabase/client.ts
 'use client';
+
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 let client: SupabaseClient | null = null;
@@ -6,20 +8,30 @@ let client: SupabaseClient | null = null;
 export function getSupabaseClient(): SupabaseClient {
   if (client) return client;
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url =
+    process.env.NEXT_PUBLIC_SUPABASE_URL ??
+    process.env.NEXT_PUBLIC_DATABASE_SUPABASE_URL;
+
+  const anon =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+    process.env.NEXT_PUBLIC_DATABASE_SUPABASE_ANON_KEY;
 
   if (!url || !anon) {
     throw new Error(
-      'Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY. ' +
-      'Add them in Vercel → Project → Settings → Environment Variables, then redeploy.'
+      'Missing Supabase public env vars. ' +
+        'Expected NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY ' +
+        '(or *_PUBLISHABLE_KEY).'
     );
   }
 
   client = createClient(url, anon, {
-    auth: { persistSession: true, autoRefreshToken: true },
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      flowType: "pkce", // ✅ IMPORTANT
+    },
   });
+
   return client;
 }
-export { createClient };
-
