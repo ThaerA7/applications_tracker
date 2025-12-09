@@ -1,3 +1,4 @@
+// app/offers/page.tsx
 "use client";
 
 import {
@@ -179,6 +180,11 @@ export default function OffersReceivedPage() {
   const [activityOpen, setActivityOpen] = useState(false);
   const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
 
+  // ✅ NEW: Delete confirmation dialog target (like Interviews)
+  const [deleteTarget, setDeleteTarget] = useState<OfferReceivedJob | null>(
+    null
+  );
+
   // ✅ helper to append to activity log (and persist)
   const appendActivity = (entry: ActivityItem) => {
     setActivityItems((prev) => {
@@ -275,50 +281,54 @@ export default function OffersReceivedPage() {
     }
   };
 
-  const handleDelete = (id: string) => {
-    const target = items.find((j) => j.id === id);
+  // ✅ NEW delete flow (Interview-style)
+  const openDeleteDialog = (id: string) => {
+    const target = items.find((j) => j.id === id) ?? null;
+    if (!target) return;
+    setDeleteTarget(target);
+  };
 
-    if (typeof window !== "undefined") {
-      const confirmed = window.confirm(
-        "Remove this offer from your win board?"
-      );
-      if (!confirmed) return;
-    }
+  const handleCancelDelete = () => {
+    setDeleteTarget(null);
+  };
 
-    if (target) {
-      const activityId =
-        typeof crypto !== "undefined" && "randomUUID" in crypto
-          ? crypto.randomUUID()
-          : `${Date.now()}-offer-delete`;
+  const handleConfirmDelete = () => {
+    if (!deleteTarget) return;
 
-      const received = getOfferReceivedForActivity(target);
+    const activityId =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-offer-delete`;
 
-      appendActivity({
-        id: activityId,
-        appId: target.id,
-        type: "deleted",
-        timestamp: new Date().toISOString(),
-        company: target.company,
-        role: target.role,
-        location: target.location,
+    const received = getOfferReceivedForActivity(deleteTarget);
 
-        // fallback compatibility
-        appliedOn: received,
+    appendActivity({
+      id: activityId,
+      appId: deleteTarget.id,
+      type: "deleted",
+      timestamp: new Date().toISOString(),
+      company: deleteTarget.company,
+      role: deleteTarget.role,
+      location: deleteTarget.location,
 
-        // ✅ offer-specific dates
-        offerReceivedDate: received,
-        offerAcceptedDate: target.offerAcceptedDate,
-        offerDeclinedDate: target.offerDeclinedDate,
+      // fallback compatibility
+      appliedOn: received,
 
-        note: target.notes,
-      });
-    }
+      // ✅ offer-specific dates
+      offerReceivedDate: received,
+      offerAcceptedDate: deleteTarget.offerAcceptedDate,
+      offerDeclinedDate: deleteTarget.offerDeclinedDate,
+
+      note: deleteTarget.notes,
+    });
 
     setItems((prev) => {
-      const next = prev.filter((job) => job.id !== id);
+      const next = prev.filter((job) => job.id !== deleteTarget.id);
       persist(next);
       return next;
     });
+
+    setDeleteTarget(null);
   };
 
   const openAddDialog = () => {
@@ -603,6 +613,92 @@ export default function OffersReceivedPage() {
 
   return (
     <>
+      {/* Add / edit offer received dialog */}
+      <MoveToAcceptedDialog
+        open={isDialogOpen}
+        onClose={handleCloseDialog}
+        application={
+          editingItem
+            ? {
+                id: editingItem.id,
+                company: editingItem.company,
+                role: editingItem.role,
+                location: editingItem.location,
+                status: "Offer",
+                appliedOn: editingItem.appliedOn,
+                employmentType: editingItem.employmentType,
+                offerUrl: editingItem.url,
+                logoUrl: editingItem.logoUrl,
+                notes: editingItem.notes,
+                decisionDate: editingItem.decisionDate,
+                offerReceivedDate:
+                  editingItem.offerReceivedDate ??
+                  editingItem.decisionDate,
+                offerAcceptedDate: editingItem.offerAcceptedDate,
+              }
+            : null
+        }
+        onAcceptedCreated={handleOfferCreated}
+        mode={editingItem ? "edit" : "add"}
+      />
+
+      {/* Tag decision dialog */}
+      <OfferAcceptanceTagDialog
+        open={isTagDialogOpen}
+        onClose={closeTagDialog}
+        offer={taggingItem}
+        onSave={handleTagSave}
+      />
+
+      {/* ✅ Delete confirmation dialog (Offers) – matches Interviews */}
+      {deleteTarget && (
+        <div className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[13000] flex items-center justify-center px-4 py-8">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-neutral-900/40"
+            aria-hidden="true"
+            onClick={handleCancelDelete}
+          />
+
+          {/* Panel */}
+          <div
+            className={[
+              "relative z-10 w-full max-w-sm rounded-2xl border border-neutral-200/80",
+              "bg-white shadow-2xl p-5",
+            ].join(" ")}
+          >
+            <h2 className="text-sm font-semibold text-neutral-900">
+              Delete offer?
+            </h2>
+            <p className="mt-2 text-sm text-neutral-700">
+              This will permanently remove the offer from{" "}
+              <span className="font-medium">{deleteTarget.company}</span> for
+              the role <span className="font-medium">{deleteTarget.role}</span>.
+            </p>
+            <p className="mt-1 text-xs text-neutral-500">
+              This action cannot be undone.
+            </p>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={handleCancelDelete}
+                className="inline-flex items-center justify-center rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 shadow-sm hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="inline-flex items-center justify-center rounded-lg border border-rose-500 bg-rose-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-rose-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-rose-400"
+              >
+                Delete offer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <section
         className={[
           "relative rounded-2xl border border-neutral-200/70",
@@ -610,43 +706,6 @@ export default function OffersReceivedPage() {
           "p-8 shadow-md overflow-hidden",
         ].join(" ")}
       >
-        {/* Add / edit offer received dialog */}
-        <MoveToAcceptedDialog
-          open={isDialogOpen}
-          onClose={handleCloseDialog}
-          application={
-            editingItem
-              ? {
-                  id: editingItem.id,
-                  company: editingItem.company,
-                  role: editingItem.role,
-                  location: editingItem.location,
-                  status: "Offer",
-                  appliedOn: editingItem.appliedOn,
-                  employmentType: editingItem.employmentType,
-                  offerUrl: editingItem.url,
-                  logoUrl: editingItem.logoUrl,
-                  notes: editingItem.notes,
-                  decisionDate: editingItem.decisionDate,
-                  offerReceivedDate:
-                    editingItem.offerReceivedDate ??
-                    editingItem.decisionDate,
-                  offerAcceptedDate: editingItem.offerAcceptedDate,
-                }
-              : null
-          }
-          onAcceptedCreated={handleOfferCreated}
-          mode={editingItem ? "edit" : "add"}
-        />
-
-        {/* Tag decision dialog */}
-        <OfferAcceptanceTagDialog
-          open={isTagDialogOpen}
-          onClose={closeTagDialog}
-          offer={taggingItem}
-          onSave={handleTagSave}
-        />
-
         {/* cheerful blobs */}
         <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-emerald-400/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-lime-400/20 blur-3xl" />
@@ -865,7 +924,7 @@ export default function OffersReceivedPage() {
           view={view}
           onTagStatus={openTagDialog}
           onEdit={handleEdit}
-          onDelete={handleDelete}
+          onDelete={openDeleteDialog}
         />
       </section>
 
