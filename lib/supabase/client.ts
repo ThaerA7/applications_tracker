@@ -1,7 +1,8 @@
 // lib/supabase/client.ts
 'use client';
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 let client: SupabaseClient | null = null;
 
@@ -25,11 +26,11 @@ export function getSupabaseClient(): SupabaseClient {
     );
   }
 
-  client = createClient(url, anon, {
+  client = createBrowserClient(url, anon, {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      flowType: "pkce", // ✅ IMPORTANT
+      flowType: 'pkce',
     },
   });
 

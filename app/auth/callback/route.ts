@@ -8,18 +8,17 @@ export async function GET(request: Request) {
   const next = url.searchParams.get("next") ?? "/";
   const origin = url.origin;
 
-  // If no code, this was likely implicit flow (hash tokens).
-  // Your UI client will handle session from the hash automatically.
   if (!code) {
     return NextResponse.redirect(`${origin}${next}`);
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
-  if (!error) {
-    return NextResponse.redirect(`${origin}${next}`);
+  if (error) {
+    console.error("exchangeCodeForSession error:", error);
+    return NextResponse.redirect(`${origin}/?auth=error`);
   }
 
-  return NextResponse.redirect(`${origin}/?auth=error`);
+  return NextResponse.redirect(`${origin}${next}`);
 }
