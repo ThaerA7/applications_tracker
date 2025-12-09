@@ -1,4 +1,3 @@
-// lib/supabase/middleware.ts
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
@@ -44,24 +43,9 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  // IMPORTANT: Keep this pattern to avoid random logouts with SSR
-  const { data } = await supabase.auth.getClaims();
-  const user = data?.claims;
+  // Keep this pattern to avoid random logouts with SSR
+  await supabase.auth.getClaims();
 
-  const path = request.nextUrl.pathname;
-
-  const isPublic =
-    path === "/" ||
-    path.startsWith("/login") ||
-    path.startsWith("/auth") ||
-    path.startsWith("/public");
-
-  if (!user && !isPublic) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/auth/login";
-    url.searchParams.set("next", path);
-    return NextResponse.redirect(url);
-  }
-
+  // ✅ Make all pages accessible (UI gate only)
   return supabaseResponse;
 }
