@@ -752,118 +752,118 @@ export default function StatsCard() {
           </div>
 
           <div className="grid grid-cols-1 divide-y divide-neutral-100 lg:grid-cols-2 lg:divide-y-0 lg:divide-x">
-  {/* Weekly bar chart */}
-  <div className="pb-4 lg:pb-0 lg:pr-4">
-    <div className="flex items-center justify-between gap-2">
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">
-          This week
-        </p>
-        <p className="mt-1 text-sm font-semibold text-neutral-900">
-          Applications vs interviews
-        </p>
-      </div>
-      <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700">
-        <TrendingUp className="h-3 w-3" />
-        <span>Live from your boards</span>
-      </span>
-    </div>
+            {/* Weekly bar chart */}
+            <div className="pb-4 lg:pb-0 lg:pr-4">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+                    This week
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-neutral-900">
+                    Applications vs interviews
+                  </p>
+                </div>
+                <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700">
+                  <TrendingUp className="h-3 w-3" />
+                  <span>Live from your boards</span>
+                </span>
+              </div>
 
-    {/* ✅ Same height as the other chart */}
-    <div className="mt-3 h-32">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={weeklyActivity} barSize={14}>
-          <CartesianGrid vertical={false} stroke="#e5e7eb" />
-          <XAxis
-            dataKey="day"
-            tickLine={false}
-            axisLine={false}
-            tickMargin={8}
-            tick={{ fontSize: 11, fill: "#6b7280" }}
-          />
-          <YAxis
-          width={18}
-            tickLine={false}
-            axisLine={false}
-            tickMargin={8}
-            tick={{ fontSize: 11, fill: "#6b7280" }}
-            allowDecimals={false}
-          />
-          <Tooltip contentStyle={tooltipStyle} />
-          <Bar
-            dataKey="applications"
-            radius={[6, 6, 0, 0]}
-            fill="#0ea5e9"
-          />
-          <Bar
-            dataKey="interviews"
-            radius={[6, 6, 0, 0]}
-            fill="#22c55e"
-          />
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  </div>
+              {/* ✅ Same height as the other chart */}
+              <div className="mt-3 h-32">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={weeklyActivity} barSize={14}>
+                    <CartesianGrid vertical={false} stroke="#e5e7eb" />
+                    <XAxis
+                      dataKey="day"
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={8}
+                      tick={{ fontSize: 11, fill: "#6b7280" }}
+                    />
+                    <YAxis
+                      width={18}
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={8}
+                      tick={{ fontSize: 11, fill: "#6b7280" }}
+                      allowDecimals={false}
+                    />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Bar
+                      dataKey="applications"
+                      radius={[6, 6, 0, 0]}
+                      fill="#0ea5e9"
+                    />
+                    <Bar
+                      dataKey="interviews"
+                      radius={[6, 6, 0, 0]}
+                      fill="#22c55e"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
 
-  {/* Conversion line chart */}
-  <div className="pt-4 lg:pt-0 lg:pl-4">
-    <div className="flex items-center justify-between gap-2">
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">
-          This month
-        </p>
-        <p className="mt-1 text-sm font-semibold text-neutral-900">
-          Pipeline over weeks
-        </p>
-      </div>
-      <span className="rounded-full bg-neutral-50 px-2 py-0.5 text-[11px] font-medium text-neutral-600">
-        {kpi.monthlyApplications} applications
-      </span>
-    </div>
+            {/* Conversion line chart */}
+            <div className="pt-4 lg:pt-0 lg:pl-4">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+                    This month
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-neutral-900">
+                    Pipeline over weeks
+                  </p>
+                </div>
+                <span className="rounded-full bg-neutral-50 px-2 py-0.5 text-[11px] font-medium text-neutral-600">
+                  {kpi.monthlyApplications} applications
+                </span>
+              </div>
 
-    {/* ✅ Match height to bar chart */}
-    <div className="mt-3 h-32">
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={conversionOverTime}>
-          <CartesianGrid vertical={false} stroke="#e5e7eb" />
-          <XAxis
-            dataKey="label"
-            tickLine={false}
-            axisLine={false}
-            tickMargin={8}
-            tick={{ fontSize: 10, fill: "#6b7280" }}
-          />
-          <YAxis hide />
-          <Tooltip contentStyle={tooltipStyle} />
-          <Line
-            type="monotone"
-            dataKey="applications"
-            stroke="#0ea5e9"
-            strokeWidth={2}
-            dot={false}
-            activeDot={{ r: 4 }}
-          />
-          <Line
-            type="monotone"
-            dataKey="interviews"
-            stroke="#22c55e"
-            strokeWidth={2}
-            dot={false}
-            activeDot={{ r: 4 }}
-          />
-          <Line
-            type="monotone"
-            dataKey="offers"
-            stroke="#f97316"
-            strokeWidth={2}
-            dot={{ r: 3 }}
-            activeDot={{ r: 4 }}
-          />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
-  </div>
-</div>
+              {/* ✅ Match height to bar chart */}
+              <div className="mt-3 h-32">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={conversionOverTime}>
+                    <CartesianGrid vertical={false} stroke="#e5e7eb" />
+                    <XAxis
+                      dataKey="label"
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={8}
+                      tick={{ fontSize: 10, fill: "#6b7280" }}
+                    />
+                    <YAxis hide />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Line
+                      type="monotone"
+                      dataKey="applications"
+                      stroke="#0ea5e9"
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={{ r: 4 }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="interviews"
+                      stroke="#22c55e"
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={{ r: 4 }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="offers"
+                      stroke="#f97316"
+                      strokeWidth={2}
+                      dot={{ r: 3 }}
+                      activeDot={{ r: 4 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
 
         </div>
       </section>
