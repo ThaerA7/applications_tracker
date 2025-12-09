@@ -1,8 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { usePathname } from "next/navigation";
-import { LogOut, Menu, UserRound } from "lucide-react";
+import {
+  LogOut,
+  Menu,
+  UserRound,
+  ShieldAlert,
+  CheckCircle2,
+} from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { getSupabaseClient } from "@/lib/supabase/client";
 
@@ -108,6 +114,145 @@ type TopBarProps = {
   onToggleSidebar: () => void;
 };
 
+const GUEST_ACCEPTED_KEY = "job-tracker:guest-accepted";
+
+function ConfirmLogoutDialog({
+  open,
+  onClose,
+  onConfirm,
+  busy,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  busy?: boolean;
+}) {
+  // ESC to close
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  // scroll lock
+  useEffect(() => {
+    if (!open) return;
+    const original = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = original;
+    };
+  }, [open]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[70]">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        onClick={busy ? undefined : onClose}
+      />
+
+      {/* Dialog */}
+      <div className="absolute inset-0 flex items-center justify-center p-4 sm:p-6">
+        <div
+          className={[
+            "relative w-full max-w-[520px]",
+            "rounded-[22px] p-[1px]",
+            "bg-gradient-to-br from-rose-200/70 via-orange-100/50 to-amber-100/60",
+            "shadow-[0_20px_70px_-20px_rgba(0,0,0,0.35)]",
+          ].join(" ")}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="logout-title"
+            aria-describedby="logout-desc"
+            className={[
+              "relative overflow-hidden rounded-[21px]",
+              "bg-white ring-1 ring-black/5",
+            ].join(" ")}
+          >
+            {/* Soft glow accents */}
+            <div className="pointer-events-none absolute -top-24 -left-24 h-64 w-64 rounded-full bg-rose-500/10 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-24 -right-24 h-64 w-64 rounded-full bg-amber-500/10 blur-3xl" />
+
+            <div className="p-6 sm:p-8">
+              <div className="flex items-start gap-4">
+
+
+                <div className="flex-1">
+
+
+                  <h3
+                    id="logout-title"
+                    className="mt-3 text-xl sm:text-2xl font-semibold tracking-tight text-neutral-900"
+                  >
+                    Log out of your account?
+                  </h3>
+
+                  <p
+                    id="logout-desc"
+                    className="mt-2 text-sm sm:text-base text-neutral-600"
+                  >
+                    You’ll be signed out on this device. Your synced data will
+                    remain safe in your account.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={!!busy}
+                  className={[
+                    "inline-flex items-center justify-center",
+                    "rounded-xl px-4 py-2.5 text-sm font-medium",
+                    "border border-neutral-200",
+                    "bg-white hover:bg-neutral-50",
+                    "text-neutral-900",
+                    "shadow-sm",
+                    "transition active:scale-[0.99]",
+                    "disabled:opacity-60 disabled:cursor-not-allowed",
+                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300",
+                  ].join(" ")}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={onConfirm}
+                  disabled={!!busy}
+                  className={[
+                    "inline-flex items-center justify-center gap-2",
+                    "rounded-xl px-4 py-2.5 text-sm font-semibold",
+                    "bg-rose-600 text-white",
+                    "hover:bg-rose-700",
+                    "shadow-sm",
+                    "transition active:scale-[0.99]",
+                    "disabled:opacity-70 disabled:cursor-not-allowed",
+                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300",
+                  ].join(" ")}
+                >
+                  <LogOut className="h-4 w-4" />
+                  {busy ? "Logging out..." : "Log out"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function TopBar({ collapsed, onToggleSidebar }: TopBarProps) {
   const pathname = usePathname();
 
@@ -120,6 +265,10 @@ export default function TopBar({ collapsed, onToggleSidebar }: TopBarProps) {
   const accent = ACCENTS[activeKey];
 
   const [user, setUser] = useState<User | null>(null);
+  const [guestAccepted, setGuestAccepted] = useState(false);
+
+  const [logoutOpen, setLogoutOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   // Load session + subscribe
   useEffect(() => {
@@ -141,135 +290,175 @@ export default function TopBar({ collapsed, onToggleSidebar }: TopBarProps) {
     };
   }, []);
 
- const avatarLabel = useMemo(() => {
-  if (!user) return "Guest";
-  const meta = user.user_metadata as Record<string, any> | undefined;
+  // Read guest acceptance (re-check on route changes)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      setGuestAccepted(
+        window.localStorage.getItem(GUEST_ACCEPTED_KEY) === "1"
+      );
+    } catch {
+      setGuestAccepted(false);
+    }
+  }, [pathname]);
 
-  const name =
-    meta?.full_name ||
-    meta?.name ||
-    meta?.given_name ||
-    meta?.first_name;
+  const avatarLabel = useMemo(() => {
+    if (!user) return guestAccepted ? "Guest mode" : "Guest";
 
-  if (name) return name;
+    const meta = user.user_metadata as Record<string, any> | undefined;
 
-  if (user.email) {
-    const local = user.email.split("@")[0] ?? "";
-    return local.replace(/[._-]+/g, " ").trim() || user.email;
-  }
+    const name =
+      meta?.full_name || meta?.name || meta?.given_name || meta?.first_name;
 
-  return "User";
-}, [user]);
+    if (name) return name;
+
+    if (user.email) {
+      const local = user.email.split("@")[0] ?? "";
+      return local.replace(/[._-]+/g, " ").trim() || user.email;
+    }
+
+    return "User";
+  }, [user, guestAccepted]);
 
   const avatarInitial = useMemo(() => {
     const txt = (avatarLabel || "").trim();
     return txt ? txt[0].toUpperCase() : "U";
   }, [avatarLabel]);
 
-  const handleGoogleSignIn = async () => {
-  const supabase = getSupabaseClient();
-  const redirectTo = `${window.location.origin}/auth/callback?next=/`; // ✅ force Overview
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: { redirectTo },
-  });
-  if (error) console.error("Google sign-in failed:", error.message);
-};
-const openSignInGate = () => {
-  if (typeof window === "undefined") return;
-  window.dispatchEvent(new Event("job-tracker:open-signin-gate"));
-};
+  const openSignInGate = useCallback(() => {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(new Event("job-tracker:open-signin-gate"));
+  }, []);
 
-  const handleLogout = async () => {
-    const supabase = getSupabaseClient();
-    const { error } = await supabase.auth.signOut();
-    if (error) console.error("Sign out failed:", error.message);
-  };
+  const confirmLogout = useCallback(() => {
+    setLogoutOpen(true);
+  }, []);
+
+  const handleLogout = useCallback(async () => {
+    if (loggingOut) return;
+
+    setLoggingOut(true);
+    try {
+      const supabase = getSupabaseClient();
+      const { error } = await supabase.auth.signOut();
+      if (error) console.error("Sign out failed:", error.message);
+    } finally {
+      setLoggingOut(false);
+      setLogoutOpen(false);
+    }
+  }, [loggingOut]);
 
   return (
-    <header
-      className={[
-        "sticky top-0 z-40 shadow-lg",
-        "bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60",
-        "relative bg-gradient-to-r to-transparent",
-        accent.washFrom,
-      ].join(" ")}
-    >
-      {/* keep 5px padding left/right */}
-      <div className="w-full h-14 pl-[15px] pr-[15px] flex items-center justify-between">
-        {/* Left: collapse icon + title */}
-        <div className="flex items-center gap-2 sm:gap-2">
-          <button
-            type="button"
-            onClick={onToggleSidebar}
-            className={[
-              "inline-flex items-center justify-center p-1.5",
-              "text-neutral-700 hover:text-neutral-900",
-              "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
-              accent.focus,
-            ].join(" ")}
-            aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
-          >
-            <Menu className="h-6 w-6" aria-hidden="true" />
-          </button>
+    <>
+      <ConfirmLogoutDialog
+        open={logoutOpen}
+        busy={loggingOut}
+        onClose={() => setLogoutOpen(false)}
+        onConfirm={handleLogout}
+      />
 
-          <h1 className="text-lg font-semibold text-neutral-900">{title}</h1>
-        </div>
-
-        {/* Right: auth-aware area */}
-        <div className="flex items-center gap-3">
-          {/* Avatar / Guest badge */}
-          <div
-            className={[
-              "grid h-8 w-8 place-items-center rounded-full",
-              user
-                ? "bg-neutral-200/80 text-neutral-700 ring-1 ring-neutral-300"
-                : "bg-amber-100/80 text-amber-800 ring-1 ring-amber-200",
-              "text-sm font-semibold",
-            ].join(" ")}
-            aria-label={user ? "User avatar" : "Guest mode"}
-            title={avatarLabel}
-          >
-            {user ? avatarInitial : "G"}
-          </div>
-
-          {user ? (
+      <header
+        className={[
+          "sticky top-0 z-40 shadow-lg",
+          "bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60",
+          "relative bg-gradient-to-r to-transparent",
+          accent.washFrom,
+        ].join(" ")}
+      >
+        {/* keep 5px padding left/right */}
+        <div className="w-full h-14 pl-[15px] pr-[15px] flex items-center justify-between">
+          {/* Left: collapse icon + title */}
+          <div className="flex items-center gap-2 sm:gap-2">
             <button
               type="button"
-              onClick={handleLogout}
+              onClick={onToggleSidebar}
               className={[
-                "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium",
-                "text-red-600 hover:text-red-700",
-                "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
-                "border border-red-200/60 shadow-sm",
-                "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-300",
+                "inline-flex items-center justify-center p-1.5",
+                "text-neutral-700 hover:text-neutral-900",
+                "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+                accent.focus,
               ].join(" ")}
-              aria-label="Log out"
+              aria-label={
+                collapsed ? "Expand navigation" : "Collapse navigation"
+              }
             >
-              <LogOut className="h-4 w-4" aria-hidden="true" />
-              Log out
+              <Menu className="h-6 w-6" aria-hidden="true" />
             </button>
-          ) : (
-            <button
-  type="button"
-  onClick={openSignInGate} // ✅ open dialog instead of direct OAuth
-  className={[
-    "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium",
-    "text-neutral-900",
-    "bg-white/80",
-    "border border-neutral-200 shadow-sm",
-    "hover:bg-neutral-50",
-    "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
-    accent.focus,
-  ].join(" ")}
-  aria-label="Sign in"
->
-  <UserRound className="h-4 w-4" aria-hidden="true" />
-  Sign in
-</button>
-          )}
+
+            <h1 className="text-lg font-semibold text-neutral-900">{title}</h1>
+          </div>
+
+          {/* Right: auth-aware area */}
+          <div className="flex items-center gap-3">
+            {/* Avatar / Guest badge */}
+            <div
+              className={[
+                "grid h-8 w-8 place-items-center rounded-full",
+                user
+                  ? "bg-neutral-200/80 text-neutral-700 ring-1 ring-neutral-300"
+                  : "bg-amber-100/80 text-amber-800 ring-1 ring-amber-200",
+                "text-sm font-semibold",
+              ].join(" ")}
+              aria-label={
+                user ? "User avatar" : guestAccepted ? "Guest mode" : "Guest"
+              }
+              title={avatarLabel}
+            >
+              {user ? (
+                avatarInitial
+              ) : guestAccepted ? (
+                // ✅ Different icon when guest mode was explicitly accepted
+                <UserRound className="h-4 w-4" aria-hidden="true" />
+              ) : (
+                "G"
+              )}
+            </div>
+
+            {user ? (
+              <button
+                type="button"
+                onClick={confirmLogout}
+                className={[
+                  "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium",
+                  "text-red-600",
+                  "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
+                  "border border-red-200/60 shadow-sm",
+                  "transition-colors duration-150",
+                  "hover:bg-rose-50 hover:border-rose-300/70 hover:text-rose-700",
+                  "active:bg-rose-100",
+                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-300",
+                ].join(" ")}
+
+                aria-label="Log out"
+              >
+                <LogOut className="h-4 w-4" aria-hidden="true" />
+                Log out
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={openSignInGate}
+                className={[
+                  "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium",
+                  "text-neutral-900",
+                  "bg-white/80",
+                  "border border-neutral-200 shadow-sm",
+                  "transition-colors duration-150",
+                  "hover:bg-sky-50 hover:border-sky-200 hover:text-sky-900",
+                  "active:bg-sky-100",
+                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+                  accent.focus,
+                ].join(" ")}
+
+                aria-label="Sign in"
+              >
+                <UserRound className="h-4 w-4" aria-hidden="true" />
+                Sign in
+              </button>
+            )}
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+    </>
   );
 }
