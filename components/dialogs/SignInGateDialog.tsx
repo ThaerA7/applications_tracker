@@ -1,11 +1,9 @@
-// components/dialogs/SignInGateDialog.tsx
 "use client";
 
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
-  X,
   UserRound,
   ShieldCheck,
   Sparkles,
@@ -76,12 +74,13 @@ export default function SignInGateDialog({
 
     run();
   }, [defaultOpen]);
-useEffect(() => {
-  const handler = () => setOpen(true);
-  window.addEventListener("job-tracker:open-signin-gate", handler);
-  return () =>
-    window.removeEventListener("job-tracker:open-signin-gate", handler);
-}, []);
+
+  useEffect(() => {
+    const handler = () => setOpen(true);
+    window.addEventListener("job-tracker:open-signin-gate", handler);
+    return () =>
+      window.removeEventListener("job-tracker:open-signin-gate", handler);
+  }, []);
 
   // ESC to close
   useEffect(() => {
@@ -163,23 +162,6 @@ useEffect(() => {
             >
               <div className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-indigo-500/10 blur-3xl" />
               <div className="pointer-events-none absolute -bottom-28 -right-24 h-80 w-80 rounded-full bg-sky-500/10 blur-3xl" />
-
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className={[
-                  "absolute right-4 top-4 z-10",
-                  "inline-flex h-10 w-10 items-center justify-center",
-                  "rounded-xl border border-neutral-200",
-                  "bg-white/90 text-neutral-600",
-                  "hover:text-neutral-900 hover:bg-white",
-                  "active:scale-95 transition",
-                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400",
-                ].join(" ")}
-                aria-label="Close"
-              >
-                <X className="h-4.5 w-4.5" />
-              </button>
 
               <div
                 className={[
@@ -336,7 +318,7 @@ useEffect(() => {
         </div>
       </div>
     );
-  }, [open, handleGoogle, handleGuest]);
+  }, [open, handleGoogle, handleGuest, handleGuest]);
 
   if (!mounted) return null;
   return createPortal(content, document.body);
