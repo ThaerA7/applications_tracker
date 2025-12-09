@@ -1,0 +1,211 @@
+"use client";
+
+import { getSupabaseClient } from "@/lib/supabase/client";
+import { idbGet, idbSet, idbDel } from "./indexedDb";
+import type { NewApplicationForm } from "@/components/dialogs/AddApplicationDialog";
+
+export type AppliedApplication = {
+  id: string;
+  website?: string;
+} & NewApplicationForm;
+
+export type AppliedStorageMode = "guest" | "user";
+
+const GUEST_LOCAL_KEY = "job-tracker:applied";
+const GUEST_IDB_KEY = "applied";
+
+const TABLE = "applications";
+const BUCKET = "applied";
+
+// ---------- safe parsing (defensive) ----------
+
+function isObject(v: any) {
+  return v && typeof v === "object" && !Array.isArray(v);
+}
+
+function safeParseList(raw: any): AppliedApplication[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((x) => isObject(x) && typeof x.id === "string") as AppliedApplication[];
+}
+
+// ---------- guest storage ----------
+
+async function loadGuestApplied(): Promise<AppliedApplication[]> {
+  // Prefer IDB
+  try {
+    const idb = await idbGet<AppliedApplication[]>(GUEST_IDB_KEY);
+    if (idb) return safeParseList(idb);
+  } catch {}
+
+  // Fallback localStorage
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(GUEST_LOCAL_KEY);
+    return safeParseList(raw ? JSON.parse(raw) : []);
+  } catch {
+    return [];
+  }
+}
+
+async function saveGuestApplied(list: AppliedApplication[]) {
+  // Try IDB
+  try {
+    await idbSet(GUEST_IDB_KEY, list);
+  } catch {}
+
+  // Also mirror to localStorage (cheap backup)
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(GUEST_LOCAL_KEY, JSON.stringify(list));
+  } catch {}
+}
+
+async function clearGuestApplied() {
+  try {
+    await idbDel(GUEST_IDB_KEY);
+  } catch {}
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(GUEST_LOCAL_KEY);
+  } catch {}
+}
+
+// ---------- user storage (Supabase) ----------
+
+async function loadUserApplied(): Promise<AppliedApplication[]> {
+  const supabase = getSupabaseClient();
+
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("id, data")
+    .eq("bucket", BUCKET)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Failed to load applied from Supabase:", error.message);
+    return [];
+  }
+
+  const mapped = (data ?? []).map((row: any) => ({
+    id: row.id,
+    ...(row.data ?? {}),
+  }));
+
+  return safeParseList(mapped);
+}
+
+async function upsertUserApplied(app: AppliedApplication) {
+  const supabase = getSupabaseClient();
+
+  const { error } = await supabase
+    .from(TABLE)
+    .upsert(
+      {
+        id: app.id,
+        bucket: BUCKET,
+        data: app,
+      },
+      { onConflict: "id" }
+    );
+
+  if (error) {
+    console.error("Failed to upsert applied in Supabase:", error.message);
+  }
+}
+
+async function deleteUserApplied(id: string) {
+  const supabase = getSupabaseClient();
+
+  const { error } = await supabase
+    .from(TABLE)
+    .delete()
+    .eq("id", id)
+    .eq("bucket", BUCKET);
+
+  if (error) {
+    console.error("Failed to delete applied in Supabase:", error.message);
+  }
+}
+
+// ---------- mode detection ----------
+
+export async function detectAppliedMode(): Promise<AppliedStorageMode> {
+  const supabase = getSupabaseClient();
+  const { data } = await supabase.auth.getSession();
+  return data.session?.user ? "user" : "guest";
+}
+
+// ---------- public API ----------
+
+export async function loadApplied(): Promise<{
+  mode: AppliedStorageMode;
+  items: AppliedApplication[];
+}> {
+  const mode = await detectAppliedMode();
+  const items = mode === "user" ? await loadUserApplied() : await loadGuestApplied();
+  return { mode, items };
+}
+
+export async function upsertApplied(
+  app: AppliedApplication,
+  mode: AppliedStorageMode
+) {
+  if (mode === "user") {
+    await upsertUserApplied(app);
+    return;
+  }
+
+  const prev = await loadGuestApplied();
+  const idx = prev.findIndex((x) => x.id === app.id);
+  const next =
+    idx === -1
+      ? [app, ...prev]
+      : prev.map((x) => (x.id === app.id ? app : x));
+
+  await saveGuestApplied(next);
+}
+
+export async function deleteApplied(
+  id: string,
+  mode: AppliedStorageMode
+) {
+  if (mode === "user") {
+    await deleteUserApplied(id);
+    return;
+  }
+
+  const prev = await loadGuestApplied();
+  const next = prev.filter((x) => x.id !== id);
+  await saveGuestApplied(next);
+}
+
+/**
+ * When a user signs in, move guest Applied data into Supabase.
+ * This prevents data loss while keeping server as source of truth.
+ */
+export async function migrateGuestAppliedToUser() {
+  const supabase = getSupabaseClient();
+  const { data } = await supabase.auth.getSession();
+  if (!data.session?.user) return;
+
+  const guest = await loadGuestApplied();
+  if (guest.length === 0) return;
+
+  // Upsert all guest apps as user rows
+  const payload = guest.map((app) => ({
+    id: app.id,
+    bucket: BUCKET,
+    data: app,
+  }));
+
+  const { error } = await supabase.from(TABLE).upsert(payload, {
+    onConflict: "id",
+  });
+
+  if (error) {
+    console.error("Guest → user applied migration failed:", error.message);
+    return;
+  }
+
+  await clearGuestApplied();
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { Search, Plus, Filter, History } from "lucide-react";
 import Image from "next/image";
 import { animateCardExit } from "../../components/dialogs/cardExitAnimation";
@@ -17,6 +17,15 @@ import ActivityLogSidebar, {
   type ActivityItem,
   type ActivityType,
 } from "@/components/ActivityLogSidebar";
+
+import { getSupabaseClient } from "@/lib/supabase/client";
+import {
+  loadApplied,
+  upsertApplied,
+  deleteApplied,
+  migrateGuestAppliedToUser,
+  type AppliedStorageMode,
+} from "@/lib/storage/applied";
 
 type StoredRejection = RejectionDetails & { id: string };
 
@@ -114,6 +123,8 @@ function appendWithdrawnActivity(entry: ActivityItem) {
 
 export default function AppliedPage() {
   const [applications, setApplications] = useState<Application[]>([]);
+  const [storageMode, setStorageMode] = useState<AppliedStorageMode>("guest");
+
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -129,6 +140,48 @@ export default function AppliedPage() {
   // Activity sidebar / log state (for Applied page)
   const [activityOpen, setActivityOpen] = useState(false);
   const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
+
+  // ---------- load initial data + auth switching ----------
+  useEffect(() => {
+    let alive = true;
+    const supabase = getSupabaseClient();
+
+    const init = async () => {
+      const { mode, items } = await loadApplied();
+      if (!alive) return;
+      setStorageMode(mode);
+      setApplications(items);
+    };
+
+    init();
+
+    const { data: sub } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (!alive) return;
+
+        if (event === "SIGNED_IN" && session?.user) {
+          await migrateGuestAppliedToUser();
+          const { mode, items } = await loadApplied();
+          if (!alive) return;
+          setStorageMode(mode);
+          setApplications(items);
+          return;
+        }
+
+        if (event === "SIGNED_OUT") {
+          const { mode, items } = await loadApplied();
+          if (!alive) return;
+          setStorageMode(mode);
+          setApplications(items);
+        }
+      }
+    );
+
+    return () => {
+      alive = false;
+      sub?.subscription?.unsubscribe();
+    };
+  }, []);
 
   const logActivity = (
     type: ActivityType,
@@ -152,11 +205,10 @@ export default function AppliedPage() {
       company: app.company,
       role: app.role,
       location: app.location,
-      appliedOn: app.appliedOn, // for "Applied on" column
+      appliedOn: app.appliedOn,
       ...extras,
     };
 
-    // newest first, keep last 100
     setActivityItems((prev) => [base, ...prev].slice(0, 100));
   };
 
@@ -172,7 +224,8 @@ export default function AppliedPage() {
 
   const toggle = (id: string) => setExpanded((s) => ({ ...s, [id]: !s[id] }));
 
-  const handleCreate = (data: NewApplicationForm) => {
+  // ---------- create / update ----------
+  const handleCreate = async (data: NewApplicationForm) => {
     const id =
       typeof crypto !== "undefined" && "randomUUID" in crypto
         ? crypto.randomUUID()
@@ -185,13 +238,16 @@ export default function AppliedPage() {
 
     setApplications((prev) => [newApp, ...prev]);
 
+    // persist (guest or user)
+    await upsertApplied(newApp, storageMode);
+
     logActivity("added", newApp, {
       toStatus: newApp.status,
       note: "Application created",
     });
   };
 
-  const handleUpdate = (data: NewApplicationForm) => {
+  const handleUpdate = async (data: NewApplicationForm) => {
     if (!editingApp) return;
 
     const updatedApp: Application = { ...editingApp, ...data };
@@ -200,23 +256,25 @@ export default function AppliedPage() {
       prev.map((app) => (app.id === editingApp.id ? updatedApp : app))
     );
 
+    await upsertApplied(updatedApp, storageMode);
+
     logActivity("edited", updatedApp, {
       fromStatus: editingApp.status,
       toStatus: data.status,
     });
   };
 
-  const handleSave = (data: NewApplicationForm) => {
+  const handleSave = async (data: NewApplicationForm) => {
     if (editingApp) {
-      handleUpdate(data);
+      await handleUpdate(data);
     } else {
-      handleCreate(data);
+      await handleCreate(data);
     }
     setDialogOpen(false);
     setEditingApp(null);
   };
 
-  // Delete dialog helpers
+  // ---------- delete ----------
   const openDeleteDialog = (app: Application) => {
     setDeleteTarget(app);
   };
@@ -225,19 +283,17 @@ export default function AppliedPage() {
     setDeleteTarget(null);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
     const id = deleteTarget.id;
     const elementId = `application-card-${id}`;
 
-    // log before removing
     logActivity("deleted", deleteTarget, {
       fromStatus: deleteTarget.status,
       note: "Application removed from Applied list",
     });
 
-    animateCardExit(elementId, "delete", () => {
-      // actually remove from state AFTER animation
+    animateCardExit(elementId, "delete", async () => {
       setApplications((prev) => prev.filter((app) => app.id !== id));
 
       setExpanded((prev) => {
@@ -251,12 +307,14 @@ export default function AppliedPage() {
         setDialogOpen(false);
       }
 
+      // persist delete
+      await deleteApplied(id, storageMode);
+
       setDeleteTarget(null);
     });
   };
 
-  // --- Move dialog helpers ---
-
+  // ---------- move dialog helpers ----------
   const openMoveDialog = (app: Application) => {
     setAppBeingMoved(app);
     setMoveDialogOpen(true);
@@ -275,7 +333,7 @@ export default function AppliedPage() {
     const id = appBeingMoved.id;
     const elementId = `application-card-${id}`;
 
-    animateCardExit(elementId, "move", () => {
+    animateCardExit(elementId, "move", async () => {
       setApplications((prev) => prev.filter((app) => app.id !== id));
 
       setExpanded((prev) => {
@@ -283,6 +341,9 @@ export default function AppliedPage() {
         delete copy[id];
         return copy;
       });
+
+      // persist delete from Applied bucket
+      await deleteApplied(id, storageMode);
 
       closeMoveDialog();
     });
@@ -294,7 +355,6 @@ export default function AppliedPage() {
       return;
     }
 
-    // Applied → Interviews
     logActivity("moved_to_interviews", appBeingMoved, {
       fromStatus: "Applied",
       toStatus: "Interviews",
@@ -334,7 +394,6 @@ export default function AppliedPage() {
       }
     }
 
-    // log to Applied activity (Applied → Rejected)
     if (appBeingMoved) {
       logActivity("moved_to_rejected", appBeingMoved, {
         fromStatus: "Applied",
@@ -343,7 +402,6 @@ export default function AppliedPage() {
       });
     }
 
-    // ALSO log into Rejected activity log (for Rejected page)
     appendRejectedActivity({
       id: makeActivityId(),
       appId: newRejection.id,
@@ -406,14 +464,12 @@ export default function AppliedPage() {
       }
     }
 
-    // log to Applied activity (Applied → Withdrawn)
     logActivity("moved_to_withdrawn", source, {
       fromStatus: "Applied",
       toStatus: "Withdrawn",
       note: details.reason || "Moved to withdrawn",
     });
 
-    // ALSO log into Withdrawn activity log (for Withdrawn page)
     appendWithdrawnActivity({
       id: makeActivityId(),
       appId: newWithdrawn.id,
@@ -436,14 +492,12 @@ export default function AppliedPage() {
       {/* Delete confirmation dialog */}
       {deleteTarget && (
         <div className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[13000] flex items-center justify-center px-4 py-8">
-          {/* Backdrop */}
           <div
             className="absolute inset-0 bg-neutral-900/40"
             aria-hidden="true"
             onClick={handleCancelDelete}
           />
 
-          {/* Panel */}
           <div
             className={[
               "relative z-10 w-full max-w-sm rounded-2xl border border-neutral-200/80",
@@ -497,11 +551,9 @@ export default function AppliedPage() {
           "p-8 shadow-md overflow-hidden",
         ].join(" ")}
       >
-        {/* soft color blobs */}
         <div className="pointer-events-none absolute -top-20 -right-24 h-72 w-72 rounded-full bg-sky-400/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 -left-28 h-80 w-80 rounded-full bg-fuchsia-400/20 blur-3xl" />
 
-        {/* header row with activity button on the right */}
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-1">
             <Image
@@ -541,7 +593,6 @@ export default function AppliedPage() {
 
         {/* Toolbar */}
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-          {/* Search */}
           <div className="relative flex-1">
             <Search
               className="pointer-events-none absolute left-3 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-neutral-400"
@@ -565,7 +616,6 @@ export default function AppliedPage() {
             />
           </div>
 
-          {/* Add */}
           <button
             type="button"
             onClick={() => {
@@ -583,7 +633,6 @@ export default function AppliedPage() {
             Add
           </button>
 
-          {/* Filter (placeholder) */}
           <button
             type="button"
             className={[

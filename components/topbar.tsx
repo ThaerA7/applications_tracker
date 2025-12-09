@@ -1,13 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation"; // ✅ add useRouter
 import {
   LogOut,
   Menu,
   UserRound,
-  ShieldAlert,
-  CheckCircle2,
 } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { getSupabaseClient } from "@/lib/supabase/client";
@@ -255,6 +253,7 @@ function ConfirmLogoutDialog({
 
 export default function TopBar({ collapsed, onToggleSidebar }: TopBarProps) {
   const pathname = usePathname();
+const router = useRouter();
 
   const activeKey =
     Object.keys(ROUTES)
@@ -334,19 +333,41 @@ export default function TopBar({ collapsed, onToggleSidebar }: TopBarProps) {
     setLogoutOpen(true);
   }, []);
 
-  const handleLogout = useCallback(async () => {
-    if (loggingOut) return;
+  const withTimeout = <T,>(promise: Promise<T>, ms = 8000): Promise<T> => {
+    return new Promise<T>((resolve, reject) => {
+      const id = window.setTimeout(() => {
+        reject(new Error("Sign out timed out"));
+      }, ms);
 
-    setLoggingOut(true);
-    try {
-      const supabase = getSupabaseClient();
-      const { error } = await supabase.auth.signOut();
-      if (error) console.error("Sign out failed:", error.message);
-    } finally {
-      setLoggingOut(false);
-      setLogoutOpen(false);
-    }
-  }, [loggingOut]);
+      promise.then(
+        (val) => {
+          window.clearTimeout(id);
+          resolve(val);
+        },
+        (err) => {
+          window.clearTimeout(id);
+          reject(err);
+        }
+      );
+    });
+  };
+
+  const handleLogout = useCallback(async () => {
+  if (loggingOut) return;
+
+  setLogoutOpen(false);
+  setLoggingOut(true);
+
+  try {
+    const supabase = getSupabaseClient();
+    await withTimeout(supabase.auth.signOut());
+    router.refresh();
+  } catch (err) {
+    console.error("Sign out failed:", err);
+  } finally {
+    setLoggingOut(false);
+  }
+}, [loggingOut, router]);
 
   return (
     <>

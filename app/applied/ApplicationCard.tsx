@@ -19,12 +19,11 @@ import {
   MoveRight,
   Pencil,
 } from 'lucide-react';
-import type { NewApplicationForm } from '../../components/dialogs/AddApplicationDialog';
 
-export type Application = {
-  id: string;
-  website?: string;
-} & NewApplicationForm;
+import type { AppliedApplication } from "@/lib/types/applied";
+
+// 👇 keep old export name so the rest of your app doesn't break
+export type Application = AppliedApplication;
 
 // Reusable section label with gradient highlight line
 function SectionLabel({
@@ -51,7 +50,7 @@ type ApplicationCardProps = {
   onToggle: () => void;
   onEdit: (app: Application) => void;
   onMove: (app: Application) => void;
-  onDelete: (app: Application) => void; // changed to pass full app
+  onDelete: (app: Application) => void;
   fmtDate: (d: string) => string;
   statusClasses: (s: string) => string;
 };
@@ -124,35 +123,23 @@ export default function ApplicationCard({
         <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-neutral-700">
           {app.location && (
             <span className="inline-flex items-center gap-1.5">
-              <MapPin
-                className="h-4 w-4 text-neutral-400"
-                aria-hidden="true"
-              />
+              <MapPin className="h-4 w-4 text-neutral-400" aria-hidden="true" />
               {app.location}
             </span>
           )}
           <span className="inline-flex items-center gap-1.5">
-            <CalendarDays
-              className="h-4 w-4 text-neutral-400"
-              aria-hidden="true"
-            />
+            <CalendarDays className="h-4 w-4 text-neutral-400" aria-hidden="true" />
             Applied {fmtDate(app.appliedOn)}
           </span>
           {app.startDate && (
             <span className="inline-flex items-center gap-1.5">
-              <CalendarDays
-                className="h-4 w-4 text-neutral-400"
-                aria-hidden="true"
-              />
+              <CalendarDays className="h-4 w-4 text-neutral-400" aria-hidden="true" />
               Start {fmtDate(app.startDate)}
             </span>
           )}
           {app.salary && (
             <span className="inline-flex items-center gap-1.5">
-              <Briefcase
-                className="h-4 w-4 text-neutral-400"
-                aria-hidden="true"
-              />
+              <Briefcase className="h-4 w-4 text-neutral-400" aria-hidden="true" />
               {app.salary}
             </span>
           )}
@@ -163,20 +150,16 @@ export default function ApplicationCard({
               rel="noreferrer"
               className="inline-flex items-center gap-1.5 underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-700"
             >
-              <ExternalLink
-                className="h-4 w-4 text-neutral-400"
-                aria-hidden="true"
-              />
+              <ExternalLink className="h-4 w-4 text-neutral-400" aria-hidden="true" />
               Website
             </a>
           )}
         </div>
       </div>
 
-           {/* Edit + move + delete + expand buttons – compact icon group */}
+      {/* Edit + move + delete + expand buttons – compact icon group */}
       <div className="flex items-center justify-end">
         <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white/90 px-1.5 py-1 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/80">
-          {/* Edit */}
           <button
             type="button"
             onClick={() => onEdit(app)}
@@ -186,7 +169,6 @@ export default function ApplicationCard({
             <Pencil className="h-4 w-4" aria-hidden="true" />
           </button>
 
-          {/* Move */}
           <button
             type="button"
             onClick={() => onMove(app)}
@@ -196,7 +178,6 @@ export default function ApplicationCard({
             <MoveRight className="h-4 w-4" aria-hidden="true" />
           </button>
 
-          {/* Delete */}
           <button
             type="button"
             onClick={() => onDelete(app)}
@@ -206,13 +187,8 @@ export default function ApplicationCard({
             <Trash2 className="h-4 w-4" aria-hidden="true" />
           </button>
 
-          {/* Divider between main actions and expand */}
-          <span
-            aria-hidden="true"
-            className="mx-0.5 h-5 w-px bg-neutral-200"
-          />
+          <span aria-hidden="true" className="mx-0.5 h-5 w-px bg-neutral-200" />
 
-          {/* Expand / collapse */}
           <button
             type="button"
             onClick={onToggle}
