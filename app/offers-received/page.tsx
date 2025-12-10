@@ -875,7 +875,7 @@ export default function OffersReceivedPage() {
           <div
             className={[
               "relative overflow-hidden",
-              "grid grid-cols-3 gap-0 rounded-xl border border-neutral-200 bg-white/80 p-2",
+              "grid grid-cols-3 gap-0 rounded-xl border border-neutral-200 bg-white/80 p-0",
               "shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/70",
             ].join(" ")}
             role="tablist"
