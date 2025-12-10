@@ -1,27 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { usePathname, useRouter } from "next/navigation"; // ✅ add useRouter
-import {
-  LogOut,
-  Menu,
-  UserRound,
-} from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { LogOut, Menu, UserRound } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { getSupabaseClient } from "@/lib/supabase/client";
-
-type RouteMeta = {
-  title: string;
-};
 
 const ROUTES: Record<string, { title: string }> = {
   "/": { title: "Overview" },
   "/applied": { title: "Applied" },
   "/interviews": { title: "Interviews" },
-
   "/job-search": { title: "Job Search" },
   "/offers-received": { title: "Offers" },
-
   "/rejected": { title: "Rejected" },
   "/withdrawn": { title: "Withdrawn" },
   "/wishlist": { title: "Wishlist" },
@@ -68,7 +58,6 @@ const ACCENTS: Record<string, Accent> = {
     barTo: "after:to-emerald-500",
     focus: "focus-visible:ring-lime-300",
   },
-
   "/rejected": {
     washFrom: "from-rose-50",
     barFrom: "after:from-rose-500",
@@ -111,8 +100,6 @@ type TopBarProps = {
   collapsed: boolean;
   onToggleSidebar: () => void;
 };
-
-const GUEST_ACCEPTED_KEY = "job-tracker:guest-accepted";
 
 function ConfirmLogoutDialog({
   open,
@@ -182,11 +169,7 @@ function ConfirmLogoutDialog({
 
             <div className="p-6 sm:p-8">
               <div className="flex items-start gap-4">
-
-
                 <div className="flex-1">
-
-
                   <h3
                     id="logout-title"
                     className="mt-3 text-xl sm:text-2xl font-semibold tracking-tight text-neutral-900"
@@ -253,7 +236,7 @@ function ConfirmLogoutDialog({
 
 export default function TopBar({ collapsed, onToggleSidebar }: TopBarProps) {
   const pathname = usePathname();
-const router = useRouter();
+  const router = useRouter();
 
   const activeKey =
     Object.keys(ROUTES)
@@ -264,7 +247,6 @@ const router = useRouter();
   const accent = ACCENTS[activeKey];
 
   const [user, setUser] = useState<User | null>(null);
-  const [guestAccepted, setGuestAccepted] = useState(false);
 
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -289,20 +271,8 @@ const router = useRouter();
     };
   }, []);
 
-  // Read guest acceptance (re-check on route changes)
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      setGuestAccepted(
-        window.localStorage.getItem(GUEST_ACCEPTED_KEY) === "1"
-      );
-    } catch {
-      setGuestAccepted(false);
-    }
-  }, [pathname]);
-
   const avatarLabel = useMemo(() => {
-    if (!user) return guestAccepted ? "Guest mode" : "Guest";
+    if (!user) return "Guest";
 
     const meta = user.user_metadata as Record<string, any> | undefined;
 
@@ -317,7 +287,7 @@ const router = useRouter();
     }
 
     return "User";
-  }, [user, guestAccepted]);
+  }, [user]);
 
   const avatarInitial = useMemo(() => {
     const txt = (avatarLabel || "").trim();
@@ -353,21 +323,21 @@ const router = useRouter();
   };
 
   const handleLogout = useCallback(async () => {
-  if (loggingOut) return;
+    if (loggingOut) return;
 
-  setLogoutOpen(false);
-  setLoggingOut(true);
+    setLogoutOpen(false);
+    setLoggingOut(true);
 
-  try {
-    const supabase = getSupabaseClient();
-    await withTimeout(supabase.auth.signOut());
-    router.refresh();
-  } catch (err) {
-    console.error("Sign out failed:", err);
-  } finally {
-    setLoggingOut(false);
-  }
-}, [loggingOut, router]);
+    try {
+      const supabase = getSupabaseClient();
+      await withTimeout(supabase.auth.signOut());
+      router.refresh();
+    } catch (err) {
+      console.error("Sign out failed:", err);
+    } finally {
+      setLoggingOut(false);
+    }
+  }, [loggingOut, router]);
 
   return (
     <>
@@ -420,18 +390,14 @@ const router = useRouter();
                   : "bg-amber-100/80 text-amber-800 ring-1 ring-amber-200",
                 "text-sm font-semibold",
               ].join(" ")}
-              aria-label={
-                user ? "User avatar" : guestAccepted ? "Guest mode" : "Guest"
-              }
+              aria-label={user ? "User avatar" : "Guest"}
               title={avatarLabel}
             >
               {user ? (
                 avatarInitial
-              ) : guestAccepted ? (
-                // ✅ Different icon when guest mode was explicitly accepted
-                <UserRound className="h-4 w-4" aria-hidden="true" />
               ) : (
-                "G"
+                // ✅ Always show guest avatar icon unless signed in
+                <UserRound className="h-4 w-4" aria-hidden="true" />
               )}
             </div>
 
@@ -449,7 +415,6 @@ const router = useRouter();
                   "active:bg-rose-100",
                   "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-300",
                 ].join(" ")}
-
                 aria-label="Log out"
               >
                 <LogOut className="h-4 w-4" aria-hidden="true" />
@@ -470,7 +435,6 @@ const router = useRouter();
                   "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
                   accent.focus,
                 ].join(" ")}
-
                 aria-label="Sign in"
               >
                 <UserRound className="h-4 w-4" aria-hidden="true" />
