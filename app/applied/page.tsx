@@ -1,7 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
-import { Search, Plus, Filter, History } from "lucide-react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  useCallback,
+} from "react";
+import { Search, Plus, History, X } from "lucide-react";
 import Image from "next/image";
 import { animateCardExit } from "../../components/dialogs/cardExitAnimation";
 
@@ -26,6 +31,13 @@ import {
   migrateGuestAppliedToUser,
   type AppliedStorageMode,
 } from "@/lib/storage/applied";
+
+import ApplicationsFilter, {
+  DEFAULT_APPLICATION_FILTERS,
+  getActiveFilterCount,
+  filterApplications,
+  type ApplicationFilters,
+} from "@/components/ApplicationsFilter";
 
 type StoredRejection = RejectionDetails & { id: string };
 
@@ -141,6 +153,10 @@ export default function AppliedPage() {
   const [activityOpen, setActivityOpen] = useState(false);
   const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
 
+  // Shared filters state (can be reused on other pages)
+  const [filters, setFilters] =
+    useState<ApplicationFilters>(DEFAULT_APPLICATION_FILTERS);
+
   // ---------- load initial data + auth switching ----------
   useEffect(() => {
     let alive = true;
@@ -183,46 +199,51 @@ export default function AppliedPage() {
     };
   }, []);
 
-  const logActivity = (
-    type: ActivityType,
-    app: Application | null,
-    extras?: Partial<ActivityItem>
-  ) => {
-    if (!app) return;
+  const logActivity = useCallback(
+    (
+      type: ActivityType,
+      app: Application | null,
+      extras?: Partial<ActivityItem>
+    ) => {
+      if (!app) return;
 
-    const id =
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : Math.random().toString(36).slice(2);
+      const id =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : Math.random().toString(36).slice(2);
 
-    const timestamp = new Date().toISOString();
+      const timestamp = new Date().toISOString();
 
-    const base: ActivityItem = {
-      id,
-      appId: app.id,
-      type,
-      timestamp,
-      company: app.company,
-      role: app.role,
-      location: app.location,
-      appliedOn: app.appliedOn,
-      ...extras,
-    };
+      const base: ActivityItem = {
+        id,
+        appId: app.id,
+        type,
+        timestamp,
+        company: app.company,
+        role: app.role,
+        location: app.location,
+        appliedOn: app.appliedOn,
+        ...extras,
+      };
 
-    setActivityItems((prev) => [base, ...prev].slice(0, 100));
-  };
+      setActivityItems((prev) => [base, ...prev].slice(0, 100));
+    },
+    []
+  );
 
-  const filtered = useMemo(() => {
-    const q = query.toLowerCase().trim();
-    if (!q) return applications;
-    return applications.filter((a) =>
-      [a.company, a.role, a.location, a.status]
-        .filter(Boolean)
-        .some((v) => v!.toLowerCase().includes(q))
-    );
-  }, [applications, query]);
+  // ---------- filtered list using shared helper ----------
+  const filtered = useMemo(
+    () => filterApplications(applications, query, filters),
+    [applications, query, filters]
+  );
 
-  const toggle = (id: string) => setExpanded((s) => ({ ...s, [id]: !s[id] }));
+  const activeFilterCount = useMemo(
+    () => getActiveFilterCount(filters),
+    [filters]
+  );
+
+  const toggle = (id: string) =>
+    setExpanded((s) => ({ ...s, [id]: !s[id] }));
 
   // ---------- create / update ----------
   const handleCreate = async (data: NewApplicationForm) => {
@@ -487,6 +508,8 @@ export default function AppliedPage() {
     moveOutOfApplied();
   };
 
+  const hasAnyApplications = applications.length > 0;
+
   return (
     <>
       {/* Delete confirmation dialog */}
@@ -548,174 +571,191 @@ export default function AppliedPage() {
         className={[
           "relative rounded-2xl border border-neutral-200/70",
           "bg-gradient-to-br from-sky-50 via-fuchsia-50 to-amber-50",
-          "p-8 shadow-md overflow-hidden",
+          "p-8 shadow-md",
         ].join(" ")}
       >
-        <div className="pointer-events-none absolute -top-20 -right-24 h-72 w-72 rounded-full bg-sky-400/20 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-24 -left-28 h-80 w-80 rounded-full bg-fuchsia-400/20 blur-3xl" />
-
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-1">
-            <Image
-              src="/icons/checklist.png"
-              alt=""
-              width={37}
-              height={37}
-              aria-hidden="true"
-              className="shrink-0"
-            />
-            <h1 className="text-2xl font-semibold text-neutral-900">Applied</h1>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setActivityOpen(true)}
-            className={[
-              "inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-neutral-800",
-              "bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70",
-              "border border-neutral-200 shadow-sm hover:bg-white",
-              "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-300",
-            ].join(" ")}
-          >
-            <History className="h-4 w-4 text-sky-600" aria-hidden="true" />
-            <span>Activity log</span>
-            {activityItems.length > 0 && (
-              <span className="ml-1 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-semibold text-neutral-700">
-                {activityItems.length}
-              </span>
-            )}
-          </button>
+        {/* Decorative background layer */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
+          <div className="absolute -top-20 -right-24 h-72 w-72 rounded-full bg-sky-400/20 blur-3xl" />
+          <div className="absolute -bottom-24 -left-28 h-80 w-80 rounded-full bg-fuchsia-400/20 blur-3xl" />
         </div>
 
-        <p className="mt-1 text-neutral-700">
-          List of your submitted applications.
-        </p>
+        {/* Content */}
+        <div className="relative">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-1">
+              <Image
+                src="/icons/checklist.png"
+                alt=""
+                width={37}
+                height={37}
+                aria-hidden="true"
+                className="shrink-0"
+              />
+              <h1 className="text-2xl font-semibold text-neutral-900">
+                Applied
+              </h1>
+            </div>
 
-        {/* Toolbar */}
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="relative flex-1">
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-neutral-400"
-              aria-hidden="true"
-            />
-            <input
-              type="search"
-              placeholder="Search company, role, location, status…"
-              aria-label="Search applications"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
+            <button
+              type="button"
+              onClick={() => setActivityOpen(true)}
               className={[
-                "h-11 w-full rounded-lg pl-9 pr-3 text-sm text-neutral-900 placeholder:text-neutral-500",
-                "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
-                "border border-neutral-200 shadow-sm",
-                "hover:bg-white focus:bg-white",
-                "ring-1 ring-transparent",
-                "focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-sky-300",
-                "transition-shadow",
+                "inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-neutral-800",
+                "bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70",
+                "border border-neutral-200 shadow-sm hover:bg-white",
+                "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-300",
               ].join(" ")}
-            />
+            >
+              <History className="h-4 w-4 text-sky-600" aria-hidden="true" />
+              <span>Activity log</span>
+              {activityItems.length > 0 && (
+                <span className="ml-1 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-semibold text-neutral-700">
+                  {activityItems.length}
+                </span>
+              )}
+            </button>
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              setEditingApp(null);
-              setDialogOpen(true);
-            }}
-            className={[
-              "inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800",
-              "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
-              "border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50",
-              "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-300",
-            ].join(" ")}
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            Add
-          </button>
+          <p className="mt-1 text-neutral-700">
+            List of your submitted applications.
+          </p>
 
-          <button
-            type="button"
-            className={[
-              "inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800",
-              "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
-              "border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50",
-              "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-300",
-            ].join(" ")}
-          >
-            <Filter className="h-4 w-4" aria-hidden="true" />
-            Filter
-          </button>
-        </div>
+          {/* Toolbar */}
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="relative flex-1">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-neutral-400"
+                aria-hidden="true"
+              />
+              <input
+                type="search"
+                placeholder="Search company, role, location, status…"
+                aria-label="Search applications"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className={[
+                  "h-11 w-full rounded-lg pl-9 pr-3 text-sm text-neutral-900 placeholder:text-neutral-500",
+                  "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
+                  "border border-neutral-200 shadow-sm",
+                  "hover:bg-white focus:bg-white",
+                  "ring-1 ring-transparent",
+                  "focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-sky-300",
+                  "transition-shadow",
+                ].join(" ")}
+              />
+            </div>
 
-        {/* Results grid */}
-        <div className="mt-5 grid grid-cols-1 gap-3">
-          {filtered.map((app) => (
-            <ApplicationCard
-              key={app.id}
-              app={app}
-              isExpanded={!!expanded[app.id]}
-              onToggle={() => toggle(app.id)}
-              onEdit={(a) => {
-                setEditingApp(a);
+            <button
+              type="button"
+              onClick={() => {
+                setEditingApp(null);
                 setDialogOpen(true);
               }}
-              onMove={openMoveDialog}
-              onDelete={openDeleteDialog}
-              fmtDate={fmtDate}
-              statusClasses={statusClasses}
+              className={[
+                "inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800",
+                "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
+                "border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50",
+                "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-300",
+              ].join(" ")}
+            >
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Add
+            </button>
+
+            {/* Reusable filter */}
+            <ApplicationsFilter
+              applications={applications}
+              filters={filters}
+              onChange={setFilters}
+              filteredCount={filtered.length}
+              listLabel="applied"
             />
-          ))}
+          </div>
 
-          {filtered.length === 0 && (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
-              <div className="mb-2 text-5xl">🔎</div>
-              <p className="text-sm text-neutral-700">
-                {applications.length === 0
-                  ? "No applications yet. Click “Add” to create your first one."
-                  : "No applications match your search."}
-              </p>
-            </div>
-          )}
-        </div>
+          {/* Results grid */}
+          <div className="mt-5 grid grid-cols-1 gap-3">
+            {filtered.map((app) => (
+              <ApplicationCard
+                key={app.id}
+                app={app}
+                isExpanded={!!expanded[app.id]}
+                onToggle={() => toggle(app.id)}
+                onEdit={(a) => {
+                  setEditingApp(a);
+                  setDialogOpen(true);
+                }}
+                onMove={openMoveDialog}
+                onDelete={openDeleteDialog}
+                fmtDate={fmtDate}
+                statusClasses={statusClasses}
+              />
+            ))}
 
-        {/* Move dialog */}
-        <MoveApplicationDialog
-          open={moveDialogOpen}
-          application={
-            appBeingMoved && {
-              id: appBeingMoved.id,
-              company: appBeingMoved.company,
-              role: appBeingMoved.role,
-              location: appBeingMoved.location,
-              status: appBeingMoved.status,
-              appliedOn: appBeingMoved.appliedOn,
-              contactPerson: appBeingMoved.contactPerson,
-              contactEmail: appBeingMoved.contactEmail,
-              contactPhone: appBeingMoved.contactPhone,
-              offerUrl: appBeingMoved.offerUrl,
-              logoUrl: appBeingMoved.logoUrl,
-              employmentType: appBeingMoved.employmentType,
-              notes: appBeingMoved.notes,
+            {filtered.length === 0 && (
+              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
+                <div className="mb-2 text-5xl">🔎</div>
+                <p className="text-sm text-neutral-700">
+                  {!hasAnyApplications
+                    ? "No applications yet. Click “Add” to create your first one."
+                    : activeFilterCount > 0
+                    ? "No applications match your filters. Try resetting or broadening them."
+                    : "No applications match your search."}
+                </p>
+
+                {activeFilterCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setFilters(DEFAULT_APPLICATION_FILTERS)}
+                    className="mt-3 inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-800 shadow-sm hover:bg-neutral-50"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                    Reset filters
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Move dialog */}
+          <MoveApplicationDialog
+            open={moveDialogOpen}
+            application={
+              appBeingMoved && {
+                id: appBeingMoved.id,
+                company: appBeingMoved.company,
+                role: appBeingMoved.role,
+                location: appBeingMoved.location,
+                status: appBeingMoved.status,
+                appliedOn: appBeingMoved.appliedOn,
+                contactPerson: appBeingMoved.contactPerson,
+                contactEmail: appBeingMoved.contactEmail,
+                contactPhone: appBeingMoved.contactPhone,
+                offerUrl: appBeingMoved.offerUrl,
+                logoUrl: appBeingMoved.logoUrl,
+                employmentType: appBeingMoved.employmentType,
+                notes: appBeingMoved.notes,
+              }
             }
-          }
-          onClose={closeMoveDialog}
-          onMoveToInterviews={moveToInterviews}
-          onMoveToRejected={moveToRejected}
-          onMoveToWithdrawn={moveToWithdrawn}
-          fmtDate={fmtDate}
-          statusClasses={statusClasses}
-        />
+            onClose={closeMoveDialog}
+            onMoveToInterviews={moveToInterviews}
+            onMoveToRejected={moveToRejected}
+            onMoveToWithdrawn={moveToWithdrawn}
+            fmtDate={fmtDate}
+            statusClasses={statusClasses}
+          />
 
-        {/* Add / edit dialog */}
-        <AddApplicationDialog
-          open={dialogOpen}
-          onClose={() => {
-            setDialogOpen(false);
-            setEditingApp(null);
-          }}
-          initialData={editingApp ? appToForm(editingApp) : undefined}
-          onSave={handleSave}
-        />
+          {/* Add / edit dialog */}
+          <AddApplicationDialog
+            open={dialogOpen}
+            onClose={() => {
+              setDialogOpen(false);
+              setEditingApp(null);
+            }}
+            initialData={editingApp ? appToForm(editingApp) : undefined}
+            onSave={handleSave}
+          />
+        </div>
       </section>
     </>
   );
