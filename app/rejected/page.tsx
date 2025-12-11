@@ -7,11 +7,17 @@ import MoveToRejectedDialog, {
   type RejectionDetails,
 } from "@/components/dialogs/MoveToRejectedDialog";
 import RejectedCard, { type Rejection } from "./RejectedCard";
-import { Search, Plus, Filter, History } from "lucide-react";
+import { Search, Plus, History } from "lucide-react";
 import { animateCardExit } from "@/components/dialogs/cardExitAnimation";
 import ActivityLogSidebar, {
   type ActivityItem,
 } from "@/components/ActivityLogSidebar";
+
+import RejectedFilter, {
+  DEFAULT_REJECTED_FILTERS,
+  filterRejected,
+  type RejectedFilters,
+} from "@/components/RejectedFilter";
 
 const REJECTIONS_STORAGE_KEY = "job-tracker:rejected";
 const REJECTIONS_ACTIVITY_STORAGE_KEY = "job-tracker:rejected-activity";
@@ -37,6 +43,11 @@ export default function RejectedPage() {
   // Activity log sidebar & data
   const [activityOpen, setActivityOpen] = useState(false);
   const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
+
+  // Rejected filters state
+  const [filters, setFilters] = useState<RejectedFilters>(
+    DEFAULT_REJECTED_FILTERS
+  );
 
   // helper to append to activity log (and persist)
   const appendActivity = (entry: ActivityItem) => {
@@ -254,24 +265,10 @@ export default function RejectedPage() {
     setDialogApplication(null);
   };
 
-  const filtered = useMemo(() => {
-    const q = query.toLowerCase().trim();
-    if (!q) return rejected;
-
-    return rejected.filter((item) =>
-      [
-        item.company,
-        item.role,
-        item.location,
-        item.contactName,
-        item.contactEmail,
-        item.notes,
-        item.rejectionType === "no-interview" ? "no interview" : "interview",
-      ]
-        .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(q))
-    );
-  }, [query, rejected]);
+  const filtered = useMemo(
+    () => filterRejected(rejected, query, filters),
+    [rejected, query, filters]
+  );
 
   return (
     <>
@@ -325,7 +322,7 @@ export default function RejectedPage() {
         className={[
           "relative rounded-2xl border border-neutral-200/70",
           "bg-gradient-to-br from-rose-50 via-white to-pink-50",
-          "p-8 shadow-md overflow-hidden",
+          "p-8 shadow-md",
         ].join(" ")}
       >
         {/* soft rose/pink blobs */}
@@ -398,7 +395,7 @@ export default function RejectedPage() {
             />
           </div>
 
-          {/* Add (glass, matches Filter) */}
+          {/* Add */}
           <button
             type="button"
             onClick={handleAdd}
@@ -413,19 +410,13 @@ export default function RejectedPage() {
             Add
           </button>
 
-          {/* Filter (glass sibling) – still a placeholder */}
-          <button
-            type="button"
-            className={[
-              "inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800",
-              "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
-              "border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50",
-              "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-300",
-            ].join(" ")}
-          >
-            <Filter className="h-4 w-4" aria-hidden="true" />
-            Filter
-          </button>
+          {/* New rejected filter */}
+          <RejectedFilter
+            items={rejected}
+            filters={filters}
+            onChange={setFilters}
+            filteredCount={filtered.length}
+          />
         </div>
 
         {/* Grid */}
@@ -455,7 +446,7 @@ export default function RejectedPage() {
                 </>
               ) : (
                 <p className="text-sm text-neutral-700">
-                  No rejected applications match your search.
+                  No rejected applications match your search or filters.
                 </p>
               )}
             </div>

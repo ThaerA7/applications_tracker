@@ -3,11 +3,10 @@
 
 import { useEffect, useMemo, useState, useRef, FormEvent } from "react";
 import { createPortal } from "react-dom";
-import Image from 'next/image';
+import Image from "next/image";
 import {
   Search,
   Plus,
-  Filter,
   MapPin,
   ExternalLink,
   Star,
@@ -28,9 +27,15 @@ import {
   Image as ImageIcon,
 } from "lucide-react";
 
+import WishlistFilter, {
+  DEFAULT_WISHLIST_FILTERS,
+  filterWishlistItems,
+  type WishlistFilters,
+} from "@/components/WishlistFilter";
+
 const WISHLIST_STORAGE_KEY = "job-wishlist-v1";
 
-type WishlistItem = {
+export type WishlistItem = {
   id: string;
   company: string;
   role?: string;
@@ -255,8 +260,7 @@ function AddWishlistItemDialog({ open, onClose, onSave }: AddDialogProps) {
   if (typeof document === "undefined") return null;
 
   const dialog = (
-  <div className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[10000] flex items-center justify-center px-4 py-8">
-
+    <div className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[10000] flex items-center justify-center px-4 py-8">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-neutral-900/40"
@@ -499,6 +503,9 @@ export default function WishlistPage() {
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [query, setQuery] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [filters, setFilters] = useState<WishlistFilters>(
+    DEFAULT_WISHLIST_FILTERS
+  );
 
   // Load wishlist items from localStorage (no demo data)
   useEffect(() => {
@@ -521,15 +528,10 @@ export default function WishlistPage() {
     }
   }, []);
 
-  const filtered = useMemo(() => {
-    const q = query.toLowerCase().trim();
-    if (!q) return items;
-    return items.filter((w) =>
-      [w.company, w.role, w.location, w.priority]
-        .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(q))
-    );
-  }, [query, items]);
+  const filtered = useMemo(
+    () => filterWishlistItems(items, query, filters),
+    [items, query, filters]
+  );
 
   function persistWishlist(next: WishlistItem[]) {
     if (typeof window === "undefined") return;
@@ -579,7 +581,7 @@ export default function WishlistPage() {
       className={[
         "relative rounded-2xl border border-yellow-100/80",
         "bg-gradient-to-br from-yellow-50 via-white to-amber-50",
-        "p-8 shadow-md overflow-hidden",
+        "p-8 shadow-md", // no overflow-hidden so filter panel can fully show
       ].join(" ")}
     >
       {/* soft accent blobs */}
@@ -587,16 +589,16 @@ export default function WishlistPage() {
       <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-amber-300/20 blur-3xl" />
 
       <div className="flex items-center gap-1">
-                <Image
-                  src="/icons/star.png" // same icon you used for Applied
-                  alt=""
-                  width={37}
-                  height={37}
-                  aria-hidden="true"
-                  className="shrink-0 -mt-1"
-                />
-                <h1 className="text-2xl font-semibold text-neutral-900">Wishlist</h1>
-              </div>
+        <Image
+          src="/icons/star.png"
+          alt=""
+          width={37}
+          height={37}
+          aria-hidden="true"
+          className="shrink-0 -mt-1"
+        />
+        <h1 className="text-2xl font-semibold text-neutral-900">Wishlist</h1>
+      </div>
       <p className="mt-1 text-neutral-700">
         Offers you starred from the Offers page or saved manually.
       </p>
@@ -642,19 +644,13 @@ export default function WishlistPage() {
           Add
         </button>
 
-        {/* Filter (visual) */}
-        <button
-          type="button"
-          className={[
-            "inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800",
-            "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
-            "border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50",
-            "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-300",
-          ].join(" ")}
-        >
-          <Filter className="h-4 w-4" aria-hidden="true" />
-          Filter
-        </button>
+        {/* Filter */}
+        <WishlistFilter
+          items={items}
+          filters={filters}
+          onChange={setFilters}
+          filteredCount={filtered.length}
+        />
       </div>
 
       {/* Results grid */}

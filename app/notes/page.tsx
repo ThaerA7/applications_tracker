@@ -155,6 +155,7 @@ export default function NotesPage() {
   const [query, setQuery] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [activeTag, setActiveTag] = useState<string>("All");
+  const [activeColor, setActiveColor] = useState<ColorKey | "all">("all");
 
   // dialog state (for add + edit)
   const [editingId, setEditingId] = useState<string | null>(null); // "new" for add
@@ -185,17 +186,25 @@ export default function NotesPage() {
         n.title.toLowerCase().includes(q) ||
         n.content.toLowerCase().includes(q) ||
         n.tags.some((t) => t.toLowerCase().includes(q));
+
       const matchesTag = activeTag === "All" || n.tags.includes(activeTag);
-      return matchesQ && matchesTag;
+
+      const noteColor: ColorKey = n.color || "gray";
+      const matchesColor = activeColor === "all" || noteColor === activeColor;
+
+      return matchesQ && matchesTag && matchesColor;
     });
+
     res.sort((a, b) => {
       if (!!b.pinned === !!a.pinned) {
-        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+        return (
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        );
       }
       return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
     });
     return res;
-  }, [notes, query, activeTag]);
+  }, [notes, query, activeTag, activeColor]);
 
   function openAddDialog() {
     setEditingId("new");
@@ -381,8 +390,9 @@ export default function NotesPage() {
         {showFilters && (
           <div
             id="notes-filters"
-            className="mt-3 rounded-lg border border-neutral-200 bg-white/70 p-3 backdrop-blur supports-[backdrop-filter]:bg-white/60"
+            className="mt-3 relative rounded-lg border border-neutral-200 bg-white/70 p-3 pb-10 backdrop-blur supports-[backdrop-filter]:bg-white/60"
           >
+            {/* Tag filter row – now can go full width */}
             <div className="flex flex-wrap items-center gap-2">
               {allTags.map((t) => {
                 const active = activeTag === t;
@@ -405,8 +415,49 @@ export default function NotesPage() {
                 );
               })}
             </div>
+
+            {/* Color filter cluster – still bottom-right */}
+            <div className="absolute bottom-2 right-3 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveColor("all")}
+                aria-pressed={activeColor === "all"}
+                aria-label="Show notes of any color"
+                className={[
+                  "h-7 w-7 rounded-full border transition",
+                  activeColor === "all"
+                    ? "ring-2 ring-fuchsia-300 border-neutral-300"
+                    : "ring-0 border-neutral-300",
+                  "bg-[conic-gradient(at_50%_50%,#ec4899,#eab308,#22c55e,#3b82f6,#a855f7,#ec4899)]",
+                ].join(" ")}
+              />
+
+              {COLORS.map((c) => {
+                const selected = activeColor === c;
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setActiveColor(c)}
+                    aria-label={`Filter by color: ${c}`}
+                    aria-pressed={selected}
+                    className={[
+                      "h-7 w-7 rounded-full border transition",
+                      selected ? `ring-2 ${COLOR_STYLES[c].ring}` : "ring-0",
+                      c === "yellow" || c === "gray"
+                        ? "border-neutral-300"
+                        : "border-transparent",
+                    ].join(" ")}
+                    style={{ background: getColorHex(c) }}
+                    title={c}
+                  />
+                );
+              })}
+            </div>
           </div>
         )}
+
+
 
         {/* Notes grid */}
         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -519,7 +570,9 @@ export default function NotesPage() {
           })}
 
           {filtered.length === 0 && (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
+            <div
+              className="md:col-span-2 xl:col-span-3 flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur"
+            >
               <div className="mb-2 text-5xl">📝</div>
               <p className="text-sm text-neutral-700">
                 No notes match your filters.
@@ -598,7 +651,7 @@ export default function NotesPage() {
         </div>
       )}
 
-      {/* NOTE DIALOG – same style idea as ScheduleInterviewDialog / overview note dialog */}
+      {/* NOTE DIALOG */}
       {isDialogOpen && (
         <div
           className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[12500] flex items-center justify-center px-4 py-8"
