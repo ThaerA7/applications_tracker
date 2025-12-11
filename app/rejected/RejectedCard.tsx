@@ -1,20 +1,19 @@
 "use client";
 
-import Image from "next/image";
 import type { ComponentType } from "react";
 import type { RejectionDetails } from "@/components/dialogs/MoveToRejectedDialog";
 import {
   Briefcase,
   MapPin,
-  Calendar,
+  CalendarDays,
   Phone,
   Video,
-  User2,
-  Ban,
-  Link as LinkIcon,
+  Building2,
+  Mail,
   Trash2,
   Pencil,
   FileText,
+  Link as LinkIcon,
 } from "lucide-react";
 
 type InterviewType = "phone" | "video" | "in-person";
@@ -43,14 +42,14 @@ function getInterviewMeta(
   }
 }
 
-function formatDate(iso: string) {
+function formatDate(iso?: string) {
+  if (!iso) return "—";
   const d = new Date(iso);
-  return new Intl.DateTimeFormat("en-DE", {
-    weekday: "short",
+  if (Number.isNaN(d.getTime())) return iso;
+  return new Intl.DateTimeFormat(undefined, {
     year: "numeric",
     month: "short",
-    day: "2-digit",
-    timeZone: "Europe/Berlin",
+    day: "numeric",
   }).format(d);
 }
 
@@ -69,8 +68,7 @@ export default function RejectedCard({
   onEdit,
   onDelete,
 }: RejectedCardProps) {
-  const date = formatDate(item.decisionDate);
-  const WithType = getInterviewMeta(item.rejectionType);
+  const interviewMeta = getInterviewMeta(item.rejectionType);
 
   return (
     <article
@@ -80,45 +78,58 @@ export default function RejectedCard({
         "bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70",
         "hover:-translate-y-0.5 hover:shadow-md",
         "before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl",
+        // keep rejected-specific gradient, but structure matches ApplicationCard
         "before:bg-gradient-to-b before:from-rose-500 before:via-pink-500 before:to-fuchsia-500",
         "before:opacity-90",
         "flex h-full flex-col",
       ].join(" ")}
     >
-      {/* same inner padding as InterviewCard: top gap = 3 */}
-      <div className="relative flex-1 px-5 pt-3 pb-5">
-        {/* Header with logo + company/role + actions */}
+      {/* Inner padding container for main content (matches ApplicationCard spacing) */}
+      <div className="relative flex-1 px-5 pt-3 pb-6">
+        {/* Header with square logo + company/role + actions (same layout as ApplicationCard) */}
         <div className="relative flex items-start gap-3 pr-16 sm:pr-20">
-          {item.logoUrl ? (
+          {/* Logo */}
+          {item.logoUrl?.trim() ? (
             <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-neutral-200 bg-white ring-1 ring-white/60">
-              <Image
+              <img
                 src={item.logoUrl}
                 alt={`${item.company} logo`}
-                fill
-                sizes="48px"
-                className="object-contain p-1.5"
+                className="h-full w-full object-contain p-1.5"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src =
+                    'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><rect width="100%" height="100%" rx="12" fill="%25fee2e2"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="11" fill="%25be123c">Logo</text></svg>';
+                }}
               />
             </div>
           ) : (
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-neutral-50 text-neutral-600">
-              <Briefcase className="h-5 w-5" aria-hidden="true" />
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-neutral-50 text-neutral-500">
+              <Building2 className="h-6 w-6" aria-hidden="true" />
+              <span className="sr-only">{item.company}</span>
             </div>
           )}
 
+          {/* Company / role */}
           <div className="min-w-0">
-            <h2 className="truncate text-base font-semibold text-neutral-900">
-              {item.company}
-            </h2>
-            <p className="flex items-center gap-1 truncate text-sm text-neutral-600">
-              <Briefcase
-                className="h-3.5 w-3.5 text-neutral-400"
-                aria-hidden="true"
-              />
-              {item.role}
-            </p>
+            <div className="flex items-center gap-2">
+              <h2 className="max-w-full truncate text-base font-semibold text-neutral-900">
+                {item.company}
+              </h2>
+            </div>
+
+            {item.role && (
+              <p className="mt-0.5 flex items-center gap-1 text-sm text-neutral-600">
+                <Briefcase
+                  className="h-3.5 w-3.5 flex-shrink-0 text-neutral-400"
+                  aria-hidden="true"
+                />
+                <span className="truncate" title={item.role}>
+                  {item.role}
+                </span>
+              </p>
+            )}
           </div>
 
-          {/* Same pill-style actions as InterviewCard, 10% bigger buttons */}
+          {/* Actions pill (same shape/style as ApplicationCard, but keep rejected focus color) */}
           <div className="absolute right-0 top-1/2 -translate-y-1/2">
             <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white/90 px-1.5 py-1 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/80">
               {/* Edit */}
@@ -151,38 +162,43 @@ export default function RejectedCard({
           aria-hidden="true"
         />
 
-        {/* Details */}
-        <dl className="mt-4 grid grid-cols-1 gap-3 text-sm">
-          <div className="flex items-center gap-2">
-            <Calendar
-              className="h-4 w-4 text-neutral-500"
-              aria-hidden="true"
-            />
-            <div className="flex flex-col">
-              <dt className="text-neutral-500">Decision date</dt>
-              <dd className="font-medium text-neutral-900">{date}</dd>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {WithType ? (
-              <WithType.Icon
+        {/* Details – same 2-column grid structure as ApplicationCard */}
+        <dl
+          className="relative mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm before:absolute before:inset-y-0 before:left-1/2 before:w-px before:bg-neutral-200/70 before:content-['']"
+        >
+          {/* Applied date (if available) */}
+          {item.appliedDate && (
+            <div className="flex items-center gap-2">
+              <CalendarDays
                 className="h-4 w-4 text-neutral-500"
                 aria-hidden="true"
               />
-            ) : (
-              <Ban className="h-4 w-4 text-neutral-500" aria-hidden="true" />
-            )}
-            <div className="flex flex-col">
-              <dt className="text-neutral-500">Interview</dt>
-              <dd className="font-medium text-neutral-900">
-                {WithType
-                  ? `With interview (${WithType.label})`
-                  : "No interview"}
-              </dd>
+              <div className="flex flex-col">
+                <dt className="text-neutral-500">Applied</dt>
+                <dd className="font-medium text-neutral-900">
+                  {formatDate(item.appliedDate)}
+                </dd>
+              </div>
             </div>
-          </div>
+          )}
 
+          {/* Decision date */}
+          {item.decisionDate && (
+            <div className="flex items-center gap-2">
+              <CalendarDays
+                className="h-4 w-4 text-neutral-500"
+                aria-hidden="true"
+              />
+              <div className="flex flex-col">
+                <dt className="text-neutral-500">Decision date</dt>
+                <dd className="font-medium text-neutral-900">
+                  {formatDate(item.decisionDate)}
+                </dd>
+              </div>
+            </div>
+          )}
+
+          {/* Location */}
           {item.location && (
             <div className="flex items-center gap-2">
               <MapPin
@@ -198,57 +214,122 @@ export default function RejectedCard({
             </div>
           )}
 
-          {(item.contactName || item.contactEmail || item.contactPhone) && (
+          {/* Interview info */}
+          <div className="flex items-center gap-2">
+            {interviewMeta ? (
+              <interviewMeta.Icon
+                className="h-4 w-4 text-neutral-500"
+                aria-hidden="true"
+              />
+            ) : (
+              <Briefcase
+                className="h-4 w-4 text-neutral-500"
+                aria-hidden="true"
+              />
+            )}
+            <div className="flex flex-col">
+              <dt className="text-neutral-500">Interview</dt>
+              <dd className="font-medium text-neutral-900">
+                {interviewMeta
+                  ? `With interview (${interviewMeta.label})`
+                  : "No interview"}
+              </dd>
+            </div>
+          </div>
+
+          {/* Employment type */}
+          {item.employmentType && (
             <div className="flex items-center gap-2">
-              <User2
+              <Briefcase
                 className="h-4 w-4 text-neutral-500"
                 aria-hidden="true"
               />
               <div className="flex flex-col">
-                <dt className="text-neutral-500">Contact</dt>
+                <dt className="text-neutral-500">Employment</dt>
                 <dd className="font-medium text-neutral-900">
-                  {item.contactName}
-                  {item.contactEmail && (
-                    <>
-                      {" "}
-                      <span className="text-neutral-500">·</span>{" "}
-                      <a
-                        href={`mailto:${item.contactEmail}`}
-                        className="underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-600"
-                      >
-                        {item.contactEmail}
-                      </a>
-                    </>
-                  )}
+                  {item.employmentType}
                 </dd>
               </div>
             </div>
           )}
 
-          {item.notes && (
-            <div className="flex items-start gap-2">
-              <FileText
-                className="mt-0.5 h-4 w-4 text-neutral-500"
+          {/* Contact name */}
+          {item.contactName && (
+            <div className="flex items-center gap-2">
+              <Building2
+                className="h-4 w-4 text-neutral-500"
                 aria-hidden="true"
               />
               <div className="flex flex-col">
-                <dt className="text-neutral-500">Notes</dt>
-                <dd className="font-medium text-neutral-900 whitespace-pre-wrap">
-                  {item.notes}
+                <dt className="text-neutral-500">Contact person</dt>
+                <dd className="font-medium text-neutral-900">
+                  {item.contactName}
+                </dd>
+              </div>
+            </div>
+          )}
+
+          {/* Contact email */}
+          {item.contactEmail && (
+            <div className="flex items-center gap-2">
+              <Mail className="h-4 w-4 text-neutral-500" aria-hidden="true" />
+              <div className="flex flex-col">
+                <dt className="text-neutral-500">Contact email</dt>
+                <dd className="font-medium text-neutral-900">
+                  <a
+                    href={`mailto:${item.contactEmail}`}
+                    className="underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-600"
+                  >
+                    {item.contactEmail}
+                  </a>
+                </dd>
+              </div>
+            </div>
+          )}
+
+          {/* Contact phone */}
+          {item.contactPhone && (
+            <div className="flex items-center gap-2">
+              <Phone
+                className="h-4 w-4 text-neutral-500"
+                aria-hidden="true"
+              />
+              <div className="flex flex-col">
+                <dt className="text-neutral-500">Contact phone</dt>
+                <dd className="font-medium text-neutral-900">
+                  <a
+                    href={`tel:${item.contactPhone}`}
+                    className="underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-600"
+                  >
+                    {item.contactPhone}
+                  </a>
                 </dd>
               </div>
             </div>
           )}
         </dl>
 
-        {/* Footer actions */}
+        {/* Notes – same style as ApplicationCard */}
+        {item.notes && (
+          <div className="mt-4 rounded-lg border border-dashed border-neutral-200 bg-neutral-50/80 px-3 py-2">
+            <div className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+              <FileText className="h-3 w-3" aria-hidden="true" />
+              <span>Notes</span>
+            </div>
+            <p className="mt-1 text-xs text-neutral-800 whitespace-pre-line">
+              {item.notes}
+            </p>
+          </div>
+        )}
+
+        {/* Footer – Job posting link (same style as ApplicationCard footer) */}
         {item.url && (
-          <div className="mt-4 flex items-center justify-end">
+          <div className="mt-4 flex justify-end">
             <a
               href={item.url}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1 text-sm font-medium text-neutral-900 hover:underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-700"
+              className="inline-flex items-center gap-1 text-sm font-medium text-neutral-900 underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-700"
             >
               <LinkIcon className="h-4 w-4" aria-hidden="true" />
               Job posting
