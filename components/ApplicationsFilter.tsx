@@ -655,7 +655,7 @@ export default function ApplicationsFilter({
           </div>
 
           {/* Body */}
-          <div className="max-h-[70vh] overflow-auto px-5 py-0">
+          <div className="max-h-[70vh] overflow-auto px-5 py-3">
             {!hasAnyApplications && (
               <div className="rounded-xl border border-dashed border-neutral-200 bg-white px-4 py-3 text-xs text-neutral-600">
                 Add a few applications first — filters will populate

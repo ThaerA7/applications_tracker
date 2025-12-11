@@ -11,7 +11,6 @@ import {
 import {
   Search,
   Plus,
-  Filter,
   PhoneCall,
   Video,
   Users,
@@ -37,6 +36,12 @@ import ActivityLogSidebar, {
   type ActivityItem,
   type ActivityType,
 } from "@/components/ActivityLogSidebar";
+
+import InterviewsFilter, {
+  DEFAULT_INTERVIEW_FILTERS,
+  filterInterviews,
+  type InterviewFilters,
+} from "@/components/InterviewsFilter";
 
 const INTERVIEWS_STORAGE_KEY = "job-tracker:interviews";
 const REJECTIONS_STORAGE_KEY = "job-tracker:rejected";
@@ -92,15 +97,6 @@ type AcceptedRecord = {
 
 type InterviewStage = "upcoming" | "past" | "done";
 
-const INTERVIEW_TYPE_META: Record<
-  InterviewType,
-  { label: string; Icon: ComponentType<any> }
-> = {
-  phone: { label: "Phone screening", Icon: PhoneCall },
-  video: { label: "Video call", Icon: Video },
-  "in-person": { label: "In person", Icon: Users },
-};
-
 const STAGE_FILTERS: {
   id: InterviewStage;
   label: string;
@@ -126,6 +122,15 @@ const STAGE_FILTERS: {
     icon: CheckCircle2,
   },
 ];
+
+const INTERVIEW_TYPE_META: Record<
+  InterviewType,
+  { label: string; Icon: ComponentType<any> }
+> = {
+  phone: { label: "Phone screening", Icon: PhoneCall },
+  video: { label: "Video call", Icon: Video },
+  "in-person": { label: "In person", Icon: Users },
+};
 
 // Initial demo data (used only if localStorage is empty)
 const DEMO_INTERVIEWS: InterviewWithStage[] = [
@@ -362,6 +367,9 @@ export default function InterviewsPage() {
   const [query, setQuery] = useState("");
   const [items, setItems] = useState<InterviewWithStage[]>(DEMO_INTERVIEWS);
   const [stageFilter, setStageFilter] = useState<InterviewStage>("upcoming");
+  const [filters, setFilters] = useState<InterviewFilters>(
+    DEFAULT_INTERVIEW_FILTERS
+  );
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogApplication, setDialogApplication] =
@@ -929,30 +937,15 @@ export default function InterviewsPage() {
     });
   };
 
-  const filtered = useMemo(() => {
-    const q = query.toLowerCase().trim();
+  const filtered = useMemo(
+    () => filterInterviews(items, query, filters, stageFilter),
+    [items, query, filters, stageFilter]
+  );
 
-    const byStage = items.filter((i) => i.stage === stageFilter);
-
-    if (!q) return byStage;
-
-    return byStage.filter((i) =>
-      [
-        i.company,
-        i.role,
-        i.location,
-        INTERVIEW_TYPE_META[i.type].label,
-        i.contact?.name,
-        i.contact?.email,
-        i.contact?.phone,
-        i.appliedOn,
-        i.employmentType,
-        i.notes,
-      ]
-        .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(q))
-    );
-  }, [query, items, stageFilter]);
+  const totalInStage = useMemo(
+    () => items.filter((i) => i.stage === stageFilter).length,
+    [items, stageFilter]
+  );
 
   // Formatting + status styles for MoveApplicationDialog
   const fmtDate = (date: string) => date;
@@ -1053,7 +1046,7 @@ export default function InterviewsPage() {
         className={[
           "relative rounded-2xl border border-neutral-200/70",
           "bg-gradient-to-br from-emerald-50 via-white to-teal-50",
-          "p-8 shadow-md overflow-hidden",
+          "p-8 shadow-md",
         ].join(" ")}
       >
         {/* soft emerald/teal blobs */}
@@ -1141,19 +1134,14 @@ export default function InterviewsPage() {
             Add
           </button>
 
-          {/* Filter (placeholder) */}
-          <button
-            type="button"
-            className={[
-              "inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800",
-              "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
-              "border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50",
-              "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-300",
-            ].join(" ")}
-          >
-            <Filter className="h-4 w-4" aria-hidden="true" />
-            Filter
-          </button>
+          {/* New Interviews filter */}
+          <InterviewsFilter
+            items={items}
+            filters={filters}
+            onChange={setFilters}
+            filteredCount={filtered.length}
+            totalInStage={totalInStage}
+          />
         </div>
 
         {/* Stage view toggle – full width, same container width as cards */}
@@ -1184,8 +1172,12 @@ export default function InterviewsPage() {
                   role="tab"
                 >
                   <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-                  <span className="hidden sm:inline">{option.label}</span>
-                  <span className="sm:hidden">{option.shortLabel}</span>
+                  <span className="hidden sm:inline">
+                    {option.label}
+                  </span>
+                  <span className="sm:hidden">
+                    {option.shortLabel}
+                  </span>
                 </button>
               );
             })}
@@ -1243,7 +1235,7 @@ export default function InterviewsPage() {
                 </>
               ) : (
                 <p className="text-sm text-neutral-700">
-                  No interviews match your search in this view.
+                  No interviews match your search or filters in this view.
                 </p>
               )}
             </div>
