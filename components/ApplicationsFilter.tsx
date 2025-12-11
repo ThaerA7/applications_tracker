@@ -655,7 +655,7 @@ export default function ApplicationsFilter({
           </div>
 
           {/* Body */}
-          <div className="max-h-[70vh] overflow-auto px-5 py-4">
+          <div className="max-h-[70vh] overflow-auto px-5 py-0">
             {!hasAnyApplications && (
               <div className="rounded-xl border border-dashed border-neutral-200 bg-white px-4 py-3 text-xs text-neutral-600">
                 Add a few applications first — filters will populate
@@ -664,7 +664,7 @@ export default function ApplicationsFilter({
             )}
 
             {/* Dates (Applied + Start on same row) */}
-            <div className="mt-1">
+            <div className="mt-0">
               <div className="grid gap-6 sm:grid-cols-2">
                 {/* Applied date column */}
                 <div>
@@ -890,7 +890,7 @@ export default function ApplicationsFilter({
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between gap-2 border-t border-neutral-200/70 px-5 py-3">
+          <div className="mt-2 flex items-center justify-between gap-2 border-t border-neutral-200/70 px-5 py-3">
             <div className="text-[11px] text-neutral-500">
               Showing{" "}
               <span className="font-semibold text-neutral-800">
