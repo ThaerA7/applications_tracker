@@ -908,11 +908,11 @@ export default function OffersReceivedPage() {
             })}
 
             <div
-              className="pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-pink-500 via-orange-400 to-amber-300"
+              className="pointer-events-none absolute inset-x-0 top-0 h-0 bg-gradient-to-r from-pink-500 via-orange-400 to-amber-300"
               aria-hidden="true"
             />
             <div
-              className="pointer-events-none absolute inset-x-0 bottom-0 h-1.5 bg-gradient-to-r from-pink-500 via-orange-400 to-amber-300"
+              className="pointer-events-none absolute inset-x-0 bottom-0 h-0 bg-gradient-to-r from-pink-500 via-orange-400 to-amber-300"
               aria-hidden="true"
             />
           </div>
