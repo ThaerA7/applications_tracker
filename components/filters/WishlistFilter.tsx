@@ -11,7 +11,7 @@ import {
   type SetStateAction,
 } from "react";
 import { Check, ChevronDown, Filter, X } from "lucide-react";
-import type { WishlistItem } from "../app/wishlist/page";
+import type { WishlistItem } from "../../app/wishlist/page";
 
 export type WishlistDatePreset = "any" | "last30" | "last90" | "thisYear" | "custom";
 

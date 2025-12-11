@@ -41,7 +41,7 @@ import InterviewsFilter, {
   DEFAULT_INTERVIEW_FILTERS,
   filterInterviews,
   type InterviewFilters,
-} from "@/components/InterviewsFilter";
+} from "@/components/filters/InterviewsFilter";
 
 const INTERVIEWS_STORAGE_KEY = "job-tracker:interviews";
 const REJECTIONS_STORAGE_KEY = "job-tracker:rejected";
@@ -103,25 +103,25 @@ const STAGE_FILTERS: {
   shortLabel: string;
   icon: ComponentType<any>;
 }[] = [
-  {
-    id: "upcoming",
-    label: "Upcoming interviews",
-    shortLabel: "Upcoming",
-    icon: Calendar,
-  },
-  {
-    id: "past",
-    label: "Interviews with passed dates",
-    shortLabel: "Passed",
-    icon: History,
-  },
-  {
-    id: "done",
-    label: "Done • waiting for answer",
-    shortLabel: "Done",
-    icon: CheckCircle2,
-  },
-];
+    {
+      id: "upcoming",
+      label: "Upcoming interviews",
+      shortLabel: "Upcoming",
+      icon: Calendar,
+    },
+    {
+      id: "past",
+      label: "Interviews with passed dates",
+      shortLabel: "Passed",
+      icon: History,
+    },
+    {
+      id: "done",
+      label: "Done • waiting for answer",
+      shortLabel: "Done",
+      icon: CheckCircle2,
+    },
+  ];
 
 const INTERVIEW_TYPE_META: Record<
   InterviewType,
@@ -665,8 +665,8 @@ export default function InterviewsPage() {
             newStage === "done"
               ? "Marked as done – waiting for answer"
               : newStage === "past"
-              ? "Marked as interview with passed date"
-              : "Marked as upcoming interview",
+                ? "Marked as interview with passed date"
+                : "Marked as upcoming interview",
         });
       }
 
@@ -1224,8 +1224,8 @@ export default function InterviewsPage() {
                     {stageFilter === "upcoming"
                       ? "upcoming interviews"
                       : stageFilter === "past"
-                      ? "interviews with passed dates"
-                      : "interviews marked as done and waiting for an answer"}
+                        ? "interviews with passed dates"
+                        : "interviews marked as done and waiting for an answer"}
                     .
                   </p>
                   <p className="mt-1 text-xs text-neutral-500">

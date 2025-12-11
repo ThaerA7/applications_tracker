@@ -37,7 +37,7 @@ import ApplicationsFilter, {
   getActiveFilterCount,
   filterApplications,
   type ApplicationFilters,
-} from "@/components/ApplicationsFilter";
+} from "@/components/filters/ApplicationsFilter";
 
 type StoredRejection = RejectionDetails & { id: string };
 
@@ -699,8 +699,8 @@ export default function AppliedPage() {
                   {!hasAnyApplications
                     ? "No applications yet. Click “Add” to create your first one."
                     : activeFilterCount > 0
-                    ? "No applications match your filters. Try resetting or broadening them."
-                    : "No applications match your search."}
+                      ? "No applications match your filters. Try resetting or broadening them."
+                      : "No applications match your search."}
                 </p>
 
                 {activeFilterCount > 0 && (

@@ -17,7 +17,7 @@ import RejectedFilter, {
   DEFAULT_REJECTED_FILTERS,
   filterRejected,
   type RejectedFilters,
-} from "@/components/RejectedFilter";
+} from "@/components/filters/RejectedFilter";
 
 const REJECTIONS_STORAGE_KEY = "job-tracker:rejected";
 const REJECTIONS_ACTIVITY_STORAGE_KEY = "job-tracker:rejected-activity";

@@ -31,7 +31,7 @@ import WishlistFilter, {
   DEFAULT_WISHLIST_FILTERS,
   filterWishlistItems,
   type WishlistFilters,
-} from "@/components/WishlistFilter";
+} from "@/components/filters/WishlistFilter";
 
 const WISHLIST_STORAGE_KEY = "job-wishlist-v1";
 
@@ -218,10 +218,10 @@ function AddWishlistItemDialog({ open, onClose, onSave }: AddDialogProps) {
 
   const handleChange =
     (field: keyof NewWishlistItemForm) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-      const { value } = e.target;
-      setForm((f) => ({ ...f, [field]: value }));
-    };
+      (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        const { value } = e.target;
+        setForm((f) => ({ ...f, [field]: value }));
+      };
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
