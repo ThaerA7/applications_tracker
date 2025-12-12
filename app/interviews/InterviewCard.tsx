@@ -43,6 +43,31 @@ type InterviewCardProps = {
   onStageChange: (stage: InterviewStage) => void;
 };
 
+const STAGE_STAMP_META: Record<
+  InterviewStage,
+  {
+    label: string;
+    Icon: ComponentType<any>;
+    colorClasses: string;
+  }
+> = {
+  upcoming: {
+    label: "Upcoming",
+    Icon: Calendar,
+    colorClasses: "border-emerald-500/70 text-emerald-700 bg-emerald-50/70",
+  },
+  past: {
+    label: "Passed date",
+    Icon: History,
+    colorClasses: "border-amber-500/70 text-amber-700 bg-amber-50/70",
+  },
+  done: {
+    label: "Done • waiting",
+    Icon: CheckCircle2,
+    colorClasses: "border-sky-500/70 text-sky-700 bg-sky-50/70",
+  },
+};
+
 export default function InterviewCard({
   item,
   typeIcon: TypeIcon,
@@ -57,6 +82,7 @@ export default function InterviewCard({
   onStageChange,
 }: InterviewCardProps) {
   const stage = item.stage;
+  const stampMeta = STAGE_STAMP_META[stage];
 
   return (
     <article
@@ -68,11 +94,35 @@ export default function InterviewCard({
         "before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl",
         "before:bg-gradient-to-b before:from-emerald-500 before:via-teal-500 before:to-cyan-500",
         "before:opacity-90",
-        "flex h-full flex-col", // make card stretch + allow footer to stick to bottom
+        "flex h-full flex-col",
       ].join(" ")}
     >
+      {/* Bigger status stamp overlay – centered on right side, slightly inwards (does NOT affect layout) */}
+      {stampMeta && (
+        <div
+          className="pointer-events-none absolute right-12 top-1/2 -translate-y-1/2 -translate-x-4 rotate-[-8deg] z-0"
+          aria-hidden="true"
+        >
+          <div
+            className={[
+              "select-none rounded-xl border-[4px] px-4 py-2",
+              "text-[11px] sm:text-sm font-semibold uppercase tracking-[0.24em]",
+              "shadow-[0_0_0_1px_rgba(255,255,255,0.6),_0_8px_20px_rgba(0,0,0,0.06)]",
+              "backdrop-blur-sm",
+              "opacity-15 mix-blend-multiply",
+              stampMeta.colorClasses,
+            ].join(" ")}
+          >
+            <span className="flex items-center gap-1.5">
+              <stampMeta.Icon className="h-4 w-4" aria-hidden="true" />
+              <span>{stampMeta.label}</span>
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Inner padding container for main content */}
-      <div className="relative flex-1 px-5 pt-3 pb-6">
+      <div className="relative z-10 flex-1 px-5 pt-3 pb-6">
         {/* Header with square logo + company/role + actions */}
         <div className="relative flex items-start gap-3 pr-16 sm:pr-20">
           {item.logoUrl ? (
@@ -144,7 +194,6 @@ export default function InterviewCard({
             </div>
           </div>
         </div>
-
 
         {/* Divider */}
         <div
@@ -313,7 +362,7 @@ export default function InterviewCard({
               href={item.url}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items.center gap-1 text-sm font-medium text-neutral-900 hover:underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-700"
+              className="inline-flex items-center gap-1 text-sm font-medium text-neutral-900 hover:underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-700"
             >
               <LinkIcon className="h-4 w-4" aria-hidden="true" />
               Job posting
@@ -326,7 +375,7 @@ export default function InterviewCard({
       <div
         className={[
           "mt-auto border-t border-neutral-200 bg-neutral-50/95 px-5 py-2.5",
-          "-mb-px rounded-b-xl", // hug bottom radius of the card
+          "-mb-px rounded-b-xl",
         ].join(" ")}
       >
         <div className="flex items-center justify-between gap-2">

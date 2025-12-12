@@ -14,6 +14,7 @@ import {
   Building2,
   FileText,
 } from "lucide-react";
+import type { InterviewType } from "@/components/dialogs/ScheduleInterviewDialog";
 
 export type WithdrawnReason =
   | "accepted-other-offer"
@@ -40,6 +41,8 @@ export type WithdrawnDetails = {
   notes?: string;
   /** Free-text detail when 'other' is selected as the reason */
   otherReasonText?: string;
+  /** Interview type at the stage you withdrew (if applicable) */
+  interviewType?: InterviewType;
 };
 
 type MoveToWithdrawnDialogProps = {
@@ -64,6 +67,10 @@ type MoveToWithdrawnDialogProps = {
     withdrawnDate?: string;
     reason?: WithdrawnReason;
     otherReasonText?: string;
+
+    // optional interview info / stage
+    interviewDate?: string;
+    interviewType?: InterviewType;
   } | null;
   /**
    * Called when the user submits the withdrawn form.
@@ -93,6 +100,7 @@ type FormState = {
   url: string;
   notes: string;
   otherReasonText: string;
+  stage: "before-interview" | "phone" | "video" | "in-person";
 };
 
 const REASON_OPTIONS: {
@@ -161,6 +169,13 @@ function makeInitialForm(
 ): FormState {
   const today = todayISO();
 
+  const stage: FormState["stage"] =
+    app?.interviewType === "phone" ||
+    app?.interviewType === "video" ||
+    app?.interviewType === "in-person"
+      ? app.interviewType
+      : "before-interview";
+
   return {
     company: app?.company ?? "",
     role: app?.role ?? "",
@@ -175,6 +190,7 @@ function makeInitialForm(
     url: app?.offerUrl ?? "",
     notes: app?.notes ?? "",
     otherReasonText: app?.otherReasonText ?? "",
+    stage,
   };
 }
 
@@ -249,6 +265,15 @@ export default function MoveToWithdrawnDialog({
     const notes = form.notes.trim();
     const otherReasonText = form.otherReasonText.trim();
 
+    let interviewType: InterviewType | undefined;
+    if (
+      form.stage === "phone" ||
+      form.stage === "video" ||
+      form.stage === "in-person"
+    ) {
+      interviewType = form.stage;
+    }
+
     const details: WithdrawnDetails = {
       company,
       role,
@@ -268,6 +293,7 @@ export default function MoveToWithdrawnDialog({
     if (form.reason === "other" && otherReasonText) {
       details.otherReasonText = otherReasonText;
     }
+    if (interviewType) details.interviewType = interviewType;
 
     onWithdrawnCreated?.(details);
     onClose();
@@ -529,6 +555,33 @@ export default function MoveToWithdrawnDialog({
               </p>
             </label>
 
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-neutral-800">
+                Stage when you withdrew
+              </span>
+              <div className="relative">
+                <select
+                  value={form.stage}
+                  onChange={handleChange("stage")}
+                  className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 px-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-300"
+                >
+                  <option value="before-interview">Before interview</option>
+                  <option value="phone">
+                    During interview – phone screening
+                  </option>
+                  <option value="video">
+                    During interview – video call
+                  </option>
+                  <option value="in-person">
+                    During interview – in person
+                  </option>
+                </select>
+              </div>
+              <p className="mt-1 text-[11px] text-neutral-500">
+                This controls how the stage is shown on the withdrawn card.
+              </p>
+            </label>
+
             {form.reason === "other" && (
               <label className="space-y-1 text-sm">
                 <span className="font-medium text-neutral-800">
@@ -662,7 +715,7 @@ export default function MoveToWithdrawnDialog({
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex items-center justify-center rounded-lg border border-neutral-200 bg-white/80 px-4 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-300"
+              className="inline-flex items-center justify-center rounded-lg border border-neutral-200 bg-white/80 px-4 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg:white focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-300"
             >
               Cancel
             </button>

@@ -9,7 +9,6 @@ import {
   Phone,
   Video,
   User2,
-  Mail,
   FileText,
   Link as LinkIcon,
   Trash2,
@@ -17,6 +16,7 @@ import {
   Clock,
   Building2,
   AlertCircle,
+  Undo2, // ⬅️ new icon for the stamp
 } from "lucide-react";
 import type { InterviewType } from "@/components/dialogs/ScheduleInterviewDialog";
 import type {
@@ -127,8 +127,31 @@ export default function WithdrawnCard({
         "flex h-full flex-col",
       ].join(" ")}
     >
+      {/* Big withdrawn stamp overlay – centered, slanted, does NOT affect layout */}
+      <div
+        className="pointer-events-none absolute inset-0 flex items-center justify-center z-0"
+        aria-hidden="true"
+      >
+        <div
+          className={[
+            "select-none rounded-2xl border-[5px] px-6 py-3",
+            "text-lg sm:text-xl font-extrabold uppercase tracking-[0.35em]",
+            "shadow-[0_0_0_1px_rgba(255,255,255,0.7),_0_10px_26px_rgba(0,0,0,0.08)]",
+            "backdrop-blur-sm",
+            "opacity-10 mix-blend-multiply",
+            "border-amber-500/80 text-amber-800 bg-amber-50/70",
+            "rotate-[-8deg]",
+          ].join(" ")}
+        >
+          <span className="flex items-center gap-2">
+            <Undo2 className="h-5 w-5" aria-hidden="true" />
+            <span>Withdrawn</span>
+          </span>
+        </div>
+      </div>
+
       {/* inner padding – same as other cards, top gap = 3 */}
-      <div className="relative flex-1 px-5 pt-3 pb-6">
+      <div className="relative z-10 flex-1 px-5 pt-3 pb-6">
         {/* Header: logo + company/role + actions */}
         <div className="relative flex items-start gap-3 pr-16 sm:pr-20">
           {item.logoUrl ? (

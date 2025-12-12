@@ -205,6 +205,9 @@ export default function WithdrawnPage() {
       // used by dialog to prefill existing withdrawn data
       withdrawnDate: item.withdrawnDate,
       reason: item.withdrawnReason,
+      // prefill stage info
+      interviewDate: item.interviewDate,
+      interviewType: item.interviewType,
     };
 
     setEditingWithdrawn(item);
@@ -237,6 +240,8 @@ export default function WithdrawnPage() {
         url: details.url ?? editingWithdrawn.url,
         logoUrl: details.logoUrl ?? editingWithdrawn.logoUrl,
         notes: details.notes ?? editingWithdrawn.notes,
+        interviewType:
+          details.interviewType ?? editingWithdrawn.interviewType,
       };
 
       setWithdrawn((prev) => {
@@ -291,7 +296,8 @@ export default function WithdrawnPage() {
         url: details.url,
         logoUrl: details.logoUrl,
         notes: details.notes,
-        // interviewDate / interviewType left empty here (withdrawn before interview)
+        interviewType: details.interviewType,
+        // interviewDate left empty here (withdrawn before interview, unless you add it later)
       };
 
       setWithdrawn((prev) => {
@@ -374,7 +380,7 @@ export default function WithdrawnPage() {
               <button
                 type="button"
                 onClick={handleCancelDelete}
-                className="inline-flex items-center justify-center rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 shadow-sm hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300"
+                className="inline-flex items-center justify-center rounded-lg border border-neutral-200 bg:white px-3 py-1.5 text-xs font-medium text-neutral-700 shadow-sm hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300"
               >
                 Cancel
               </button>
@@ -498,7 +504,7 @@ export default function WithdrawnPage() {
         </div>
 
         {/* Grid */}
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((item) => (
             <WithdrawnCard
               key={item.id}

@@ -1,3 +1,4 @@
+// app/rejected/RejectedCard.tsx
 "use client";
 
 import type { ComponentType } from "react";
@@ -14,6 +15,7 @@ import {
   Pencil,
   FileText,
   Link as LinkIcon,
+  XCircle,
 } from "lucide-react";
 
 type InterviewType = "phone" | "video" | "in-person";
@@ -84,8 +86,31 @@ export default function RejectedCard({
         "flex h-full flex-col",
       ].join(" ")}
     >
+      {/* Big rejected stamp overlay – centered, does NOT affect layout */}
+      <div
+        className="pointer-events-none absolute inset-0 flex items-center justify-center z-0"
+        aria-hidden="true"
+      >
+        <div
+          className={[
+            "select-none rounded-2xl border-[5px] px-6 py-3",
+            "text-lg sm:text-xl font-extrabold uppercase tracking-[0.35em]",
+            "shadow-[0_0_0_1px_rgba(255,255,255,0.7),_0_10px_26px_rgba(0,0,0,0.08)]",
+            "backdrop-blur-sm",
+            "opacity-10 mix-blend-multiply",
+            "border-rose-500/80 text-rose-700 bg-rose-50/70",
+            "rotate-[-8deg]",
+          ].join(" ")}
+        >
+          <span className="flex items-center gap-2">
+            <XCircle className="h-5 w-5" aria-hidden="true" />
+            <span>Rejected</span>
+          </span>
+        </div>
+      </div>
+
       {/* Inner padding container for main content (matches ApplicationCard spacing) */}
-      <div className="relative flex-1 px-5 pt-3 pb-6">
+      <div className="relative z-10 flex-1 px-5 pt-3 pb-6">
         {/* Header with square logo + company/role + actions (same layout as ApplicationCard) */}
         <div className="relative flex items-start gap-3 pr-16 sm:pr-20">
           {/* Logo */}
