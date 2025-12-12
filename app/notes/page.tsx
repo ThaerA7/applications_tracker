@@ -1,7 +1,7 @@
 // app/notes/page.tsx
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Search,
   Plus,
@@ -102,6 +102,8 @@ const INITIAL_NOTES: Note[] = [
   },
 ];
 
+const NOTES_STORAGE_KEY = "job-tracker:notes";
+
 // Lock locale & timezone so SSR and CSR output identical strings.
 const FORMAT_LOCALE = "en-US";
 const FORMAT_TIMEZONE: Intl.DateTimeFormatOptions["timeZone"] = "UTC";
@@ -169,8 +171,52 @@ export default function NotesPage() {
     {}
   );
 
-  // ✅ delete confirmation state
+  // delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState<Note | null>(null);
+
+  // Load notes from localStorage (or seed with INITIAL_NOTES)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(NOTES_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          setNotes(parsed);
+          return;
+        }
+      }
+      // seed
+      window.localStorage.setItem(
+        NOTES_STORAGE_KEY,
+        JSON.stringify(INITIAL_NOTES)
+      );
+      setNotes(INITIAL_NOTES);
+    } catch (err) {
+      console.error("Failed to load notes from localStorage", err);
+      setNotes(INITIAL_NOTES);
+    }
+  }, []);
+
+  // helper: update + persist
+  const setNotesWithPersist = (
+    updater: (prev: Note[]) => Note[]
+  ) => {
+    setNotes((prev) => {
+      const next = updater(prev);
+      if (typeof window !== "undefined") {
+        try {
+          window.localStorage.setItem(
+            NOTES_STORAGE_KEY,
+            JSON.stringify(next)
+          );
+        } catch (err) {
+          console.error("Failed to persist notes", err);
+        }
+      }
+      return next;
+    });
+  };
 
   const allTags = useMemo(() => {
     const s = new Set<string>();
@@ -232,7 +278,7 @@ export default function NotesPage() {
       .map((t) => t.trim())
       .filter(Boolean);
 
-    setNotes((prev) => {
+    setNotesWithPersist((prev) => {
       if (editingId === "new") {
         const id = `n${Date.now()}`;
         const newNote: Note = {
@@ -250,13 +296,13 @@ export default function NotesPage() {
       return prev.map((n) =>
         n.id === editingId
           ? {
-            ...n,
-            title: draftTitle || "Untitled note",
-            content: draftContent,
-            tags,
-            color: draftColor,
-            updatedAt: new Date().toISOString(),
-          }
+              ...n,
+              title: draftTitle || "Untitled note",
+              content: draftContent,
+              tags,
+              color: draftColor,
+              updatedAt: new Date().toISOString(),
+            }
           : n
       );
     });
@@ -271,12 +317,11 @@ export default function NotesPage() {
   }
 
   function togglePin(id: string) {
-    setNotes((prev) =>
+    setNotesWithPersist((prev) =>
       prev.map((n) => (n.id === id ? { ...n, pinned: !n.pinned } : n))
     );
   }
 
-  // ✅ open confirm dialog instead of deleting immediately
   function requestDelete(note: Note) {
     setDeleteTarget(note);
   }
@@ -284,7 +329,7 @@ export default function NotesPage() {
   function confirmDelete() {
     if (!deleteTarget) return;
     const id = deleteTarget.id;
-    setNotes((prev) => prev.filter((n) => n.id !== id));
+    setNotesWithPersist((prev) => prev.filter((n) => n.id !== id));
     setDeleteTarget(null);
   }
 
@@ -299,6 +344,8 @@ export default function NotesPage() {
   const toggleExpanded = (id: string) =>
     setExpandedNote((s) => ({ ...s, [id]: !s[id] }));
 
+  const noteCount = filtered.length;
+
   return (
     <>
       <section
@@ -312,7 +359,7 @@ export default function NotesPage() {
         <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-fuchsia-400/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-violet-400/20 blur-3xl" />
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
           <Image
             src="/icons/note.png"
             alt=""
@@ -322,6 +369,10 @@ export default function NotesPage() {
             className="shrink-0 -mt-1"
           />
           <h1 className="text-2xl font-semibold text-neutral-900">Notes</h1>
+          {/* NEW: note count chip */}
+          <span className="inline-flex items-center rounded-full border border-neutral-200 bg-white/80 px-2.5 py-0.5 text-xs font-medium text-neutral-800 shadow-sm">
+            {noteCount} note{noteCount === 1 ? "" : "s"}
+          </span>
         </div>
         <p className="mt-1 text-neutral-700">
           Quick research, interview prep, and reminders.
@@ -392,7 +443,7 @@ export default function NotesPage() {
             id="notes-filters"
             className="mt-3 relative rounded-lg border border-neutral-200 bg-white/70 p-3 pb-10 backdrop-blur supports-[backdrop-filter]:bg-white/60"
           >
-            {/* Tag filter row – now can go full width */}
+            {/* Tag filter row */}
             <div className="flex flex-wrap items-center gap-2">
               {allTags.map((t) => {
                 const active = activeTag === t;
@@ -416,7 +467,7 @@ export default function NotesPage() {
               })}
             </div>
 
-            {/* Color filter cluster – still bottom-right */}
+            {/* Color filter cluster */}
             <div className="absolute bottom-2 right-3 flex items-center gap-2">
               <button
                 type="button"
@@ -456,8 +507,6 @@ export default function NotesPage() {
             </div>
           </div>
         )}
-
-
 
         {/* Notes grid */}
         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -514,7 +563,7 @@ export default function NotesPage() {
                       <Edit3 className="h-4 w-4" aria-hidden="true" />
                     </button>
 
-                    {/* ✅ delete now opens confirmation dialog */}
+                    {/* delete -> confirmation dialog */}
                     <button
                       type="button"
                       onClick={() => requestDelete(n)}
@@ -570,9 +619,7 @@ export default function NotesPage() {
           })}
 
           {filtered.length === 0 && (
-            <div
-              className="md:col-span-2 xl:col-span-3 flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur"
-            >
+            <div className="md:col-span-2 xl:col-span-3 flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
               <div className="mb-2 text-5xl">📝</div>
               <p className="text-sm text-neutral-700">
                 No notes match your filters.
@@ -582,9 +629,7 @@ export default function NotesPage() {
         </div>
       </section>
 
-      {/* =============================== */}
-      {/* ✅ DELETE CONFIRMATION DIALOG */}
-      {/* =============================== */}
+      {/* DELETE CONFIRMATION DIALOG */}
       {deleteTarget && (
         <div
           className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[12450] flex items-center justify-center px-4 py-8"
@@ -729,11 +774,13 @@ export default function NotesPage() {
                         onClick={() => setDraftColor(c)}
                         aria-label={`Set note color: ${c}`}
                         aria-pressed={selected}
-                        className={`h-7 w-7 rounded-full border transition ${selected ? `ring-2 ${COLOR_STYLES[c].ring}` : "ring-0"
-                          } ${c === "yellow" || c === "gray"
+                        className={`h-7 w-7 rounded-full border transition ${
+                          selected ? `ring-2 ${COLOR_STYLES[c].ring}` : "ring-0"
+                        } ${
+                          c === "yellow" || c === "gray"
                             ? "border-neutral-300"
                             : "border-transparent"
-                          }`}
+                        }`}
                         style={{ background: getColorHex(c) }}
                         title={c}
                       />

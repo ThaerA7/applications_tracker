@@ -103,25 +103,25 @@ const STAGE_FILTERS: {
   shortLabel: string;
   icon: ComponentType<any>;
 }[] = [
-    {
-      id: "upcoming",
-      label: "Upcoming interviews",
-      shortLabel: "Upcoming",
-      icon: Calendar,
-    },
-    {
-      id: "past",
-      label: "Interviews with passed dates",
-      shortLabel: "Passed",
-      icon: History,
-    },
-    {
-      id: "done",
-      label: "Done • waiting for answer",
-      shortLabel: "Done",
-      icon: CheckCircle2,
-    },
-  ];
+  {
+    id: "upcoming",
+    label: "Upcoming interviews",
+    shortLabel: "Upcoming",
+    icon: Calendar,
+  },
+  {
+    id: "past",
+    label: "Interviews with passed dates",
+    shortLabel: "Passed",
+    icon: History,
+  },
+  {
+    id: "done",
+    label: "Done • waiting for answer",
+    shortLabel: "Done",
+    icon: CheckCircle2,
+  },
+];
 
 const INTERVIEW_TYPE_META: Record<
   InterviewType,
@@ -947,6 +947,19 @@ export default function InterviewsPage() {
     [items, stageFilter]
   );
 
+  // NEW: per-stage counts (respecting search + filters)
+  const cardsPerStage = useMemo(() => {
+    const stages: InterviewStage[] = ["upcoming", "past", "done"];
+    const result = {} as Record<InterviewStage, number>;
+    for (const stage of stages) {
+      result[stage] = filterInterviews(items, query, filters, stage).length;
+    }
+    return result;
+  }, [items, query, filters]);
+
+  // NEW: how many cards are currently visible (current stage + filters + search)
+  const cardCount = filtered.length;
+
   // Formatting + status styles for MoveApplicationDialog
   const fmtDate = (date: string) => date;
   const statusClasses = (status: string) => {
@@ -1055,7 +1068,7 @@ export default function InterviewsPage() {
 
         {/* header row with activity button */}
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
             <Image
               src="/icons/interview.png"
               alt=""
@@ -1067,6 +1080,10 @@ export default function InterviewsPage() {
             <h1 className="text-2xl font-semibold text-neutral-900">
               Interviews
             </h1>
+            {/* Card count indicator */}
+            <span className="inline-flex items-center rounded-full border border-neutral-200 bg-white/80 px-2.5 py-0.5 text-xs font-medium text-neutral-800 shadow-sm">
+              {cardCount} card{cardCount === 1 ? "" : "s"}
+            </span>
           </div>
 
           <button
@@ -1157,6 +1174,8 @@ export default function InterviewsPage() {
             {STAGE_FILTERS.map((option) => {
               const active = stageFilter === option.id;
               const Icon = option.icon;
+              const stageCount = cardsPerStage[option.id];
+
               return (
                 <button
                   key={option.id}
@@ -1177,6 +1196,16 @@ export default function InterviewsPage() {
                   </span>
                   <span className="sm:hidden">
                     {option.shortLabel}
+                  </span>
+                  <span
+                    className={[
+                      "ml-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-[10px] font-semibold",
+                      active
+                        ? "bg-white/90 text-emerald-700"
+                        : "bg-neutral-200/80 text-neutral-800",
+                    ].join(" ")}
+                  >
+                    {stageCount}
                   </span>
                 </button>
               );

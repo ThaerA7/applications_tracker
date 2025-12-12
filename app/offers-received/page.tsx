@@ -611,6 +611,20 @@ export default function OffersReceivedPage() {
     return items.filter(isPendingOffer);
   }, [items, view]);
 
+  // NEW: card count for current view
+  const cardCount = filteredItems.length;
+
+  // NEW: per-view counts for toggle badges
+  const countsPerView = useMemo(
+    () =>
+      ({
+        received: items.filter(isPendingOffer).length,
+        declined: items.filter(isDeclinedOffer).length,
+        accepted: items.filter(isAcceptedOffer).length,
+      } as Record<OffersReceivedView, number>),
+    [items]
+  );
+
   return (
     <>
       {/* Add / edit offer received dialog */}
@@ -713,16 +727,22 @@ export default function OffersReceivedPage() {
         {/* header row */}
         <div className="flex items-center justify-between gap-3 relative z-10">
           <div>
-            <h1 className="text-2xl font-semibold text-neutral-900 flex items-center gap-1">
-              <Image
-                src="/icons/accepted.png"
-                alt="Offers received icon"
-                width={37}
-                height={37}
-                className="shrink-0 -mt-1"
-              />
-              <span>Offers</span>
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-semibold text-neutral-900 flex items-center gap-1">
+                <Image
+                  src="/icons/accepted.png"
+                  alt="Offers received icon"
+                  width={37}
+                  height={37}
+                  className="shrink-0 -mt-1"
+                />
+                <span>Offers</span>
+              </h1>
+              {/* Card count indicator */}
+              <span className="inline-flex items-center rounded-full border border-neutral-200 bg-white/80 px-2.5 py-0.5 text-xs font-medium text-neutral-800 shadow-sm">
+                {cardCount} card{cardCount === 1 ? "" : "s"}
+              </span>
+            </div>
             <p className="mt-1 text-sm text-neutral-700">
               This is your win board – every card here is a{" "}
               <span className="font-semibold text-emerald-700">
@@ -884,13 +904,20 @@ export default function OffersReceivedPage() {
             {VIEW_FILTERS.map((option) => {
               const active = view === option.id;
               const Icon = option.icon;
+              const viewCount = countsPerView[option.id];
+
+              const activeBadgeClasses =
+                option.id === "declined"
+                  ? "bg-white/90 text-rose-700"
+                  : "bg-white/90 text-emerald-700";
+
               return (
                 <button
                   key={option.id}
                   type="button"
                   onClick={() => setView(option.id)}
                   className={[
-                    "flex items-center justify-center gap-1 rounded-lg px-3 py-3 text-[15px] font-medium transition",
+                    "flex items-center justify-center gap-1.5 rounded-lg px-3 py-3 text-[15px] font-medium transition",
                     active
                       ? option.id === "declined"
                         ? "bg-rose-600 text-white shadow-sm"
@@ -903,6 +930,16 @@ export default function OffersReceivedPage() {
                   <Icon className="h-4.5 w-4.5" aria-hidden="true" />
                   <span className="hidden sm:inline">{option.label}</span>
                   <span className="sm:hidden">{option.shortLabel}</span>
+                  <span
+                    className={[
+                      "ml-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-[10px] font-semibold",
+                      active
+                        ? activeBadgeClasses
+                        : "bg-neutral-200/80 text-neutral-800",
+                    ].join(" ")}
+                  >
+                    {viewCount}
+                  </span>
                 </button>
               );
             })}

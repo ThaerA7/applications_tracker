@@ -270,6 +270,9 @@ export default function RejectedPage() {
     [rejected, query, filters]
   );
 
+  // NEW: how many cards are currently visible (after search + filters)
+  const cardCount = filtered.length;
+
   return (
     <>
       {/* Delete confirmation overlay (same style as Interviews page) */}
@@ -331,7 +334,7 @@ export default function RejectedPage() {
 
         {/* header row with activity button (matching Interviews page layout) */}
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
             <Image
               src="/icons/cancel.png"
               alt=""
@@ -343,6 +346,10 @@ export default function RejectedPage() {
             <h1 className="text-2xl font-semibold text-neutral-900">
               Rejected
             </h1>
+            {/* NEW: card count indicator */}
+            <span className="inline-flex items-center rounded-full border border-neutral-200 bg-white/80 px-2.5 py-0.5 text-xs font-medium text-neutral-800 shadow-sm">
+              {cardCount} card{cardCount === 1 ? "" : "s"}
+            </span>
           </div>
 
           <button

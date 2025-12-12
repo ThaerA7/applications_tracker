@@ -127,6 +127,9 @@ export default function WithdrawnPage() {
     );
   }, [query, withdrawn]);
 
+  // NEW: how many cards are currently visible (after search)
+  const cardCount = filtered.length;
+
   const openDeleteDialog = (item: WithdrawnRecord) => {
     setDeleteTarget(item);
   };
@@ -380,7 +383,7 @@ export default function WithdrawnPage() {
               <button
                 type="button"
                 onClick={handleCancelDelete}
-                className="inline-flex items-center justify-center rounded-lg border border-neutral-200 bg:white px-3 py-1.5 text-xs font-medium text-neutral-700 shadow-sm hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300"
+                className="inline-flex items-center justify-center rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 shadow-sm hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300"
               >
                 Cancel
               </button>
@@ -409,7 +412,7 @@ export default function WithdrawnPage() {
 
         {/* header row with activity button */}
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
             <Image
               src="/icons/withdrawn.png"
               alt=""
@@ -421,6 +424,10 @@ export default function WithdrawnPage() {
             <h1 className="text-2xl font-semibold text-neutral-900">
               Withdrawn
             </h1>
+            {/* NEW: card count indicator */}
+            <span className="inline-flex items-center rounded-full border border-neutral-200 bg-white/80 px-2.5 py-0.5 text-xs font-medium text-neutral-800 shadow-sm">
+              {cardCount} card{cardCount === 1 ? "" : "s"}
+            </span>
           </div>
 
           <button
@@ -515,7 +522,7 @@ export default function WithdrawnPage() {
           ))}
 
           {filtered.length === 0 && (
-            <div className="col-span-full flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
+            <div className="col-span-full flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text:center backdrop-blur">
               <div className="mb-2 text-5xl">🚪</div>
 
               {withdrawn.length === 0 ? (

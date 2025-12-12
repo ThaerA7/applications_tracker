@@ -241,6 +241,8 @@ export default function AppliedPage() {
     [filters],
   );
 
+  const cardCount = filtered.length;
+
   // ---------- create / update ----------
   const handleCreate = async (data: NewApplicationForm) => {
     const id =
@@ -567,7 +569,7 @@ export default function AppliedPage() {
         {/* Content */}
         <div className="relative">
           <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2">
               <Image
                 src="/icons/checklist.png"
                 alt=""
@@ -579,6 +581,10 @@ export default function AppliedPage() {
               <h1 className="text-2xl font-semibold text-neutral-900">
                 Applied
               </h1>
+              {/* Card count indicator */}
+              <span className="inline-flex items-center rounded-full border border-neutral-200 bg-white/80 px-2.5 py-0.5 text-xs font-medium text-neutral-800 shadow-sm">
+                {cardCount} card{cardCount === 1 ? '' : 's'}
+              </span>
             </div>
 
             <button
