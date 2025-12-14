@@ -18,25 +18,15 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 
-type ColorKey =
-  | "gray"
-  | "blue"
-  | "green"
-  | "yellow"
-  | "orange"
-  | "red"
-  | "pink"
-  | "purple";
-
-type Note = {
-  id: string;
-  title: string;
-  content: string;
-  tags: string[];
-  updatedAt: string; // ISO string
-  pinned?: boolean;
-  color?: ColorKey;
-};
+import {
+  loadNotes,
+  upsertNote,
+  deleteNote,
+  migrateGuestNotesToUser,
+  type Note,
+  type ColorKey,
+  type NotesStorageMode,
+} from "@/lib/storage/notes";
 
 const COLORS: ColorKey[] = [
   "gray",
@@ -70,39 +60,6 @@ const COLOR_ACCENT: Record<ColorKey, string> = {
   pink: "before:from-pink-500 before:to-fuchsia-500",
   purple: "before:from-violet-500 before:to-purple-500",
 };
-
-const INITIAL_NOTES: Note[] = [
-  {
-    id: "n1",
-    title: "Globex — Phone screen prep",
-    content:
-      "Review behavioral stories (STAR), brush up on async patterns in TS, and common React perf pitfalls.\n\nQuestions to ask: team structure, on-call, growth path.",
-    tags: ["interview", "prep"],
-    updatedAt: "2025-11-02T09:15:00.000Z",
-    pinned: true,
-    color: "yellow",
-  },
-  {
-    id: "n2",
-    title: "Acme — Frontend system design",
-    content:
-      "Component architecture, state boundaries, data fetching patterns (React Server Components + caching). Consider monitoring/observability.",
-    tags: ["system-design", "frontend"],
-    updatedAt: "2025-10-31T17:42:00.000Z",
-    color: "blue",
-  },
-  {
-    id: "n3",
-    title: "Research: Stripe career site",
-    content:
-      "Look for roles aligned with DX and UI platforms. Note interview format; collect links to recent posts.",
-    tags: ["research"],
-    updatedAt: "2025-10-28T14:03:00.000Z",
-    color: "gray",
-  },
-];
-
-const NOTES_STORAGE_KEY = "job-tracker:notes";
 
 // Lock locale & timezone so SSR and CSR output identical strings.
 const FORMAT_LOCALE = "en-US";
@@ -152,8 +109,20 @@ function getColorHex(c: ColorKey): string {
   }
 }
 
+function makeId(): string {
+  try {
+    if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+      return crypto.randomUUID();
+    }
+  } catch {}
+  return `note-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
 export default function NotesPage() {
-  const [notes, setNotes] = useState<Note[]>(INITIAL_NOTES);
+  const [mode, setMode] = useState<NotesStorageMode>("guest");
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const [query, setQuery] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [activeTag, setActiveTag] = useState<string>("All");
@@ -167,88 +136,68 @@ export default function NotesPage() {
   const [draftColor, setDraftColor] = useState<ColorKey>("gray");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  const [expandedNote, setExpandedNote] = useState<Record<string, boolean>>(
-    {}
-  );
-
-  // delete confirmation state
+  const [expandedNote, setExpandedNote] = useState<Record<string, boolean>>({});
   const [deleteTarget, setDeleteTarget] = useState<Note | null>(null);
 
-  // Load notes from localStorage (or seed with INITIAL_NOTES)
+  // Load from storage (Supabase if signed in, else guest)
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const raw = window.localStorage.getItem(NOTES_STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          setNotes(parsed);
-          return;
-        }
-      }
-      // seed
-      window.localStorage.setItem(
-        NOTES_STORAGE_KEY,
-        JSON.stringify(INITIAL_NOTES)
-      );
-      setNotes(INITIAL_NOTES);
-    } catch (err) {
-      console.error("Failed to load notes from localStorage", err);
-      setNotes(INITIAL_NOTES);
-    }
-  }, []);
+    let alive = true;
 
-  // helper: update + persist
-  const setNotesWithPersist = (
-    updater: (prev: Note[]) => Note[]
-  ) => {
-    setNotes((prev) => {
-      const next = updater(prev);
-      if (typeof window !== "undefined") {
-        try {
-          window.localStorage.setItem(
-            NOTES_STORAGE_KEY,
-            JSON.stringify(next)
-          );
-        } catch (err) {
-          console.error("Failed to persist notes", err);
-        }
+    (async () => {
+      try {
+        // If user is signed in, this moves guest notes into Supabase once.
+        await migrateGuestNotesToUser().catch(() => {});
+        const res = await loadNotes();
+        if (!alive) return;
+        setMode(res.mode);
+        setNotes(res.items);
+      } finally {
+        if (alive) setLoading(false);
       }
-      return next;
-    });
-  };
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const allTags = useMemo(() => {
     const s = new Set<string>();
-    notes.forEach((n) => n.tags.forEach((t) => s.add(t)));
+    notes.forEach((n) => (n.tags ?? []).forEach((t: string) => s.add(t)));
     return ["All", ...Array.from(s).sort((a, b) => a.localeCompare(b))];
   }, [notes]);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
+
     let res = notes.filter((n) => {
+      const title = (n.title ?? "").toLowerCase();
+      const content = (n.content ?? "").toLowerCase();
+      const tags = (n.tags ?? []).map((t: string) => t.toLowerCase());
+
       const matchesQ =
         !q ||
-        n.title.toLowerCase().includes(q) ||
-        n.content.toLowerCase().includes(q) ||
-        n.tags.some((t) => t.toLowerCase().includes(q));
+        title.includes(q) ||
+        content.includes(q) ||
+        tags.some((t: string) => t.includes(q));
 
-      const matchesTag = activeTag === "All" || n.tags.includes(activeTag);
+      const matchesTag = activeTag === "All" || (n.tags ?? []).includes(activeTag);
 
-      const noteColor: ColorKey = n.color || "gray";
+      const noteColor: ColorKey = (n.color ?? "gray") as ColorKey;
       const matchesColor = activeColor === "all" || noteColor === activeColor;
 
       return matchesQ && matchesTag && matchesColor;
     });
 
     res.sort((a, b) => {
-      if (!!b.pinned === !!a.pinned) {
-        return (
-          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-        );
+      const ap = !!a.pinned;
+      const bp = !!b.pinned;
+      if (bp === ap) {
+        return new Date(b.updatedAt ?? 0).getTime() - new Date(a.updatedAt ?? 0).getTime();
       }
-      return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
+      return (bp ? 1 : 0) - (ap ? 1 : 0);
     });
+
     return res;
   }, [notes, query, activeTag, activeColor]);
 
@@ -263,49 +212,62 @@ export default function NotesPage() {
 
   function startEdit(note: Note) {
     setEditingId(note.id);
-    setDraftTitle(note.title);
-    setDraftContent(note.content);
-    setDraftTags(note.tags.join(", "));
-    setDraftColor(note.color || "gray");
+    setDraftTitle(note.title ?? "");
+    setDraftContent(note.content ?? "");
+    setDraftTags((note.tags ?? []).join(", "));
+    setDraftColor((note.color ?? "gray") as ColorKey);
     setIsDialogOpen(true);
   }
 
-  function saveEdit() {
+  async function saveEdit() {
     if (!editingId) return;
 
     const tags = draftTags
       .split(",")
-      .map((t) => t.trim())
+      .map((t: string) => t.trim())
       .filter(Boolean);
 
-    setNotesWithPersist((prev) => {
-      if (editingId === "new") {
-        const id = `n${Date.now()}`;
-        const newNote: Note = {
-          id,
-          title: draftTitle || "Untitled note",
-          content: draftContent,
-          tags,
-          color: draftColor,
-          updatedAt: new Date().toISOString(),
-          pinned: false,
-        };
-        return [newNote, ...prev];
+    if (editingId === "new") {
+      const newNote: Note = {
+        id: makeId(),
+        title: draftTitle || "Untitled note",
+        content: draftContent,
+        tags,
+        color: draftColor,
+        updatedAt: new Date().toISOString(),
+        pinned: false,
+      };
+
+      // optimistic add
+      setNotes((prev) => [newNote, ...prev]);
+
+      // persist (mode optional, but we pass it so it doesn't re-check session)
+      const saved = await upsertNote(newNote, mode);
+
+      // if storage replaced id (uuid fix), reconcile
+      if (saved.id !== newNote.id) {
+        setNotes((prev) =>
+          prev.map((n) => (n.id === newNote.id ? { ...saved } : n))
+        );
       }
 
-      return prev.map((n) =>
-        n.id === editingId
-          ? {
-              ...n,
-              title: draftTitle || "Untitled note",
-              content: draftContent,
-              tags,
-              color: draftColor,
-              updatedAt: new Date().toISOString(),
-            }
-          : n
-      );
-    });
+      setEditingId(null);
+      setIsDialogOpen(false);
+      return;
+    }
+
+    // editing existing
+    const updated: Note = {
+      ...(notes.find((n) => n.id === editingId) ?? { id: editingId }),
+      title: draftTitle || "Untitled note",
+      content: draftContent,
+      tags,
+      color: draftColor,
+      updatedAt: new Date().toISOString(),
+    };
+
+    setNotes((prev) => prev.map((n) => (n.id === editingId ? updated : n)));
+    await upsertNote(updated, mode);
 
     setEditingId(null);
     setIsDialogOpen(false);
@@ -316,29 +278,33 @@ export default function NotesPage() {
     setEditingId(null);
   }
 
-  function togglePin(id: string) {
-    setNotesWithPersist((prev) =>
+  async function togglePin(id: string) {
+    setNotes((prev) =>
       prev.map((n) => (n.id === id ? { ...n, pinned: !n.pinned } : n))
     );
+
+    const target = notes.find((n) => n.id === id);
+    if (!target) return;
+
+    await upsertNote({ ...target, pinned: !target.pinned }, mode);
   }
 
   function requestDelete(note: Note) {
     setDeleteTarget(note);
   }
 
-  function confirmDelete() {
+  async function confirmDelete() {
     if (!deleteTarget) return;
     const id = deleteTarget.id;
-    setNotesWithPersist((prev) => prev.filter((n) => n.id !== id));
+
+    setNotes((prev) => prev.filter((n) => n.id !== id));
+    await deleteNote(id, mode);
+
     setDeleteTarget(null);
   }
 
   function cancelDelete() {
     setDeleteTarget(null);
-  }
-
-  function addNote() {
-    openAddDialog();
   }
 
   const toggleExpanded = (id: string) =>
@@ -369,7 +335,6 @@ export default function NotesPage() {
             className="shrink-0 -mt-1"
           />
           <h1 className="text-2xl font-semibold text-neutral-900">Notes</h1>
-          {/* NEW: note count chip */}
           <span className="inline-flex items-center rounded-full border border-neutral-200 bg-white/80 px-2.5 py-0.5 text-xs font-medium text-neutral-800 shadow-sm">
             {noteCount} note{noteCount === 1 ? "" : "s"}
           </span>
@@ -404,10 +369,9 @@ export default function NotesPage() {
           </div>
 
           <div className="flex gap-2">
-            {/* Add */}
             <button
               type="button"
-              onClick={addNote}
+              onClick={openAddDialog}
               className={[
                 "inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800",
                 "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
@@ -443,9 +407,8 @@ export default function NotesPage() {
             id="notes-filters"
             className="mt-3 relative rounded-lg border border-neutral-200 bg-white/70 p-3 pb-10 backdrop-blur supports-[backdrop-filter]:bg-white/60"
           >
-            {/* Tag filter row */}
             <div className="flex flex-wrap items-center gap-2">
-              {allTags.map((t) => {
+              {allTags.map((t: string) => {
                 const active = activeTag === t;
                 return (
                   <button
@@ -467,7 +430,6 @@ export default function NotesPage() {
               })}
             </div>
 
-            {/* Color filter cluster */}
             <div className="absolute bottom-2 right-3 flex items-center gap-2">
               <button
                 type="button"
@@ -510,115 +472,122 @@ export default function NotesPage() {
 
         {/* Notes grid */}
         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((n) => {
-            const color = n.color || "gray";
-            const long = isLong(n.content);
-            const expanded = !!expandedNote[n.id];
+          {loading && (
+            <div className="md:col-span-2 xl:col-span-3 rounded-xl border border-neutral-200 bg-white/70 p-10 text-center">
+              <p className="text-sm text-neutral-700">Loading notes…</p>
+            </div>
+          )}
 
-            return (
-              <article
-                key={n.id}
-                className={[
-                  "relative flex flex-col rounded-xl border p-4 shadow-sm transition-all",
-                  "bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70",
-                  "border-neutral-200/80 hover:-translate-y-0.5 hover:shadow-md",
-                  "before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl before:bg-gradient-to-b before:opacity-90",
-                  COLOR_ACCENT[color],
-                ].join(" ")}
-              >
-                {/* Header */}
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`inline-block h-2.5 w-2.5 rounded-full ${COLOR_STYLES[color].dot}`}
-                      aria-hidden="true"
-                    />
-                    <h2 className="text-sm font-semibold text-neutral-900">
-                      {n.title}
-                    </h2>
-                  </div>
+          {!loading &&
+            filtered.map((n) => {
+              const color: ColorKey = (n.color ?? "gray") as ColorKey;
+              const long = isLong(n.content ?? "");
+              const expanded = !!expandedNote[n.id];
 
-                  <div className="flex shrink-0 items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => togglePin(n.id)}
-                      className="rounded-md border border-neutral-200 bg-white/70 p-1 text-neutral-700 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-300"
-                      aria-label={n.pinned ? "Unpin note" : "Pin note"}
-                      title={n.pinned ? "Unpin" : "Pin"}
-                    >
-                      {n.pinned ? (
-                        <Pin className="h-4 w-4" aria-hidden="true" />
-                      ) : (
-                        <PinOff className="h-4 w-4" aria-hidden="true" />
-                      )}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => startEdit(n)}
-                      className="rounded-md border border-neutral-200 bg-white/70 p-1 text-neutral-700 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-300"
-                      aria-label="Edit note"
-                      title="Edit"
-                    >
-                      <Edit3 className="h-4 w-4" aria-hidden="true" />
-                    </button>
-
-                    {/* delete -> confirmation dialog */}
-                    <button
-                      type="button"
-                      onClick={() => requestDelete(n)}
-                      className="rounded-md border border-neutral-200 bg-white/70 p-1 text-neutral-700 shadow-sm hover:bg-white hover:text-rose-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
-                      aria-label="Delete note"
-                      title="Delete"
-                    >
-                      <Trash2 className="h-4 w-4" aria-hidden="true" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Meta */}
-                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-neutral-600">
-                  <span className="inline-flex items-center gap-1">
-                    <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
-                    <span>Updated</span>
-                    <time dateTime={n.updatedAt}>{fmtDate(n.updatedAt)}</time>
-                  </span>
-                  <div className="flex flex-wrap gap-1">
-                    {n.tags.map((t) => (
+              return (
+                <article
+                  key={n.id}
+                  className={[
+                    "relative flex flex-col rounded-xl border p-4 shadow-sm transition-all",
+                    "bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70",
+                    "border-neutral-200/80 hover:-translate-y-0.5 hover:shadow-md",
+                    "before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl before:bg-gradient-to-b before:opacity-90",
+                    COLOR_ACCENT[color],
+                  ].join(" ")}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-2">
                       <span
-                        key={t}
-                        className="inline-flex items-center rounded-full border border-neutral-200 bg-white/70 px-2 py-0.5 text-[11px] text-neutral-700 backdrop-blur"
+                        className={`inline-block h-2.5 w-2.5 rounded-full ${COLOR_STYLES[color].dot}`}
+                        aria-hidden="true"
+                      />
+                      <h2 className="text-sm font-semibold text-neutral-900">
+                        {n.title ?? "Untitled note"}
+                      </h2>
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => void togglePin(n.id)}
+                        className="rounded-md border border-neutral-200 bg-white/70 p-1 text-neutral-700 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-300"
+                        aria-label={n.pinned ? "Unpin note" : "Pin note"}
+                        title={n.pinned ? "Unpin" : "Pin"}
                       >
-                        {t}
-                      </span>
-                    ))}
+                        {n.pinned ? (
+                          <Pin className="h-4 w-4" aria-hidden="true" />
+                        ) : (
+                          <PinOff className="h-4 w-4" aria-hidden="true" />
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => startEdit(n)}
+                        className="rounded-md border border-neutral-200 bg-white/70 p-1 text-neutral-700 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-300"
+                        aria-label="Edit note"
+                        title="Edit"
+                      >
+                        <Edit3 className="h-4 w-4" aria-hidden="true" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => requestDelete(n)}
+                        className="rounded-md border border-neutral-200 bg-white/70 p-1 text-neutral-700 shadow-sm hover:bg-white hover:text-rose-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
+                        aria-label="Delete note"
+                        title="Delete"
+                      >
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                    </div>
                   </div>
-                </div>
 
-                {/* Content */}
-                <div className="mt-3">
-                  <p className="whitespace-pre-line text-sm text-neutral-700">
-                    {!expanded && long
-                      ? truncateText(n.content)
-                      : n.content || "No content yet."}
-                  </p>
-                  {long && (
-                    <button
-                      type="button"
-                      onClick={() => toggleExpanded(n.id)}
-                      className="mt-2 text-xs font-medium text-neutral-700 underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-700"
-                      aria-expanded={expanded}
-                      aria-label={expanded ? "Show less" : "Show more"}
-                    >
-                      {expanded ? "Show less" : "Show more"}
-                    </button>
-                  )}
-                </div>
-              </article>
-            );
-          })}
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-neutral-600">
+                    <span className="inline-flex items-center gap-1">
+                      <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
+                      <span>Updated</span>
+                      <time dateTime={n.updatedAt ?? ""}>
+                        {n.updatedAt ? fmtDate(n.updatedAt) : "—"}
+                      </time>
+                    </span>
 
-          {filtered.length === 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {(n.tags ?? []).map((t: string) => (
+                        <span
+                          key={t}
+                          className="inline-flex items-center rounded-full border border-neutral-200 bg-white/70 px-2 py-0.5 text-[11px] text-neutral-700 backdrop-blur"
+                        >
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-3">
+                    <p className="whitespace-pre-line text-sm text-neutral-700">
+                      {!expanded && long
+                        ? truncateText(n.content ?? "")
+                        : n.content || "No content yet."}
+                    </p>
+
+                    {long && (
+                      <button
+                        type="button"
+                        onClick={() => toggleExpanded(n.id)}
+                        className="mt-2 text-xs font-medium text-neutral-700 underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-700"
+                        aria-expanded={expanded}
+                        aria-label={expanded ? "Show less" : "Show more"}
+                      >
+                        {expanded ? "Show less" : "Show more"}
+                      </button>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+
+          {!loading && filtered.length === 0 && (
             <div className="md:col-span-2 xl:col-span-3 flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
               <div className="mb-2 text-5xl">📝</div>
               <p className="text-sm text-neutral-700">
@@ -637,29 +606,22 @@ export default function NotesPage() {
           aria-modal="true"
           onClick={cancelDelete}
         >
-          {/* Backdrop */}
           <div
             className="absolute inset-0 bg-fuchsia-950/40 backdrop-blur-sm"
             aria-hidden="true"
           />
 
-          {/* Panel */}
           <div
             className="relative z-10 w-full max-w-sm"
             onClick={(e) => e.stopPropagation()}
           >
-            <article
-              className={[
-                "relative overflow-hidden rounded-2xl border border-neutral-200/80",
-                "bg-white shadow-2xl p-5",
-              ].join(" ")}
-            >
+            <article className="relative overflow-hidden rounded-2xl border border-neutral-200/80 bg-white shadow-2xl p-5">
               <p className="text-sm font-semibold text-neutral-900">
                 Delete this note?
               </p>
               <p className="mt-1 text-sm text-neutral-700">
-                <span className="font-medium">{deleteTarget.title}</span> will
-                be permanently removed.
+                <span className="font-medium">{deleteTarget.title ?? "Untitled"}</span>{" "}
+                will be permanently removed.
               </p>
               <p className="mt-1 text-xs text-neutral-500">
                 This action cannot be undone.
@@ -669,23 +631,15 @@ export default function NotesPage() {
                 <button
                   type="button"
                   onClick={cancelDelete}
-                  className={[
-                    "inline-flex items-center gap-1 rounded-md border border-neutral-200",
-                    "bg-white/80 px-3 py-1.5 text-xs font-medium text-neutral-700 shadow-sm hover:bg-white",
-                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-300",
-                  ].join(" ")}
+                  className="inline-flex items-center gap-1 rounded-md border border-neutral-200 bg-white/80 px-3 py-1.5 text-xs font-medium text-neutral-700 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-300"
                 >
                   <X className="h-3 w-3" aria-hidden="true" />
                   Cancel
                 </button>
                 <button
                   type="button"
-                  onClick={confirmDelete}
-                  className={[
-                    "inline-flex items-center gap-1 rounded-md border border-rose-600",
-                    "bg-rose-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-rose-500",
-                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300",
-                  ].join(" ")}
+                  onClick={() => void confirmDelete()}
+                  className="inline-flex items-center gap-1 rounded-md border border-rose-600 bg-rose-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-rose-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
                 >
                   <Trash2 className="h-3 w-3" aria-hidden="true" />
                   Delete
@@ -704,13 +658,11 @@ export default function NotesPage() {
           aria-modal="true"
           onClick={closeDialog}
         >
-          {/* Backdrop */}
           <div
             className="absolute inset-0 bg-fuchsia-950/40 backdrop-blur-sm"
             aria-hidden="true"
           />
 
-          {/* Panel */}
           <div
             className="relative z-10 w-full max-w-xl"
             onClick={(e) => e.stopPropagation()}
@@ -720,14 +672,8 @@ export default function NotesPage() {
                 borderLeftWidth: 4,
                 borderLeftColor: getColorHex(draftColor),
               }}
-              className={[
-                "relative flex flex-col rounded-xl border p-4 sm:p-5 shadow-2xl transition-all",
-                "bg-gradient-to-br from-white via-white to-neutral-50",
-                "backdrop-blur supports-[backdrop-filter]:bg-white/90",
-                "border-neutral-100/80",
-              ].join(" ")}
+              className="relative flex flex-col rounded-xl border p-4 sm:p-5 shadow-2xl transition-all bg-gradient-to-br from-white via-white to-neutral-50 backdrop-blur supports-[backdrop-filter]:bg-white/90 border-neutral-100/80"
             >
-              {/* Header – dot + title */}
               <div className="flex items-center gap-2">
                 <span
                   className={`inline-block h-2.5 w-2.5 rounded-full ${COLOR_STYLES[draftColor].dot}`}
@@ -742,7 +688,6 @@ export default function NotesPage() {
                 />
               </div>
 
-              {/* Content */}
               <div className="mt-3">
                 <label htmlFor="notes-dialog-content" className="sr-only">
                   Note content
@@ -757,7 +702,6 @@ export default function NotesPage() {
                 />
               </div>
 
-              {/* Color picker */}
               <div className="mt-3">
                 <div className="mb-1 inline-flex items-center gap-2 text-xs text-neutral-600">
                   <Palette className="h-3.5 w-3.5" aria-hidden="true" />
@@ -789,7 +733,6 @@ export default function NotesPage() {
                 </div>
               </div>
 
-              {/* Tags input */}
               <div className="mt-3">
                 <label
                   htmlFor="notes-dialog-tags"
@@ -806,24 +749,19 @@ export default function NotesPage() {
                 />
               </div>
 
-              {/* Footer – Cancel / Save */}
               <div className="mt-4 flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={closeDialog}
                   className="inline-flex items-center gap-1 rounded-md border border-neutral-200 bg-white/80 px-3 py-1.5 text-xs font-medium text-neutral-700 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-300"
-                  aria-label="Cancel"
-                  title="Cancel"
                 >
                   <X className="h-3 w-3" aria-hidden="true" />
                   Cancel
                 </button>
                 <button
                   type="button"
-                  onClick={saveEdit}
+                  onClick={() => void saveEdit()}
                   className="inline-flex items-center gap-1 rounded-md border border-neutral-900 bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-neutral-800"
-                  aria-label="Save note"
-                  title="Save"
                 >
                   <Save className="h-3 w-3" aria-hidden="true" />
                   Save
