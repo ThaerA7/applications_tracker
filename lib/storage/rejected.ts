@@ -1,22 +1,17 @@
-// lib/storage/applied.ts
 "use client";
 
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { idbGet, idbSet, idbDel } from "./indexedDb";
-import type { NewApplicationForm } from "@/components/dialogs/AddApplicationDialog";
+import type { Rejection } from "@/app/rejected/RejectedCard";
 
-export type AppliedApplication = {
-  id: string;
-  website?: string;
-} & NewApplicationForm;
+export type RejectedApplication = Rejection;
+export type RejectedStorageMode = "guest" | "user";
 
-export type AppliedStorageMode = "guest" | "user";
-
-const GUEST_LOCAL_KEY = "job-tracker:applied";
-const GUEST_IDB_KEY = "applied";
+const GUEST_LOCAL_KEY = "job-tracker:rejected";
+const GUEST_IDB_KEY = "rejected";
 
 const TABLE = "applications";
-const BUCKET = "applied";
+const BUCKET = "rejected";
 const COUNTS_EVENT = "job-tracker:refresh-counts";
 
 function notifyCountsChanged() {
@@ -30,17 +25,19 @@ function isObject(v: any) {
   return v && typeof v === "object" && !Array.isArray(v);
 }
 
-function safeParseList(raw: any): AppliedApplication[] {
+function safeParseList(raw: any): RejectedApplication[] {
   if (!Array.isArray(raw)) return [];
-  return raw.filter((x) => isObject(x) && typeof x.id === "string") as AppliedApplication[];
+  return raw.filter(
+    (x) => isObject(x) && typeof x.id === "string"
+  ) as RejectedApplication[];
 }
 
 // ---------- guest storage ----------
 
-async function loadGuestApplied(): Promise<AppliedApplication[]> {
+async function loadGuestRejected(): Promise<RejectedApplication[]> {
   // Prefer IDB
   try {
-    const idb = await idbGet<AppliedApplication[]>(GUEST_IDB_KEY);
+    const idb = await idbGet<RejectedApplication[]>(GUEST_IDB_KEY);
     if (idb) return safeParseList(idb);
   } catch {}
 
@@ -54,7 +51,7 @@ async function loadGuestApplied(): Promise<AppliedApplication[]> {
   }
 }
 
-async function saveGuestApplied(list: AppliedApplication[]) {
+async function saveGuestRejected(list: RejectedApplication[]) {
   // Try IDB
   try {
     await idbSet(GUEST_IDB_KEY, list);
@@ -67,7 +64,7 @@ async function saveGuestApplied(list: AppliedApplication[]) {
   } catch {}
 }
 
-async function clearGuestApplied() {
+async function clearGuestRejected() {
   try {
     await idbDel(GUEST_IDB_KEY);
   } catch {}
@@ -79,7 +76,7 @@ async function clearGuestApplied() {
 
 // ---------- user storage (Supabase) ----------
 
-async function loadUserApplied(): Promise<AppliedApplication[]> {
+async function loadUserRejected(): Promise<RejectedApplication[]> {
   const supabase = getSupabaseClient();
 
   const { data, error } = await supabase
@@ -89,7 +86,7 @@ async function loadUserApplied(): Promise<AppliedApplication[]> {
     .order("created_at", { ascending: false });
 
   if (error) {
-    console.error("Failed to load applied from Supabase:", error.message);
+    console.error("Failed to load rejected from Supabase:", error.message);
     return [];
   }
 
@@ -101,7 +98,7 @@ async function loadUserApplied(): Promise<AppliedApplication[]> {
   return safeParseList(mapped);
 }
 
-async function upsertUserApplied(app: AppliedApplication) {
+async function upsertUserRejected(app: RejectedApplication) {
   const supabase = getSupabaseClient();
 
   const { error } = await supabase
@@ -116,11 +113,11 @@ async function upsertUserApplied(app: AppliedApplication) {
     );
 
   if (error) {
-    console.error("Failed to upsert applied in Supabase:", error.message);
+    console.error("Failed to upsert rejected in Supabase:", error.message);
   }
 }
 
-async function deleteUserApplied(id: string) {
+async function deleteUserRejected(id: string) {
   const supabase = getSupabaseClient();
 
   const { error } = await supabase
@@ -130,13 +127,13 @@ async function deleteUserApplied(id: string) {
     .eq("bucket", BUCKET);
 
   if (error) {
-    console.error("Failed to delete applied in Supabase:", error.message);
+    console.error("Failed to delete rejected in Supabase:", error.message);
   }
 }
 
 // ---------- mode detection ----------
 
-export async function detectAppliedMode(): Promise<AppliedStorageMode> {
+export async function detectRejectedMode(): Promise<RejectedStorageMode> {
   const supabase = getSupabaseClient();
   const { data } = await supabase.auth.getSession();
   return data.session?.user ? "user" : "guest";
@@ -144,63 +141,63 @@ export async function detectAppliedMode(): Promise<AppliedStorageMode> {
 
 // ---------- public API ----------
 
-export async function loadApplied(): Promise<{
-  mode: AppliedStorageMode;
-  items: AppliedApplication[];
+export async function loadRejected(): Promise<{
+  mode: RejectedStorageMode;
+  items: RejectedApplication[];
 }> {
-  const mode = await detectAppliedMode();
-  const items = mode === "user" ? await loadUserApplied() : await loadGuestApplied();
+  const mode = await detectRejectedMode();
+  const items =
+    mode === "user" ? await loadUserRejected() : await loadGuestRejected();
   return { mode, items };
 }
 
-export async function upsertApplied(
-  app: AppliedApplication,
-  mode: AppliedStorageMode
+export async function upsertRejected(
+  app: RejectedApplication,
+  mode: RejectedStorageMode
 ) {
   if (mode === "user") {
-    await upsertUserApplied(app);
+    await upsertUserRejected(app);
   } else {
-    const prev = await loadGuestApplied();
+    const prev = await loadGuestRejected();
     const idx = prev.findIndex((x) => x.id === app.id);
     const next =
       idx === -1
         ? [app, ...prev]
         : prev.map((x) => (x.id === app.id ? app : x));
 
-    await saveGuestApplied(next);
+    await saveGuestRejected(next);
   }
 
   notifyCountsChanged();
 }
 
-export async function deleteApplied(
+export async function deleteRejected(
   id: string,
-  mode: AppliedStorageMode
+  mode: RejectedStorageMode
 ) {
   if (mode === "user") {
-    await deleteUserApplied(id);
+    await deleteUserRejected(id);
   } else {
-    const prev = await loadGuestApplied();
+    const prev = await loadGuestRejected();
     const next = prev.filter((x) => x.id !== id);
-    await saveGuestApplied(next);
+    await saveGuestRejected(next);
   }
 
   notifyCountsChanged();
 }
 
 /**
- * When a user signs in, move guest Applied data into Supabase.
+ * When a user signs in, move guest Rejected data into Supabase.
  * This prevents data loss while keeping server as source of truth.
  */
-export async function migrateGuestAppliedToUser() {
+export async function migrateGuestRejectedToUser() {
   const supabase = getSupabaseClient();
   const { data } = await supabase.auth.getSession();
   if (!data.session?.user) return;
 
-  const guest = await loadGuestApplied();
+  const guest = await loadGuestRejected();
   if (guest.length === 0) return;
 
-  // Upsert all guest apps as user rows
   const payload = guest.map((app) => ({
     id: app.id,
     bucket: BUCKET,
@@ -212,10 +209,13 @@ export async function migrateGuestAppliedToUser() {
   });
 
   if (error) {
-    console.error("Guest → user applied migration failed:", error.message);
+    console.error(
+      "Guest → user rejected migration failed:",
+      error.message
+    );
     return;
   }
 
-  await clearGuestApplied();
+  await clearGuestRejected();
   notifyCountsChanged();
 }

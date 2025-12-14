@@ -6,9 +6,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 let client: SupabaseClient | null = null;
 
-export function getSupabaseClient(): SupabaseClient {
-  if (client) return client;
-
+function getPublicSupabaseEnv() {
   const url =
     process.env.NEXT_PUBLIC_SUPABASE_URL ??
     process.env.NEXT_PUBLIC_DATABASE_SUPABASE_URL;
@@ -26,13 +24,14 @@ export function getSupabaseClient(): SupabaseClient {
     );
   }
 
-  client = createBrowserClient(url, anon, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      flowType: 'pkce',
-    },
-  });
+  return { url, anon };
+}
+
+export function getSupabaseClient(): SupabaseClient {
+  if (client) return client;
+
+  const { url, anon } = getPublicSupabaseEnv();
+  client = createBrowserClient(url, anon);
 
   return client;
 }

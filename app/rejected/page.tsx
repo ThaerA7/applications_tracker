@@ -19,17 +19,31 @@ import RejectedFilter, {
   type RejectedFilters,
 } from "@/components/filters/RejectedFilter";
 
-const REJECTIONS_STORAGE_KEY = "job-tracker:rejected";
+import {
+  loadRejected,
+  upsertRejected,
+  deleteRejected,
+  type RejectedStorageMode,
+} from "@/lib/storage/rejected";
+
 const REJECTIONS_ACTIVITY_STORAGE_KEY = "job-tracker:rejected-activity";
 
 type ApplicationLike = React.ComponentProps<
   typeof MoveToRejectedDialog
 >["application"];
 
+const makeId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
 export default function RejectedPage() {
   const [query, setQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [rejected, setRejected] = useState<Rejection[]>([]);
+  const [storageMode, setStorageMode] =
+    useState<RejectedStorageMode>("guest");
+  const [hydrated, setHydrated] = useState(false);
 
   const [dialogApplication, setDialogApplication] =
     useState<ApplicationLike>(null);
@@ -70,21 +84,33 @@ export default function RejectedPage() {
     });
   };
 
-  // Load from localStorage on mount
+  // Load rejected from Supabase/guest storage on mount
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const { mode, items } = await loadRejected();
+        if (cancelled) return;
+        setStorageMode(mode);
+        setRejected(items as Rejection[]);
+      } catch (err) {
+        console.error("Failed to load rejected applications:", err);
+      } finally {
+        if (!cancelled) setHydrated(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Load activity log from localStorage on mount
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     try {
-      // rejected cards
-      const raw = window.localStorage.getItem(REJECTIONS_STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          setRejected(parsed);
-        }
-      }
-
-      // rejected activity log
       const rawActivity = window.localStorage.getItem(
         REJECTIONS_ACTIVITY_STORAGE_KEY
       );
@@ -96,7 +122,7 @@ export default function RejectedPage() {
       }
     } catch (err) {
       console.error(
-        "Failed to load rejected applications or activity from localStorage",
+        "Failed to load rejected activity from localStorage",
         err
       );
     }
@@ -146,36 +172,20 @@ export default function RejectedPage() {
     const elementId = `rejected-card-${id}`;
 
     animateCardExit(elementId, "delete", () => {
-      setRejected((prev) => {
-        const next = prev.filter((i) => i.id !== id);
+      setRejected((prev) => prev.filter((i) => i.id !== id));
 
-        if (typeof window !== "undefined") {
-          try {
-            window.localStorage.setItem(
-              REJECTIONS_STORAGE_KEY,
-              JSON.stringify(next)
-            );
-          } catch (err) {
-            console.error(
-              "Failed to persist rejected applications after delete",
-              err
-            );
-          }
-        }
-
-        return next;
+      // persist delete via storage layer
+      deleteRejected(id, storageMode).catch((err) => {
+        console.error("Failed to delete rejected application:", err);
       });
 
       // log delete activity
-      const activityId =
-        typeof crypto !== "undefined" && "randomUUID" in crypto
-          ? crypto.randomUUID()
-          : `${Date.now()}-delete`;
+      const activityId = makeId();
 
       appendActivity({
         id: activityId,
         appId: target.id,
-        type: "deleted", // ActivityType
+        type: "deleted",
         timestamp: new Date().toISOString(),
         company: target.company,
         role: target.role,
@@ -200,7 +210,6 @@ export default function RejectedPage() {
 
   // Use dialog output to create or update cards
   const handleRejectionCreated = (details: RejectionDetails) => {
-    let next: Rejection[];
     let target: Rejection;
 
     if (editingRejection) {
@@ -209,44 +218,37 @@ export default function RejectedPage() {
         ...editingRejection,
         ...details,
       };
-      next = rejected.map((item) =>
-        item.id === editingRejection.id ? target : item
+
+      setRejected((prev) =>
+        prev.map((item) =>
+          item.id === editingRejection.id ? target : item
+        )
       );
+
+      upsertRejected(target, storageMode).catch((err) => {
+        console.error("Failed to persist edited rejected application:", err);
+      });
     } else {
       // create new
-      const newId =
-        typeof crypto !== "undefined" && "randomUUID" in crypto
-          ? crypto.randomUUID()
-          : `${Date.now()}-${rejected.length}`;
+      const newId = makeId();
 
       target = {
         id: newId,
         ...details,
       };
-      next = [...rejected, target];
-    }
 
-    setRejected(next);
+      setRejected((prev) => [...prev, target]);
 
-    if (typeof window !== "undefined") {
-      try {
-        window.localStorage.setItem(
-          REJECTIONS_STORAGE_KEY,
-          JSON.stringify(next)
-        );
-      } catch (err) {
+      upsertRejected(target, storageMode).catch((err) => {
         console.error(
-          "Failed to persist rejected applications to localStorage",
+          "Failed to persist newly created rejected application:",
           err
         );
-      }
+      });
     }
 
     // log add / edit activity
-    const activityId =
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-activity`;
+    const activityId = makeId();
 
     appendActivity({
       id: activityId,
@@ -270,7 +272,7 @@ export default function RejectedPage() {
     [rejected, query, filters]
   );
 
-  // NEW: how many cards are currently visible (after search + filters)
+  // how many cards are currently visible (after search + filters)
   const cardCount = filtered.length;
 
   return (
@@ -346,7 +348,7 @@ export default function RejectedPage() {
             <h1 className="text-2xl font-semibold text-neutral-900">
               Rejected
             </h1>
-            {/* NEW: card count indicator */}
+            {/* card count indicator */}
             <span className="inline-flex items-center rounded-full border border-neutral-200 bg-white/80 px-2.5 py-0.5 text-xs font-medium text-neutral-800 shadow-sm">
               {cardCount} card{cardCount === 1 ? "" : "s"}
             </span>
@@ -417,7 +419,7 @@ export default function RejectedPage() {
             Add
           </button>
 
-          {/* New rejected filter */}
+          {/* Rejected filter */}
           <RejectedFilter
             items={rejected}
             filters={filters}
@@ -437,7 +439,7 @@ export default function RejectedPage() {
             />
           ))}
 
-          {filtered.length === 0 && (
+          {hydrated && filtered.length === 0 && (
             <div className="col-span-full flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
               <div className="mb-2 text-5xl">💔</div>
 

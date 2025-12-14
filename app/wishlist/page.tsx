@@ -34,6 +34,7 @@ import WishlistFilter, {
 } from "@/components/filters/WishlistFilter";
 
 const WISHLIST_STORAGE_KEY = "job-wishlist-v1";
+const COUNTS_EVENT = "job-tracker:refresh-counts";
 
 export type WishlistItem = {
   id: string;
@@ -362,7 +363,7 @@ function AddWishlistItemDialog({ open, onClose, onSave }: AddDialogProps) {
                 </div>
 
                 {form.logoUrl?.trim() && (
-                  <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-md border border-neutral-200 bg:white/70">
+                  <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-md border border-neutral-200 bg-white/70">
                     <img
                       src={form.logoUrl}
                       alt={`${form.company || "Company"} logo`}
@@ -383,7 +384,7 @@ function AddWishlistItemDialog({ open, onClose, onSave }: AddDialogProps) {
                 value={form.role}
                 onChange={handleChange("role")}
                 placeholder="Frontend Engineer"
-                className="h-9 w-full rounded-lg border border-neutral-200 bg:white/80 px-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:border-yellow-300"
+                className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 px-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:border-yellow-300"
                 required
               />
             </label>
@@ -401,7 +402,7 @@ function AddWishlistItemDialog({ open, onClose, onSave }: AddDialogProps) {
                   value={form.location}
                   onChange={handleChange("location")}
                   placeholder="Berlin, DE / Remote"
-                  className="h-9 w-full rounded-lg border border-neutral-200 bg:white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:border-yellow-300"
+                  className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:border-yellow-300"
                 />
               </div>
             </label>
@@ -418,7 +419,7 @@ function AddWishlistItemDialog({ open, onClose, onSave }: AddDialogProps) {
                   type="date"
                   value={form.startDate}
                   onChange={handleChange("startDate")}
-                  className="h-9 w-full rounded-lg border border-neutral-200 bg:white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:border-yellow-300"
+                  className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:border-yellow-300"
                 />
               </div>
             </label>
@@ -436,7 +437,7 @@ function AddWishlistItemDialog({ open, onClose, onSave }: AddDialogProps) {
                 <select
                   value={form.employmentType}
                   onChange={handleChange("employmentType")}
-                  className="h-9 w-full rounded-lg border border-neutral-200 bg:white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:border-yellow-300"
+                  className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:border-yellow-300"
                 >
                   <option value="">Select type…</option>
                   {EMPLOYMENT_OPTIONS.map((opt) => (
@@ -461,7 +462,7 @@ function AddWishlistItemDialog({ open, onClose, onSave }: AddDialogProps) {
                   value={form.offerUrl}
                   onChange={handleChange("offerUrl")}
                   placeholder="https://jobs.example.com/frontend-engineer"
-                  className="h-9 w-full rounded-lg border border-neutral-200 bg:white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:border-yellow-300"
+                  className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:border-yellow-300"
                 />
               </div>
             </label>
@@ -472,7 +473,7 @@ function AddWishlistItemDialog({ open, onClose, onSave }: AddDialogProps) {
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex items-center justify-center rounded-lg border border-neutral-200 bg:white/80 px-4 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg:white focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-300"
+              className="inline-flex items-center justify-center rounded-lg border border-neutral-200 bg-white/80 px-4 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-300"
             >
               Cancel
             </button>
@@ -539,6 +540,8 @@ export default function WishlistPage() {
     if (typeof window === "undefined") return;
     try {
       window.localStorage.setItem(WISHLIST_STORAGE_KEY, JSON.stringify(next));
+      // 🔔 notify sidebar to refresh counts
+      window.dispatchEvent(new Event(COUNTS_EVENT));
     } catch (err) {
       console.error("Failed to update wishlist", err);
     }
@@ -600,7 +603,7 @@ export default function WishlistPage() {
           className="shrink-0 -mt-1"
         />
         <h1 className="text-2xl font-semibold text-neutral-900">Wishlist</h1>
-        {/* NEW: card count indicator */}
+        {/* card count indicator */}
         <span className="inline-flex items-center rounded-full border border-neutral-200 bg-white/80 px-2.5 py-0.5 text-xs font-medium text-neutral-800 shadow-sm">
           {cardCount} item{cardCount === 1 ? "" : "s"}
         </span>

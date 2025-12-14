@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { Search, Filter, Plus, History } from "lucide-react";
 import Image from "next/image";
 import WithdrawnCard, { type WithdrawnRecord } from "./WithdrawnCard";
@@ -13,8 +13,13 @@ import { animateCardExit } from "@/components/dialogs/cardExitAnimation";
 import ActivityLogSidebar, {
   type ActivityItem,
 } from "@/components/ActivityLogSidebar";
+import {
+  loadWithdrawn,
+  upsertWithdrawn,
+  deleteWithdrawn,
+  type WithdrawnStorageMode,
+} from "@/lib/storage/withdrawn";
 
-const WITHDRAWN_STORAGE_KEY = "job-tracker:withdrawn";
 const WITHDRAWN_ACTIVITY_STORAGE_KEY = "job-tracker:withdrawn-activity";
 
 const INTERVIEW_TYPE_LABEL: Record<InterviewType, string> = {
@@ -34,10 +39,13 @@ type ApplicationLike = React.ComponentProps<
 
 export default function WithdrawnPage() {
   const [withdrawn, setWithdrawn] = useState<WithdrawnRecord[]>([]);
+  const [storageMode, setStorageMode] =
+    useState<WithdrawnStorageMode>("guest");
   const [query, setQuery] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<WithdrawnRecord | null>(
     null
   );
+  const [hydrated, setHydrated] = useState(false);
 
   // Add/edit dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -71,24 +79,31 @@ export default function WithdrawnPage() {
     });
   };
 
-  // Load from localStorage on mount
+  // Load withdrawn records (guest or user) on mount
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const { mode, items } = await loadWithdrawn();
+        if (cancelled) return;
+        setStorageMode(mode);
+        setWithdrawn(items as WithdrawnRecord[]);
+      } catch (err) {
+        console.error("Failed to load withdrawn applications:", err);
+      } finally {
+        if (!cancelled) setHydrated(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Load activity log from localStorage on mount
   useEffect(() => {
     if (typeof window === "undefined") return;
-
-    try {
-      const raw = window.localStorage.getItem(WITHDRAWN_STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          setWithdrawn(parsed);
-        }
-      }
-    } catch (err) {
-      console.error(
-        "Failed to load withdrawn applications from localStorage",
-        err
-      );
-    }
 
     try {
       const rawActivity = window.localStorage.getItem(
@@ -127,7 +142,7 @@ export default function WithdrawnPage() {
     );
   }, [query, withdrawn]);
 
-  // NEW: how many cards are currently visible (after search)
+  // how many cards are currently visible (after search)
   const cardCount = filtered.length;
 
   const openDeleteDialog = (item: WithdrawnRecord) => {
@@ -141,24 +156,11 @@ export default function WithdrawnPage() {
     const elementId = `withdrawn-card-${id}`;
 
     animateCardExit(elementId, "delete", () => {
-      setWithdrawn((prev) => {
-        const next = prev.filter((i) => i.id !== id);
+      setWithdrawn((prev) => prev.filter((i) => i.id !== id));
 
-        if (typeof window !== "undefined") {
-          try {
-            window.localStorage.setItem(
-              WITHDRAWN_STORAGE_KEY,
-              JSON.stringify(next)
-            );
-          } catch (err) {
-            console.error(
-              "Failed to persist withdrawn applications after delete",
-              err
-            );
-          }
-        }
-
-        return next;
+      // persist delete via storage layer
+      deleteWithdrawn(id, storageMode).catch((err) => {
+        console.error("Failed to delete withdrawn application:", err);
       });
 
       // log delete activity
@@ -224,124 +226,104 @@ export default function WithdrawnPage() {
     setDialogApplication(null);
   };
 
-  const handleSaveWithdrawn = (details: WithdrawnDetails) => {
-    if (editingWithdrawn) {
-      // Update existing withdrawn record
-      const updated: WithdrawnRecord = {
-        ...editingWithdrawn,
-        company: details.company,
-        role: details.role,
-        location: details.location ?? editingWithdrawn.location,
-        appliedOn: details.appliedDate ?? editingWithdrawn.appliedOn,
-        withdrawnDate: details.withdrawnDate,
-        withdrawnReason: details.reason,
-        employmentType:
-          details.employmentType ?? editingWithdrawn.employmentType,
-        contactName: details.contactName ?? editingWithdrawn.contactName,
-        contactEmail: details.contactEmail ?? editingWithdrawn.contactEmail,
-        contactPhone: details.contactPhone ?? editingWithdrawn.contactPhone,
-        url: details.url ?? editingWithdrawn.url,
-        logoUrl: details.logoUrl ?? editingWithdrawn.logoUrl,
-        notes: details.notes ?? editingWithdrawn.notes,
-        interviewType:
-          details.interviewType ?? editingWithdrawn.interviewType,
-      };
+  const handleSaveWithdrawn = useCallback(
+    (details: WithdrawnDetails) => {
+      if (editingWithdrawn) {
+        // Update existing withdrawn record
+        const updated: WithdrawnRecord = {
+          ...editingWithdrawn,
+          company: details.company,
+          role: details.role,
+          location: details.location ?? editingWithdrawn.location,
+          appliedOn: details.appliedDate ?? editingWithdrawn.appliedOn,
+          withdrawnDate: details.withdrawnDate,
+          withdrawnReason: details.reason,
+          employmentType:
+            details.employmentType ?? editingWithdrawn.employmentType,
+          contactName: details.contactName ?? editingWithdrawn.contactName,
+          contactEmail: details.contactEmail ?? editingWithdrawn.contactEmail,
+          contactPhone: details.contactPhone ?? editingWithdrawn.contactPhone,
+          url: details.url ?? editingWithdrawn.url,
+          logoUrl: details.logoUrl ?? editingWithdrawn.logoUrl,
+          notes: details.notes ?? editingWithdrawn.notes,
+          interviewType:
+            details.interviewType ?? editingWithdrawn.interviewType,
+        };
 
-      setWithdrawn((prev) => {
-        const next = prev.map((item) =>
-          item.id === updated.id ? updated : item
+        setWithdrawn((prev) =>
+          prev.map((item) => (item.id === updated.id ? updated : item))
         );
 
-        if (typeof window !== "undefined") {
-          try {
-            window.localStorage.setItem(
-              WITHDRAWN_STORAGE_KEY,
-              JSON.stringify(next)
-            );
-          } catch (err) {
-            console.error(
-              "Failed to persist withdrawn applications after edit",
-              err
-            );
-          }
-        }
+        // persist via storage layer
+        upsertWithdrawn(updated, storageMode).catch((err) => {
+          console.error("Failed to persist edited withdrawn application:", err);
+        });
 
-        return next;
-      });
+        // log edit activity
+        const activityId = makeId();
+        appendActivity({
+          id: activityId,
+          appId: updated.id,
+          type: "edited",
+          timestamp: new Date().toISOString(),
+          company: updated.company,
+          role: updated.role,
+          location: updated.location,
+          appliedOn: updated.appliedOn,
+          note: updated.notes,
+        });
+      } else {
+        // Create new withdrawn record
+        const newItem: WithdrawnRecord = {
+          id: makeId(),
+          company: details.company,
+          role: details.role,
+          location: details.location,
+          appliedOn: details.appliedDate,
+          withdrawnDate: details.withdrawnDate,
+          withdrawnReason: details.reason,
+          employmentType: details.employmentType,
+          contactName: details.contactName,
+          contactEmail: details.contactEmail,
+          contactPhone: details.contactPhone,
+          url: details.url,
+          logoUrl: details.logoUrl,
+          notes: details.notes,
+          interviewType: details.interviewType,
+          // interviewDate left empty here (withdrawn before interview, unless you add it later)
+        };
 
-      // log edit activity
-      const activityId = makeId();
-      appendActivity({
-        id: activityId,
-        appId: updated.id,
-        type: "edited",
-        timestamp: new Date().toISOString(),
-        company: updated.company,
-        role: updated.role,
-        location: updated.location,
-        appliedOn: updated.appliedOn,
-        note: updated.notes,
-      });
-    } else {
-      // Create new withdrawn record
-      const newItem: WithdrawnRecord = {
-        id: makeId(),
-        company: details.company,
-        role: details.role,
-        location: details.location,
-        appliedOn: details.appliedDate,
-        withdrawnDate: details.withdrawnDate,
-        withdrawnReason: details.reason,
-        employmentType: details.employmentType,
-        contactName: details.contactName,
-        contactEmail: details.contactEmail,
-        contactPhone: details.contactPhone,
-        url: details.url,
-        logoUrl: details.logoUrl,
-        notes: details.notes,
-        interviewType: details.interviewType,
-        // interviewDate left empty here (withdrawn before interview, unless you add it later)
-      };
+        setWithdrawn((prev) => [...prev, newItem]);
 
-      setWithdrawn((prev) => {
-        const next = [...prev, newItem];
+        // persist via storage layer
+        upsertWithdrawn(newItem, storageMode).catch((err) => {
+          console.error(
+            "Failed to persist newly created withdrawn application:",
+            err
+          );
+        });
 
-        if (typeof window !== "undefined") {
-          try {
-            window.localStorage.setItem(
-              WITHDRAWN_STORAGE_KEY,
-              JSON.stringify(next)
-            );
-          } catch (err) {
-            console.error(
-              "Failed to persist withdrawn applications after create",
-              err
-            );
-          }
-        }
+        // log add activity
+        const activityId = makeId();
+        appendActivity({
+          id: activityId,
+          appId: newItem.id,
+          type: "added",
+          timestamp: new Date().toISOString(),
+          company: newItem.company,
+          role: newItem.role,
+          location: newItem.location,
+          appliedOn: newItem.appliedOn,
+          note: newItem.notes,
+        });
+      }
 
-        return next;
-      });
-
-      // log add activity
-      const activityId = makeId();
-      appendActivity({
-        id: activityId,
-        appId: newItem.id,
-        type: "added",
-        timestamp: new Date().toISOString(),
-        company: newItem.company,
-        role: newItem.role,
-        location: newItem.location,
-        appliedOn: newItem.appliedOn,
-        note: newItem.notes,
-      });
-    }
-
-    setDialogOpen(false);
-    setEditingWithdrawn(null);
-    setDialogApplication(null);
-  };
+      setDialogOpen(false);
+      setEditingWithdrawn(null);
+      setDialogApplication(null);
+    },
+    [editingWithdrawn, storageMode]
+  );
 
   return (
     <>
@@ -424,7 +406,7 @@ export default function WithdrawnPage() {
             <h1 className="text-2xl font-semibold text-neutral-900">
               Withdrawn
             </h1>
-            {/* NEW: card count indicator */}
+            {/* card count indicator */}
             <span className="inline-flex items-center rounded-full border border-neutral-200 bg-white/80 px-2.5 py-0.5 text-xs font-medium text-neutral-800 shadow-sm">
               {cardCount} card{cardCount === 1 ? "" : "s"}
             </span>
@@ -521,7 +503,7 @@ export default function WithdrawnPage() {
             />
           ))}
 
-          {filtered.length === 0 && (
+          {hydrated && filtered.length === 0 && (
             <div className="col-span-full flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text:center backdrop-blur">
               <div className="mb-2 text-5xl">🚪</div>
 

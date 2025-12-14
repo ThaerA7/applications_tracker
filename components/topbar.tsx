@@ -303,26 +303,9 @@ export default function TopBar({ collapsed, onToggleSidebar }: TopBarProps) {
     setLogoutOpen(true);
   }, []);
 
-  const withTimeout = <T,>(promise: Promise<T>, ms = 8000): Promise<T> => {
-    return new Promise<T>((resolve, reject) => {
-      const id = window.setTimeout(() => {
-        reject(new Error("Sign out timed out"));
-      }, ms);
+  
 
-      promise.then(
-        (val) => {
-          window.clearTimeout(id);
-          resolve(val);
-        },
-        (err) => {
-          window.clearTimeout(id);
-          reject(err);
-        }
-      );
-    });
-  };
-
-  const handleLogout = useCallback(async () => {
+      const handleLogout = useCallback(async () => {
     if (loggingOut) return;
 
     setLogoutOpen(false);
@@ -330,7 +313,13 @@ export default function TopBar({ collapsed, onToggleSidebar }: TopBarProps) {
 
     try {
       const supabase = getSupabaseClient();
-      await withTimeout(supabase.auth.signOut());
+      const { error } = await supabase.auth.signOut();
+
+      if (error) {
+        console.error("Sign out failed:", error.message);
+      }
+
+      // The onAuthStateChange listener in this component will clear `user`
       router.refresh();
     } catch (err) {
       console.error("Sign out failed:", err);
@@ -338,6 +327,8 @@ export default function TopBar({ collapsed, onToggleSidebar }: TopBarProps) {
       setLoggingOut(false);
     }
   }, [loggingOut, router]);
+
+
 
   return (
     <>

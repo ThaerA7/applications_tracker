@@ -1,22 +1,22 @@
-// lib/storage/applied.ts
+// lib/storage/interviews.ts
 "use client";
 
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { idbGet, idbSet, idbDel } from "./indexedDb";
-import type { NewApplicationForm } from "@/components/dialogs/AddApplicationDialog";
 
-export type AppliedApplication = {
+export type StoredInterview = {
   id: string;
-  website?: string;
-} & NewApplicationForm;
+  // everything else is flexible, we just need an id and JSON-serialisable data
+  [key: string]: any;
+};
 
-export type AppliedStorageMode = "guest" | "user";
+export type InterviewsStorageMode = "guest" | "user";
 
-const GUEST_LOCAL_KEY = "job-tracker:applied";
-const GUEST_IDB_KEY = "applied";
+const GUEST_LOCAL_KEY = "job-tracker:interviews";
+const GUEST_IDB_KEY = "interviews";
 
 const TABLE = "applications";
-const BUCKET = "applied";
+const BUCKET = "interviews";
 const COUNTS_EVENT = "job-tracker:refresh-counts";
 
 function notifyCountsChanged() {
@@ -30,17 +30,17 @@ function isObject(v: any) {
   return v && typeof v === "object" && !Array.isArray(v);
 }
 
-function safeParseList(raw: any): AppliedApplication[] {
+function safeParseList(raw: any): StoredInterview[] {
   if (!Array.isArray(raw)) return [];
-  return raw.filter((x) => isObject(x) && typeof x.id === "string") as AppliedApplication[];
+  return raw.filter((x) => isObject(x) && typeof x.id === "string") as StoredInterview[];
 }
 
 // ---------- guest storage ----------
 
-async function loadGuestApplied(): Promise<AppliedApplication[]> {
+async function loadGuestInterviews(): Promise<StoredInterview[]> {
   // Prefer IDB
   try {
-    const idb = await idbGet<AppliedApplication[]>(GUEST_IDB_KEY);
+    const idb = await idbGet<StoredInterview[]>(GUEST_IDB_KEY);
     if (idb) return safeParseList(idb);
   } catch {}
 
@@ -54,20 +54,20 @@ async function loadGuestApplied(): Promise<AppliedApplication[]> {
   }
 }
 
-async function saveGuestApplied(list: AppliedApplication[]) {
+async function saveGuestInterviews(list: StoredInterview[]) {
   // Try IDB
   try {
     await idbSet(GUEST_IDB_KEY, list);
   } catch {}
 
-  // Also mirror to localStorage (cheap backup)
+  // Mirror to localStorage as cheap backup
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(GUEST_LOCAL_KEY, JSON.stringify(list));
   } catch {}
 }
 
-async function clearGuestApplied() {
+async function clearGuestInterviews() {
   try {
     await idbDel(GUEST_IDB_KEY);
   } catch {}
@@ -79,7 +79,7 @@ async function clearGuestApplied() {
 
 // ---------- user storage (Supabase) ----------
 
-async function loadUserApplied(): Promise<AppliedApplication[]> {
+async function loadUserInterviews(): Promise<StoredInterview[]> {
   const supabase = getSupabaseClient();
 
   const { data, error } = await supabase
@@ -89,7 +89,7 @@ async function loadUserApplied(): Promise<AppliedApplication[]> {
     .order("created_at", { ascending: false });
 
   if (error) {
-    console.error("Failed to load applied from Supabase:", error.message);
+    console.error("Failed to load interviews from Supabase:", error.message);
     return [];
   }
 
@@ -101,26 +101,24 @@ async function loadUserApplied(): Promise<AppliedApplication[]> {
   return safeParseList(mapped);
 }
 
-async function upsertUserApplied(app: AppliedApplication) {
+async function upsertUserInterview(interview: StoredInterview) {
   const supabase = getSupabaseClient();
 
-  const { error } = await supabase
-    .from(TABLE)
-    .upsert(
-      {
-        id: app.id,
-        bucket: BUCKET,
-        data: app,
-      },
-      { onConflict: "id" }
-    );
+  const { error } = await supabase.from(TABLE).upsert(
+    {
+      id: interview.id,
+      bucket: BUCKET,
+      data: interview,
+    },
+    { onConflict: "id" }
+  );
 
   if (error) {
-    console.error("Failed to upsert applied in Supabase:", error.message);
+    console.error("Failed to upsert interview in Supabase:", error.message);
   }
 }
 
-async function deleteUserApplied(id: string) {
+async function deleteUserInterview(id: string) {
   const supabase = getSupabaseClient();
 
   const { error } = await supabase
@@ -130,13 +128,13 @@ async function deleteUserApplied(id: string) {
     .eq("bucket", BUCKET);
 
   if (error) {
-    console.error("Failed to delete applied in Supabase:", error.message);
+    console.error("Failed to delete interview in Supabase:", error.message);
   }
 }
 
 // ---------- mode detection ----------
 
-export async function detectAppliedMode(): Promise<AppliedStorageMode> {
+export async function detectInterviewsMode(): Promise<InterviewsStorageMode> {
   const supabase = getSupabaseClient();
   const { data } = await supabase.auth.getSession();
   return data.session?.user ? "user" : "guest";
@@ -144,67 +142,63 @@ export async function detectAppliedMode(): Promise<AppliedStorageMode> {
 
 // ---------- public API ----------
 
-export async function loadApplied(): Promise<{
-  mode: AppliedStorageMode;
-  items: AppliedApplication[];
+export async function loadInterviews(): Promise<{
+  mode: InterviewsStorageMode;
+  items: StoredInterview[];
 }> {
-  const mode = await detectAppliedMode();
-  const items = mode === "user" ? await loadUserApplied() : await loadGuestApplied();
+  const mode = await detectInterviewsMode();
+  const items = mode === "user" ? await loadUserInterviews() : await loadGuestInterviews();
   return { mode, items };
 }
 
-export async function upsertApplied(
-  app: AppliedApplication,
-  mode: AppliedStorageMode
+export async function upsertInterview(
+  interview: StoredInterview,
+  mode: InterviewsStorageMode
 ) {
   if (mode === "user") {
-    await upsertUserApplied(app);
+    await upsertUserInterview(interview);
   } else {
-    const prev = await loadGuestApplied();
-    const idx = prev.findIndex((x) => x.id === app.id);
+    const prev = await loadGuestInterviews();
+    const idx = prev.findIndex((x) => x.id === interview.id);
     const next =
       idx === -1
-        ? [app, ...prev]
-        : prev.map((x) => (x.id === app.id ? app : x));
+        ? [interview, ...prev]
+        : prev.map((x) => (x.id === interview.id ? interview : x));
 
-    await saveGuestApplied(next);
+    await saveGuestInterviews(next);
   }
 
   notifyCountsChanged();
 }
 
-export async function deleteApplied(
-  id: string,
-  mode: AppliedStorageMode
-) {
+export async function deleteInterview(id: string, mode: InterviewsStorageMode) {
   if (mode === "user") {
-    await deleteUserApplied(id);
+    await deleteUserInterview(id);
   } else {
-    const prev = await loadGuestApplied();
+    const prev = await loadGuestInterviews();
     const next = prev.filter((x) => x.id !== id);
-    await saveGuestApplied(next);
+    await saveGuestInterviews(next);
   }
 
   notifyCountsChanged();
 }
 
 /**
- * When a user signs in, move guest Applied data into Supabase.
+ * When a user signs in, move guest Interviews data into Supabase.
  * This prevents data loss while keeping server as source of truth.
  */
-export async function migrateGuestAppliedToUser() {
+export async function migrateGuestInterviewsToUser() {
   const supabase = getSupabaseClient();
   const { data } = await supabase.auth.getSession();
   if (!data.session?.user) return;
 
-  const guest = await loadGuestApplied();
+  const guest = await loadGuestInterviews();
   if (guest.length === 0) return;
 
-  // Upsert all guest apps as user rows
-  const payload = guest.map((app) => ({
-    id: app.id,
+  const payload = guest.map((interview) => ({
+    id: interview.id,
     bucket: BUCKET,
-    data: app,
+    data: interview,
   }));
 
   const { error } = await supabase.from(TABLE).upsert(payload, {
@@ -212,10 +206,10 @@ export async function migrateGuestAppliedToUser() {
   });
 
   if (error) {
-    console.error("Guest → user applied migration failed:", error.message);
+    console.error("Guest → user interviews migration failed:", error.message);
     return;
   }
 
-  await clearGuestApplied();
+  await clearGuestInterviews();
   notifyCountsChanged();
 }

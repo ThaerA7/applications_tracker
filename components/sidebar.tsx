@@ -1,3 +1,4 @@
+// components/Sidebar.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -5,6 +6,10 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { loadApplied } from "@/lib/storage/applied";
+import { loadInterviews } from "@/lib/storage/interviews";
+import { loadWithdrawn } from "@/lib/storage/withdrawn";
+import { loadRejected } from "@/lib/storage/rejected";
+import { loadOffers } from "@/lib/storage/offers";
 
 type Item = {
   href: string;
@@ -27,12 +32,10 @@ const items: Item[] = [
   { href: "/settings", label: "Settings", icon: "/icons/settings.png" },
 ];
 
-const INTERVIEWS_STORAGE_KEY = "job-tracker:interviews";
-const OFFERS_RECEIVED_STORAGE_KEY = "job-tracker:offers-received";
-const REJECTIONS_STORAGE_KEY = "job-tracker:rejected";
-const WITHDRAWN_STORAGE_KEY = "job-tracker:withdrawn";
 const WISHLIST_STORAGE_KEY = "job-wishlist-v1";
 const NOTES_STORAGE_KEY = "job-tracker:notes";
+
+const COUNTS_EVENT = "job-tracker:refresh-counts";
 
 type SidebarProps = {
   collapsed: boolean;
@@ -53,164 +56,91 @@ export default function Sidebar({ collapsed }: SidebarProps) {
   useEffect(() => {
     let alive = true;
 
-    const initApplied = async () => {
+    const refreshCounts = async () => {
+      // Applied (Supabase or guest)
       try {
         const { items } = await loadApplied();
-        if (!alive) return;
-        setAppliedCount(items.length);
+        if (alive) setAppliedCount(items.length);
       } catch (err) {
         console.error("Failed to load applied applications count", err);
+        if (alive) setAppliedCount(0);
       }
-    };
 
-    const initInterviews = () => {
-      if (typeof window === "undefined") return;
+      // Interviews (Supabase or guest)
       try {
-        const raw = window.localStorage.getItem(INTERVIEWS_STORAGE_KEY);
-        if (!alive) return;
-
-        if (!raw) {
-          setInterviewsCount(0);
-          return;
-        }
-
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          setInterviewsCount(parsed.length);
-        } else {
-          setInterviewsCount(0);
-        }
+        const { items } = await loadInterviews();
+        if (alive) setInterviewsCount(items.length);
       } catch (err) {
         console.error("Failed to load interviews count", err);
-        setInterviewsCount(0);
+        if (alive) setInterviewsCount(0);
       }
-    };
 
-    const initOffers = () => {
-      if (typeof window === "undefined") return;
+      // Withdrawn (Supabase or guest)
       try {
-        const raw = window.localStorage.getItem(OFFERS_RECEIVED_STORAGE_KEY);
-        if (!alive) return;
-
-        if (!raw) {
-          setOffersCount(0);
-          return;
-        }
-
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          setOffersCount(parsed.length);
-        } else {
-          setOffersCount(0);
-        }
-      } catch (err) {
-        console.error("Failed to load offers count", err);
-        setOffersCount(0);
-      }
-    };
-
-    const initRejected = () => {
-      if (typeof window === "undefined") return;
-      try {
-        const raw = window.localStorage.getItem(REJECTIONS_STORAGE_KEY);
-        if (!alive) return;
-
-        if (!raw) {
-          setRejectedCount(0);
-          return;
-        }
-
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          setRejectedCount(parsed.length);
-        } else {
-          setRejectedCount(0);
-        }
-      } catch (err) {
-        console.error("Failed to load rejected count", err);
-        setRejectedCount(0);
-      }
-    };
-
-    const initWithdrawn = () => {
-      if (typeof window === "undefined") return;
-      try {
-        const raw = window.localStorage.getItem(WITHDRAWN_STORAGE_KEY);
-        if (!alive) return;
-
-        if (!raw) {
-          setWithdrawnCount(0);
-          return;
-        }
-
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          setWithdrawnCount(parsed.length);
-        } else {
-          setWithdrawnCount(0);
-        }
+        const { items } = await loadWithdrawn();
+        if (alive) setWithdrawnCount(items.length);
       } catch (err) {
         console.error("Failed to load withdrawn count", err);
-        setWithdrawnCount(0);
+        if (alive) setWithdrawnCount(0);
       }
-    };
 
-    const initWishlist = () => {
+      // Rejected (Supabase or guest)
+      try {
+        const { items } = await loadRejected();
+        if (alive) setRejectedCount(items.length);
+      } catch (err) {
+        console.error("Failed to load rejected count", err);
+        if (alive) setRejectedCount(0);
+      }
+
+      // Offers (Supabase or guest)
+      try {
+        const { items } = await loadOffers();
+        if (alive) setOffersCount(items.length);
+      } catch (err) {
+        console.error("Failed to load offers count", err);
+        if (alive) setOffersCount(0);
+      }
+
+      // Everything below is purely localStorage for now
       if (typeof window === "undefined") return;
+
       try {
         const raw = window.localStorage.getItem(WISHLIST_STORAGE_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
         if (!alive) return;
-
-        if (!raw) {
-          setWishlistCount(0);
-          return;
-        }
-
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          setWishlistCount(parsed.length);
-        } else {
-          setWishlistCount(0);
-        }
+        setWishlistCount(Array.isArray(parsed) ? parsed.length : 0);
       } catch (err) {
         console.error("Failed to load wishlist count", err);
-        setWishlistCount(0);
+        if (alive) setWishlistCount(0);
       }
-    };
 
-    const initNotes = () => {
-      if (typeof window === "undefined") return;
       try {
         const raw = window.localStorage.getItem(NOTES_STORAGE_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
         if (!alive) return;
-
-        if (!raw) {
-          setNotesCount(0);
-          return;
-        }
-
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          setNotesCount(parsed.length);
-        } else {
-          setNotesCount(0);
-        }
+        setNotesCount(Array.isArray(parsed) ? parsed.length : 0);
       } catch (err) {
         console.error("Failed to load notes count", err);
-        setNotesCount(0);
+        if (alive) setNotesCount(0);
       }
     };
 
-    initApplied();
-    initInterviews();
-    initOffers();
-    initRejected();
-    initWithdrawn();
-    initWishlist();
-    initNotes();
+    void refreshCounts();
+
+    const handler = () => {
+      void refreshCounts();
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener(COUNTS_EVENT, handler);
+    }
 
     return () => {
       alive = false;
+      if (typeof window !== "undefined") {
+        window.removeEventListener(COUNTS_EVENT, handler);
+      }
     };
   }, []);
 

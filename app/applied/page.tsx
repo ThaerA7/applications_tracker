@@ -156,47 +156,47 @@ export default function AppliedPage() {
   const [filters, setFilters] =
     useState<ApplicationFilters>(DEFAULT_APPLICATION_FILTERS);
 
-  // ---------- load initial data + auth switching ----------
+    // ---------- load initial data + auth switching ----------
   useEffect(() => {
     let alive = true;
     const supabase = getSupabaseClient();
 
-    const init = async () => {
+    const load = async () => {
       const { mode, items } = await loadApplied();
       if (!alive) return;
       setStorageMode(mode);
       setApplications(items);
     };
 
-    init();
+    // Initial load – uses whatever session exists (guest or user)
+    void load();
 
-    const { data: sub } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (!alive) return;
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!alive) return;
 
-        if (event === 'SIGNED_IN' && session?.user) {
+      if (event === "SIGNED_IN" && session?.user) {
+        // Migrate guest data + reload AFTER this callback finishes
+        setTimeout(async () => {
+          if (!alive) return;
           await migrateGuestAppliedToUser();
-          const { mode, items } = await loadApplied();
+          await load();
+        }, 0);
+      } else if (event === "SIGNED_OUT") {
+        // Reload in guest mode
+        setTimeout(async () => {
           if (!alive) return;
-          setStorageMode(mode);
-          setApplications(items);
-          return;
-        }
-
-        if (event === 'SIGNED_OUT') {
-          const { mode, items } = await loadApplied();
-          if (!alive) return;
-          setStorageMode(mode);
-          setApplications(items);
-        }
-      },
-    );
+          await load();
+        }, 0);
+      }
+    });
 
     return () => {
       alive = false;
       sub?.subscription?.unsubscribe();
     };
   }, []);
+
+
 
   const logActivity = useCallback(
     (

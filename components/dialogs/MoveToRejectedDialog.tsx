@@ -23,6 +23,7 @@ export type RejectionType =
   | "after-second-interview";
 
 export type RejectionDetails = {
+  reason: string;
   company: string;
   role: string;
   appliedDate?: string;

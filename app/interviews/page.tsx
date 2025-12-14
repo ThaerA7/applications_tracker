@@ -43,7 +43,15 @@ import InterviewsFilter, {
   type InterviewFilters,
 } from "@/components/filters/InterviewsFilter";
 
-const INTERVIEWS_STORAGE_KEY = "job-tracker:interviews";
+import { getSupabaseClient } from "@/lib/supabase/client";
+import {
+  loadInterviews,
+  upsertInterview,
+  deleteInterview,
+  migrateGuestInterviewsToUser,
+  type InterviewsStorageMode,
+} from "@/lib/storage/interviews";
+
 const REJECTIONS_STORAGE_KEY = "job-tracker:rejected";
 const WITHDRAWN_STORAGE_KEY = "job-tracker:withdrawn";
 const INTERVIEWS_ACTIVITY_STORAGE_KEY = "job-tracker:interviews-activity";
@@ -131,51 +139,6 @@ const INTERVIEW_TYPE_META: Record<
   video: { label: "Video call", Icon: Video },
   "in-person": { label: "In person", Icon: Users },
 };
-
-// Initial demo data (used only if localStorage is empty)
-const DEMO_INTERVIEWS: InterviewWithStage[] = [
-  {
-    id: "1",
-    company: "Acme Corp",
-    role: "Frontend Engineer",
-    location: "Berlin",
-    contact: { name: "Julia Meyer", email: "j.meyer@acme.example" },
-    date: "2025-11-12T14:00",
-    type: "video",
-    url: "https://jobs.example/acme/frontend",
-    logoUrl: "/logos/acme.svg",
-    employmentType: "Full-time",
-    notes: "Prepare system design questions and review React hooks.",
-    stage: "upcoming",
-  },
-  {
-    id: "2",
-    company: "Globex",
-    role: "Mobile Developer (Flutter)",
-    location: "Remote",
-    contact: { name: "HR Team" },
-    date: "2025-11-15T10:30",
-    type: "phone",
-    logoUrl: "/logos/globex.png",
-    employmentType: "Full-time",
-    notes: "Phone screen with HR – ask about team structure.",
-    stage: "upcoming",
-  },
-  {
-    id: "3",
-    company: "Initech",
-    role: "Full-Stack Developer",
-    location: "Munich HQ",
-    contact: { name: "Samir", email: "samir@initech.example" },
-    date: "2025-11-20T09:15",
-    type: "in-person",
-    url: "https://initech.example/careers/123",
-    logoUrl: "/logos/initech.svg",
-    employmentType: "Full-time",
-    notes: "Onsite: bring printed CV, prepare examples for past projects.",
-    stage: "upcoming",
-  },
-];
 
 // --- Pure, deterministic date formatting for display (no Date/Intl) ---
 
@@ -365,11 +328,14 @@ function ensureInterviewStage(
 
 export default function InterviewsPage() {
   const [query, setQuery] = useState("");
-  const [items, setItems] = useState<InterviewWithStage[]>(DEMO_INTERVIEWS);
+  const [items, setItems] = useState<InterviewWithStage[]>([]);
   const [stageFilter, setStageFilter] = useState<InterviewStage>("upcoming");
   const [filters, setFilters] = useState<InterviewFilters>(
     DEFAULT_INTERVIEW_FILTERS
   );
+
+  const [storageMode, setStorageMode] =
+    useState<InterviewsStorageMode>("guest");
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogApplication, setDialogApplication] =
@@ -439,6 +405,7 @@ export default function InterviewsPage() {
     });
   };
 
+  // keep "now" ticking
   useEffect(() => {
     if (typeof window === "undefined") return;
     setNow(Date.now());
@@ -448,33 +415,50 @@ export default function InterviewsPage() {
     return () => window.clearInterval(id);
   }, []);
 
-  // Load interviews + activity log from localStorage on mount
+    // Load interview items from guest/user storage + handle auth changes
+  useEffect(() => {
+    let alive = true;
+    const supabase = getSupabaseClient();
+
+    const load = async () => {
+      const { mode, items } = await loadInterviews();
+      if (!alive) return;
+
+      setStorageMode(mode);
+      setItems(items.map((i) => ensureInterviewStage(i as Interview)));
+    };
+
+    // Initial load
+    void load();
+
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!alive) return;
+
+      if (event === "SIGNED_IN" && session?.user) {
+        setTimeout(async () => {
+          if (!alive) return;
+          await migrateGuestInterviewsToUser();
+          await load();
+        }, 0);
+      } else if (event === "SIGNED_OUT") {
+        setTimeout(async () => {
+          if (!alive) return;
+          await load();
+        }, 0);
+      }
+    });
+
+    return () => {
+      alive = false;
+      sub?.subscription?.unsubscribe();
+    };
+  }, []);
+
+
+
+  // Load existing interview activity log
   useEffect(() => {
     if (typeof window === "undefined") return;
-
-    try {
-      const raw = window.localStorage.getItem(INTERVIEWS_STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          const withStages: InterviewWithStage[] = parsed.map((item: any) =>
-            ensureInterviewStage(item as Interview)
-          );
-          setItems(withStages);
-        } else {
-          setItems(DEMO_INTERVIEWS);
-        }
-      } else {
-        window.localStorage.setItem(
-          INTERVIEWS_STORAGE_KEY,
-          JSON.stringify(DEMO_INTERVIEWS)
-        );
-        setItems(DEMO_INTERVIEWS);
-      }
-    } catch (err) {
-      console.error("Failed to load interviews from localStorage", err);
-      setItems(DEMO_INTERVIEWS);
-    }
 
     try {
       const rawActivity = window.localStorage.getItem(
@@ -564,21 +548,10 @@ export default function InterviewsPage() {
     const id = deleteTarget.id;
     const elementId = `interview-card-${id}`;
 
-    animateCardExit(elementId, "delete", () => {
-      setItems((prev) => {
-        const next = prev.filter((i) => i.id !== id);
-        if (typeof window !== "undefined") {
-          try {
-            window.localStorage.setItem(
-              INTERVIEWS_STORAGE_KEY,
-              JSON.stringify(next)
-            );
-          } catch (err) {
-            console.error("Failed to persist interviews after delete", err);
-          }
-        }
-        return next;
-      });
+    animateCardExit(elementId, "delete", async () => {
+      setItems((prev) => prev.filter((i) => i.id !== id));
+
+      await deleteInterview(id, storageMode);
 
       setDeleteTarget(null);
     });
@@ -610,20 +583,10 @@ export default function InterviewsPage() {
         // Add new interview
         next = [...prev, createdWithStage];
       }
-
-      if (typeof window !== "undefined") {
-        try {
-          window.localStorage.setItem(
-            INTERVIEWS_STORAGE_KEY,
-            JSON.stringify(next)
-          );
-        } catch (err) {
-          console.error("Failed to persist interviews after create/edit", err);
-        }
-      }
-
       return next;
     });
+
+    void upsertInterview(createdWithStage, storageMode);
 
     // activity
     if (editingInterview) {
@@ -647,17 +610,6 @@ export default function InterviewsPage() {
         item.id === interviewId ? { ...item, stage: newStage } : item
       );
 
-      if (typeof window !== "undefined") {
-        try {
-          window.localStorage.setItem(
-            INTERVIEWS_STORAGE_KEY,
-            JSON.stringify(next)
-          );
-        } catch (err) {
-          console.error("Failed to persist interviews after stage change", err);
-        }
-      }
-
       const target = next.find((item) => item.id === interviewId) || null;
       if (target) {
         logActivity("edited", target, {
@@ -668,6 +620,8 @@ export default function InterviewsPage() {
                 ? "Marked as interview with passed date"
                 : "Marked as upcoming interview",
         });
+
+        void upsertInterview(target, storageMode);
       }
 
       return next;
@@ -729,29 +683,15 @@ export default function InterviewsPage() {
       });
     }
 
-    // 3) Remove from interviews with animation
+    // 3) Remove from interviews with animation + delete from storage
     if (source) {
       const sourceId = source.id;
       const elementId = `interview-card-${sourceId}`;
 
-      animateCardExit(elementId, "move", () => {
-        setItems((prev) => {
-          const next = prev.filter((i) => i.id !== sourceId);
-          if (typeof window !== "undefined") {
-            try {
-              window.localStorage.setItem(
-                INTERVIEWS_STORAGE_KEY,
-                JSON.stringify(next)
-              );
-            } catch (err) {
-              console.error(
-                "Failed to persist interviews after moving to rejected",
-                err
-              );
-            }
-          }
-          return next;
-        });
+      animateCardExit(elementId, "move", async () => {
+        setItems((prev) => prev.filter((i) => i.id !== sourceId));
+
+        await deleteInterview(sourceId, storageMode);
 
         handleMoveDialogClose();
       });
@@ -832,28 +772,14 @@ export default function InterviewsPage() {
       note: details.reason || "Moved to withdrawn",
     });
 
-    // 3) Remove from interviews with animation
+    // 3) Remove from interviews with animation + delete from storage
     const sourceId = source.id;
     const elementId = `interview-card-${sourceId}`;
 
-    animateCardExit(elementId, "move", () => {
-      setItems((prev) => {
-        const next = prev.filter((i) => i.id !== sourceId);
-        if (typeof window !== "undefined") {
-          try {
-            window.localStorage.setItem(
-              INTERVIEWS_STORAGE_KEY,
-              JSON.stringify(next)
-            );
-          } catch (err) {
-            console.error(
-              "Failed to persist interviews after moving to withdrawn",
-              err
-            );
-          }
-        }
-        return next;
-      });
+    animateCardExit(elementId, "move", async () => {
+      setItems((prev) => prev.filter((i) => i.id !== sourceId));
+
+      await deleteInterview(sourceId, storageMode);
 
       handleMoveDialogClose();
     });
@@ -910,28 +836,14 @@ export default function InterviewsPage() {
       note: details.notes || "Moved to accepted",
     });
 
-    // 3) Remove from interviews with animation
+    // 3) Remove from interviews with animation + delete from storage
     const sourceId = source.id;
     const elementId = `interview-card-${sourceId}`;
 
-    animateCardExit(elementId, "move", () => {
-      setItems((prev) => {
-        const next = prev.filter((i) => i.id !== sourceId);
-        if (typeof window !== "undefined") {
-          try {
-            window.localStorage.setItem(
-              INTERVIEWS_STORAGE_KEY,
-              JSON.stringify(next)
-            );
-          } catch (err) {
-            console.error(
-              "Failed to persist interviews after moving to accepted",
-              err
-            );
-          }
-        }
-        return next;
-      });
+    animateCardExit(elementId, "move", async () => {
+      setItems((prev) => prev.filter((i) => i.id !== sourceId));
+
+      await deleteInterview(sourceId, storageMode);
 
       handleMoveDialogClose();
     });
@@ -947,7 +859,7 @@ export default function InterviewsPage() {
     [items, stageFilter]
   );
 
-  // NEW: per-stage counts (respecting search + filters)
+  // per-stage counts (respecting search + filters)
   const cardsPerStage = useMemo(() => {
     const stages: InterviewStage[] = ["upcoming", "past", "done"];
     const result = {} as Record<InterviewStage, number>;
@@ -957,7 +869,7 @@ export default function InterviewsPage() {
     return result;
   }, [items, query, filters]);
 
-  // NEW: how many cards are currently visible (current stage + filters + search)
+  // number of cards currently visible (current stage + filters + search)
   const cardCount = filtered.length;
 
   // Formatting + status styles for MoveApplicationDialog
@@ -1151,7 +1063,7 @@ export default function InterviewsPage() {
             Add
           </button>
 
-          {/* New Interviews filter */}
+          {/* Interviews filter */}
           <InterviewsFilter
             items={items}
             filters={filters}
@@ -1161,7 +1073,7 @@ export default function InterviewsPage() {
           />
         </div>
 
-        {/* Stage view toggle – full width, same container width as cards */}
+        {/* Stage view toggle */}
         <div className="mt-3 w-full">
           <div
             className={[
