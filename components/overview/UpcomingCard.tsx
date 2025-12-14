@@ -1,9 +1,9 @@
 // app/components/overview/UpcomingCard.tsx
-
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PhoneCall, Plus } from "lucide-react";
+
 import ScheduleInterviewDialog, {
   type Interview,
 } from "../../components/dialogs/ScheduleInterviewDialog";
@@ -16,6 +16,24 @@ import {
   getCountdownParts,
 } from "../../app/calendar/calendarUtils";
 
+// ✅ Storage (guest: IDB/local mirror, user: Supabase)
+import { getSupabaseClient } from "@/lib/supabase/client";
+import { loadInterviews } from "@/lib/storage/interviews";
+
+/**
+ * Global refresh event emitted by storage modules
+ */
+const COUNTS_EVENT = "job-tracker:refresh-counts";
+
+type StoredInterview = {
+  id: string;
+  company?: string;
+  role?: string;
+  location?: string;
+  employmentType?: string;
+  date?: string; // ISO
+};
+
 function pad(n: number) {
   return `${n}`.padStart(2, "0");
 }
@@ -27,181 +45,44 @@ export default function UpcomingCard() {
   // Quick-add dialog state (from overview card)
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  // Helper: load all events from localStorage (same logic as CalendarPage)
-  const refreshEventsFromLocalStorage = useCallback(() => {
-    if (typeof window === "undefined") return;
+  // ✅ Load interview events from storage (guest IDB/local mirror, user Supabase)
+  const refreshInterviewEvents = useCallback(async () => {
+    try {
+      const res = await loadInterviews();
+      const interviews = ((res?.items as StoredInterview[]) ?? []).slice();
 
-    const collected: CalendarEvent[] = [];
+      const collected: CalendarEvent[] = [];
 
-    const parseArray = (key: string): any[] => {
-      try {
-        const raw = window.localStorage.getItem(key);
-        if (!raw) return [];
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed : [];
-      } catch {
-        return [];
-      }
-    };
+      for (const item of interviews) {
+        const dateOnly = normalizeDate(item.date);
+        if (!dateOnly) continue;
+        const time = extractTime(item.date);
 
-    const addEvent = (event: CalendarEvent | null | undefined) => {
-      if (!event || !event.date) return;
-      collected.push(event);
-    };
-
-    // --- Interviews ---
-    const interviews = parseArray("job-tracker:interviews");
-    interviews.forEach((item: any) => {
-      const dateOnly = normalizeDate(item.date);
-      if (!dateOnly) return;
-      const time = extractTime(item.date);
-
-      addEvent({
-        id: `interview-${item.id ?? item.date ?? dateOnly}`,
-        date: dateOnly,
-        kind: "interview",
-        title: item.company || "Interview",
-        subtitle: item.role,
-        time: time || undefined,
-        dateTime: typeof item.date === "string" ? item.date : undefined,
-        location: item.location,
-        employmentType: item.employmentType,
-      });
-    });
-
-    // --- Rejected (applied + decision) ---
-    const rejected = parseArray("job-tracker:rejected");
-    rejected.forEach((item: any) => {
-      const applied = normalizeDate(item.appliedDate);
-      if (applied) {
-        addEvent({
-          id: `applied-from-rejected-${item.id ?? applied}`,
-          date: applied,
-          kind: "applied",
-          title: item.company || "Applied",
-          subtitle: item.role,
-          location: item.location,
-          employmentType: item.employmentType,
-        });
-      }
-
-      const decision = normalizeDate(item.decisionDate);
-      if (decision) {
-        addEvent({
-          id: `rejected-${item.id ?? decision}`,
-          date: decision,
-          kind: "rejected",
-          title: item.company || "Rejected",
-          subtitle: item.role,
-          location: item.location,
-          employmentType: item.employmentType,
-        });
-      }
-    });
-
-    // --- Withdrawn (applied + interview + withdrawn) ---
-    const withdrawn = parseArray("job-tracker:withdrawn");
-    withdrawn.forEach((item: any) => {
-      const applied =
-        normalizeDate(item.appliedOn) || normalizeDate(item.appliedDate);
-      if (applied) {
-        addEvent({
-          id: `applied-from-withdrawn-${item.id ?? applied}`,
-          date: applied,
-          kind: "applied",
-          title: item.company || "Applied",
-          subtitle: item.role,
-          location: item.location,
-          employmentType: item.employmentType,
-        });
-      }
-
-      const interviewDateOnly = normalizeDate(item.interviewDate);
-      if (interviewDateOnly) {
-        const time = extractTime(item.interviewDate);
-        addEvent({
-          id: `interview-from-withdrawn-${item.id ?? item.interviewDate ?? interviewDateOnly
-            }`,
-          date: interviewDateOnly,
+        collected.push({
+          id: `interview-${item.id ?? item.date ?? dateOnly}`,
+          date: dateOnly,
           kind: "interview",
           title: item.company || "Interview",
           subtitle: item.role,
           time: time || undefined,
-          dateTime:
-            typeof item.interviewDate === "string"
-              ? item.interviewDate
-              : undefined,
+          dateTime: typeof item.date === "string" ? item.date : undefined,
           location: item.location,
           employmentType: item.employmentType,
         });
       }
 
-      const withdrawnDate = normalizeDate(item.withdrawnDate);
-      if (withdrawnDate) {
-        addEvent({
-          id: `withdrawn-${item.id ?? withdrawnDate}`,
-          date: withdrawnDate,
-          kind: "withdrawn",
-          title: item.company || "Withdrawn",
-          subtitle: item.role,
-          location: item.location,
-          employmentType: item.employmentType,
-        });
+      // Deduplicate by (kind, date, title, subtitle, time)
+      const map = new Map<string, CalendarEvent>();
+      for (const ev of collected) {
+        const key = `${ev.kind}-${ev.date}-${ev.title}-${ev.subtitle ?? ""}-${ev.time ?? ""}`;
+        if (!map.has(key)) map.set(key, ev);
       }
-    });
 
-    // --- Applied-only lists (optional) ---
-    ["job-tracker:applied", "job-tracker:applications"].forEach((key) => {
-      const arr = parseArray(key);
-      arr.forEach((item: any) => {
-        const date =
-          normalizeDate(item.appliedOn) ||
-          normalizeDate(item.appliedDate) ||
-          normalizeDate(item.date) ||
-          normalizeDate(item.createdAt);
-        if (!date) return;
-        addEvent({
-          id: `applied-${key}-${item.id ?? date}`,
-          date,
-          kind: "applied",
-          title: item.company || "Applied",
-          subtitle: item.role,
-          location: item.location,
-          employmentType: item.employmentType,
-        });
-      });
-    });
-
-    // --- Offers (optional) ---
-    const offers = parseArray("job-tracker:offers");
-    offers.forEach((item: any) => {
-      const date =
-        normalizeDate(item.offerDate) ||
-        normalizeDate(item.acceptedDate) ||
-        normalizeDate(item.createdAt);
-      if (!date) return;
-      addEvent({
-        id: `offer-${item.id ?? date}`,
-        date,
-        kind: "offer",
-        title: item.company || "Offer",
-        subtitle: item.role,
-        location: item.location,
-        employmentType: item.employmentType,
-      });
-    });
-
-    // Deduplicate by (kind, date, title, subtitle, time)
-    const map = new Map<string, CalendarEvent>();
-    for (const ev of collected) {
-      const key = `${ev.kind}-${ev.date}-${ev.title}-${ev.subtitle ?? ""}-${ev.time ?? ""
-        }`;
-      if (!map.has(key)) {
-        map.set(key, ev);
-      }
+      setEvents(Array.from(map.values()));
+    } catch (err) {
+      console.error("UpcomingCard: failed to load interviews:", err);
+      setEvents([]);
     }
-
-    setEvents(Array.from(map.values()));
   }, []);
 
   // Live ticking clock (for countdown)
@@ -213,10 +94,38 @@ export default function UpcomingCard() {
     return () => window.clearInterval(id);
   }, []);
 
-  // Load calendar-style events from localStorage on mount
+  // ✅ Refresh on mount + global refresh events + focus/visibility + auth changes
   useEffect(() => {
-    refreshEventsFromLocalStorage();
-  }, [refreshEventsFromLocalStorage]);
+    if (typeof window === "undefined") return;
+
+    let alive = true;
+    const supabase = getSupabaseClient();
+
+    const refresh = async () => {
+      if (!alive) return;
+      await refreshInterviewEvents();
+    };
+
+    refresh();
+
+    window.addEventListener(COUNTS_EVENT, refresh);
+    window.addEventListener("focus", refresh);
+
+    const onVis = () => {
+      if (!document.hidden) refresh();
+    };
+    document.addEventListener("visibilitychange", onVis);
+
+    const { data: sub } = supabase.auth.onAuthStateChange(() => refresh());
+
+    return () => {
+      alive = false;
+      window.removeEventListener(COUNTS_EVENT, refresh);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", onVis);
+      sub?.subscription?.unsubscribe();
+    };
+  }, [refreshInterviewEvents]);
 
   // Upcoming interviews (from now onwards)
   const upcomingInterviews = useMemo(() => {
@@ -246,18 +155,12 @@ export default function UpcomingCard() {
   const nextInterview = upcomingInterviews[0] ?? null;
   const laterInterviews = nextInterview ? upcomingInterviews.slice(1) : [];
 
-  const handleOpenDialog = () => {
-    setDialogOpen(true);
-  };
-
-  const handleCloseDialog = () => {
-    setDialogOpen(false);
-  };
+  const handleOpenDialog = () => setDialogOpen(true);
+  const handleCloseDialog = () => setDialogOpen(false);
 
   const handleInterviewCreated = (_interview: Interview) => {
-    // After saving to localStorage (handled inside the dialog),
-    // refresh our events so the new interview shows immediately.
-    refreshEventsFromLocalStorage();
+    // After saving (handled inside the dialog), refresh so the new interview shows immediately.
+    void refreshInterviewEvents();
   };
 
   return (
@@ -274,13 +177,10 @@ export default function UpcomingCard() {
       <section
         className={[
           "relative overflow-hidden rounded-2xl border border-emerald-100",
-          // was: from-emerald-50 via-white to-teal-50
           "bg-gradient-to-br from-emerald-50 via-white to-sky-50",
           "p-5 shadow-md",
         ].join(" ")}
       >
-        <div className="pointer-events-none absolute -top-16 -right-16 h-40 w-40 rounded-full bg-emerald-400/15 blur-3xl" />
-
         <div className="pointer-events-none absolute -top-16 -right-16 h-40 w-40 rounded-full bg-emerald-400/15 blur-3xl" />
 
         <div className="relative z-10">
@@ -340,12 +240,7 @@ export default function UpcomingCard() {
                   {new Date(nextInterview.date).getDate()}
                 </span>
                 <span className="text-[10px] font-medium uppercase tracking-wide">
-                  {
-                    MONTH_NAMES[new Date(nextInterview.date).getMonth()].slice(
-                      0,
-                      3
-                    )
-                  }
+                  {MONTH_NAMES[new Date(nextInterview.date).getMonth()].slice(0, 3)}
                 </span>
               </div>
 
@@ -405,10 +300,7 @@ export default function UpcomingCard() {
 
                     const evDate = new Date(ev.date);
                     const dayNum = evDate.getDate();
-                    const monthLabel = MONTH_NAMES[evDate.getMonth()].slice(
-                      0,
-                      3
-                    );
+                    const monthLabel = MONTH_NAMES[evDate.getMonth()].slice(0, 3);
 
                     return (
                       <li

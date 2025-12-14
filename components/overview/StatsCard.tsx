@@ -1,6 +1,6 @@
-"use client";
-
 // app/components/StatsCard.tsx
+
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -14,24 +14,17 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import {
-  CalendarDays,
-  Clock,
-  ListChecks,
-  Plus,
-  TrendingUp,
-} from "lucide-react";
+import { CalendarDays, Clock, ListChecks, Plus, TrendingUp } from "lucide-react";
 
-import {
-  AddNoteDialog,
-  upsertNoteToStorage,
-} from "@/components/overview/NotesCard";
+import { AddNoteDialog, upsertNoteToStorage } from "@/components/overview/NotesCard";
 
 // ✅ Dialogs
 import AddApplicationDialog, {
   type NewApplicationForm,
 } from "@/components/dialogs/AddApplicationDialog";
-import ScheduleInterviewDialog from "@/components/dialogs/ScheduleInterviewDialog";
+import ScheduleInterviewDialog, {
+  type Interview,
+} from "@/components/dialogs/ScheduleInterviewDialog";
 import MoveToRejectedDialog, {
   type RejectionDetails,
 } from "@/components/dialogs/MoveToRejectedDialog";
@@ -42,20 +35,47 @@ import MoveToAcceptedDialog, {
   type AcceptedDetails,
 } from "@/components/dialogs/MoveToAcceptedDialog";
 
-/**
- * Storage keys
- * We keep some fallback keys for resilience.
- */
-const APPLICATIONS_KEYS = [
-  "job-tracker:applied",
-  "job-tracker:applications",
-] as const;
+// ✅ Storage (guest: IDB/local mirror, user: Supabase)
+import { getSupabaseClient } from "@/lib/supabase/client";
 
-const INTERVIEWS_STORAGE_KEY = "job-tracker:interviews";
-const REJECTIONS_STORAGE_KEY = "job-tracker:rejected";
-const WITHDRAWN_STORAGE_KEY = "job-tracker:withdrawn";
-const OFFERS_RECEIVED_STORAGE_KEY = "job-tracker:offers-received";
-const LEGACY_ACCEPTED_STORAGE_KEY = "job-tracker:accepted";
+import {
+  loadApplied,
+  upsertApplied,
+  type AppliedApplication,
+  type AppliedStorageMode,
+} from "@/lib/storage/applied";
+
+import {
+  loadInterviews,
+  upsertInterview,
+  type StoredInterview,
+  type InterviewsStorageMode,
+} from "@/lib/storage/interviews";
+
+import {
+  loadRejected,
+  upsertRejected,
+  type RejectedApplication,
+  type RejectedStorageMode,
+} from "@/lib/storage/rejected";
+
+import {
+  loadWithdrawn,
+  upsertWithdrawn,
+  type WithdrawnApplication,
+  type WithdrawnStorageMode,
+} from "@/lib/storage/withdrawn";
+
+import {
+  loadOffers,
+  upsertOffer,
+  type OffersStorageMode,
+} from "@/lib/storage/offers";
+
+/**
+ * Global refresh event emitted by storage modules
+ */
+const COUNTS_EVENT = "job-tracker:refresh-counts";
 
 /**
  * Lightweight shapes for analytics
@@ -91,39 +111,6 @@ const tooltipStyle = {
   fontSize: 12,
   padding: "8px 10px",
 };
-
-/**
- * Safe localStorage read
- */
-function readList<T = AnyRecord>(key: string): T[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as T[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeList<T = AnyRecord>(key: string, list: T[]) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(key, JSON.stringify(list));
-  } catch (err) {
-    console.error("Failed to write list", key, err);
-  }
-}
-
-function pickApplicationsWriteKey() {
-  if (typeof window === "undefined") return APPLICATIONS_KEYS[0];
-  for (const k of APPLICATIONS_KEYS) {
-    const arr = readList(k);
-    if (arr.length > 0) return k;
-  }
-  return APPLICATIONS_KEYS[0];
-}
 
 /**
  * Parse date-like strings robustly.
@@ -351,13 +338,30 @@ function countAppliedInRange(
   return count;
 }
 
-/**
- * ID helper
- */
-function makeId() {
-  return typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : `${Date.now()}`;
+// ✅ UUID helper (valid uuid even without crypto.randomUUID)
+function makeUuidV4() {
+  const cryptoObj = globalThis.crypto as Crypto | undefined;
+  if (cryptoObj?.randomUUID) return cryptoObj.randomUUID();
+
+  const buf = new Uint8Array(16);
+  cryptoObj?.getRandomValues?.(buf);
+
+  if (!cryptoObj?.getRandomValues) {
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === "x" ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  }
+
+  buf[6] = (buf[6] & 0x0f) | 0x40;
+  buf[8] = (buf[8] & 0x3f) | 0x80;
+
+  const hex = [...buf].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(
+    12,
+    16
+  )}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 export default function StatsCard() {
@@ -375,56 +379,63 @@ export default function StatsCard() {
   const [openAddOffer, setOpenAddOffer] = useState(false);
   const [openAddNote, setOpenAddNote] = useState(false);
 
-  // Load all data on mount + react to storage changes
+  // ✅ one mode is enough (derived from auth)
+  const [mode, setMode] = useState<"guest" | "user">("guest");
+
+  // ✅ Load all data (guest via IDB/local mirror, user via Supabase)
+  // ✅ Refresh on auth changes + COUNTS_EVENT + focus/visibility
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const load = () => {
-      const a1 = readList(APPLICATIONS_KEYS[0]);
-      const a2 = readList(APPLICATIONS_KEYS[1]);
-      const appliedList = a1.length ? a1 : a2;
+    let alive = true;
+    const supabase = getSupabaseClient();
 
-      const interviewsList = readList(INTERVIEWS_STORAGE_KEY);
-      const rejectedList = readList(REJECTIONS_STORAGE_KEY);
-      const withdrawnList = readList(WITHDRAWN_STORAGE_KEY);
+    const loadAll = async () => {
+      try {
+        const [a, i, r, w, o] = await Promise.all([
+          loadApplied(),
+          loadInterviews(),
+          loadRejected(),
+          loadWithdrawn(),
+          loadOffers(),
+        ]);
 
-      const offersNew = readList<OfferReceivedJobLike>(
-        OFFERS_RECEIVED_STORAGE_KEY
-      );
-      const offersLegacy = readList<OfferReceivedJobLike>(
-        LEGACY_ACCEPTED_STORAGE_KEY
-      );
+        if (!alive) return;
 
-      const normalizedOffers = normalizeOffers(
-        offersNew.length > 0 ? offersNew : offersLegacy
-      );
+        // mode is consistent across buckets (same session)
+        setMode(a.mode);
 
-      setApplied(appliedList);
-      setInterviews(interviewsList);
-      setRejected(rejectedList);
-      setWithdrawn(withdrawnList);
-      setOffers(normalizedOffers);
+        setApplied(a.items as AnyRecord[]);
+        setInterviews(i.items as AnyRecord[]);
+        setRejected(r.items as AnyRecord[]);
+        setWithdrawn(w.items as AnyRecord[]);
+        setOffers(normalizeOffers(o.items as any) as OfferReceivedJobLike[]);
+      } catch (err) {
+        console.error("StatsCard: failed to load data:", err);
+      }
     };
 
-    load();
+    const refresh = () => void loadAll();
 
-    const onStorage = (e: StorageEvent) => {
-      if (!e.key) return;
+    refresh();
 
-      const watched = new Set<string>([
-        ...APPLICATIONS_KEYS,
-        INTERVIEWS_STORAGE_KEY,
-        REJECTIONS_STORAGE_KEY,
-        WITHDRAWN_STORAGE_KEY,
-        OFFERS_RECEIVED_STORAGE_KEY,
-        LEGACY_ACCEPTED_STORAGE_KEY,
-      ]);
+    window.addEventListener(COUNTS_EVENT, refresh);
+    window.addEventListener("focus", refresh);
 
-      if (watched.has(e.key)) load();
+    const onVis = () => {
+      if (!document.hidden) refresh();
     };
+    document.addEventListener("visibilitychange", onVis);
 
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    const { data: sub } = supabase.auth.onAuthStateChange(() => refresh());
+
+    return () => {
+      alive = false;
+      window.removeEventListener(COUNTS_EVENT, refresh);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", onVis);
+      sub?.subscription?.unsubscribe();
+    };
   }, []);
 
   const now = useMemo(() => new Date(), []);
@@ -523,82 +534,67 @@ export default function StatsCard() {
     };
   }, [now, applied, interviews, rejected, withdrawn, offers]);
 
-  // ✅ Save handlers for quick-add dialogs
+  // =========================
+  // ✅ QUICK ADD (persist via storage layer)
+  // =========================
 
-  const handleQuickSaveApplication = (data: NewApplicationForm) => {
-    const key = pickApplicationsWriteKey();
-    const existing = readList<AnyRecord>(key);
-
-    const item = {
-      id: makeId(),
-      ...data,
-      offerUrl: data.offerUrl,
-    };
-
-    writeList(key, [item, ...existing]);
-    setApplied([item, ...existing]);
+  const handleQuickSaveApplication = async (data: NewApplicationForm) => {
+    const item: AppliedApplication = { id: makeUuidV4(), ...data };
+    setApplied((prev) => [item as AnyRecord, ...prev]);
+    await upsertApplied(item, mode as AppliedStorageMode);
     setOpenAddApp(false);
   };
 
-  const handleQuickSaveRejected = (details: RejectionDetails) => {
-    const existing = readList<AnyRecord>(REJECTIONS_STORAGE_KEY);
-
-    const item = {
-      id: makeId(),
-      ...details,
-      appliedOn: details.appliedDate,
-      offerUrl: details.url,
-      contactPerson: details.contactName,
-      contactEmail: details.contactEmail,
-      contactPhone: details.contactPhone,
-    };
-
-    writeList(REJECTIONS_STORAGE_KEY, [item, ...existing]);
-    setRejected([item, ...existing]);
+  const handleQuickSaveInterview = async (created: Interview) => {
+    const item: StoredInterview = created as any;
+    setInterviews((prev) => [item as AnyRecord, ...prev]);
+    await upsertInterview(item, mode as InterviewsStorageMode);
+    setOpenAddInterview(false);
   };
 
-  const handleQuickSaveWithdrawn = (details: WithdrawnDetails) => {
-    const existing = readList<AnyRecord>(WITHDRAWN_STORAGE_KEY);
-
-    const item = {
-      id: makeId(),
-      ...details,
-      appliedOn: details.appliedDate,
-      offerUrl: details.url,
-      contactPerson: details.contactName,
-      contactEmail: details.contactEmail,
-      contactPhone: details.contactPhone,
-    };
-
-    writeList(WITHDRAWN_STORAGE_KEY, [item, ...existing]);
-    setWithdrawn([item, ...existing]);
+  const handleQuickSaveRejected = async (details: RejectionDetails) => {
+    const item: RejectedApplication = { id: makeUuidV4(), ...(details as any) } as any;
+    setRejected((prev) => [item as AnyRecord, ...prev]);
+    await upsertRejected(item, mode as RejectedStorageMode);
+    setOpenAddRejected(false);
   };
 
-  const handleQuickSaveOffer = (details: AcceptedDetails) => {
-    const existing = readList<OfferReceivedJobLike>(OFFERS_RECEIVED_STORAGE_KEY);
+  const handleQuickSaveWithdrawn = async (details: WithdrawnDetails) => {
+    const item: WithdrawnApplication = { id: makeUuidV4(), ...(details as any) } as any;
+    setWithdrawn((prev) => [item as AnyRecord, ...prev]);
+    await upsertWithdrawn(item, mode as WithdrawnStorageMode);
+    setOpenAddWithdrawn(false);
+  };
 
-    const item: OfferReceivedJobLike = normalizeOffers([
+  const handleQuickSaveOffer = async (details: AcceptedDetails) => {
+    const id = makeUuidV4();
+
+    const offerReceivedDate = details.offerReceivedDate ?? details.decisionDate;
+
+    const item = normalizeOffers([
       {
-        id: makeId(),
+        id,
         company: details.company,
         role: details.role,
         location: details.location,
         appliedOn: details.appliedOn,
         employmentType: details.employmentType,
-        offerReceivedDate: details.offerReceivedDate ?? details.decisionDate,
-        decisionDate: details.decisionDate,
+        offerReceivedDate,
+        decisionDate: offerReceivedDate,
         offerAcceptedDate: details.offerAcceptedDate,
+        offerDeclinedDate: undefined,
+        taken: Boolean(details.offerAcceptedDate),
         startDate: details.startDate,
         salary: details.salary,
         url: details.url,
         logoUrl: details.logoUrl,
         notes: details.notes,
-        taken: details.offerAcceptedDate ? true : undefined,
       },
     ])[0];
 
-    writeList(OFFERS_RECEIVED_STORAGE_KEY, [item, ...existing]);
-    setOffers([item, ...existing]);
+    setOffers((prev) => [item, ...prev]);
+    await upsertOffer(item as any, mode as OffersStorageMode);
+    setOpenAddOffer(false);
   };
 
   const quickActions = [
@@ -769,7 +765,6 @@ export default function StatsCard() {
                 </span>
               </div>
 
-              {/* ✅ Same height as the other chart */}
               <div className="mt-3 h-32">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={weeklyActivity} barSize={14}>
@@ -821,7 +816,6 @@ export default function StatsCard() {
                 </span>
               </div>
 
-              {/* ✅ Match height to bar chart */}
               <div className="mt-3 h-32">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={conversionOverTime}>
@@ -864,7 +858,6 @@ export default function StatsCard() {
               </div>
             </div>
           </div>
-
         </div>
       </section>
 
@@ -884,6 +877,7 @@ export default function StatsCard() {
         onClose={() => setOpenAddInterview(false)}
         application={null}
         mode="add"
+        onInterviewCreated={handleQuickSaveInterview}
       />
 
       <MoveToRejectedDialog

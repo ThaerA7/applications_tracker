@@ -10,8 +10,15 @@ import GoalSettingsDialog, {
   type OverviewGoalValues,
 } from "../dialogs/GoalSettingsDialog";
 
-const INTERVIEWS_STORAGE_KEY = "job-tracker:interviews";
-const OFFERS_RECEIVED_STORAGE_KEY = "job-tracker:offers-received";
+// ✅ Storage (guest: IDB/local mirror, user: Supabase)
+import { getSupabaseClient } from "@/lib/supabase/client";
+import { loadInterviews } from "@/lib/storage/interviews";
+import { loadOffers } from "@/lib/storage/offers";
+
+/**
+ * Global refresh event emitted by storage modules
+ */
+const COUNTS_EVENT = "job-tracker:refresh-counts";
 
 // settings for this card
 const GOALS_SETTINGS_KEY = "job-tracker:goals-settings";
@@ -51,7 +58,11 @@ function getTodayUtcMidnight(nowMs: number): number {
   return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
 }
 
-function isWithinLastDays(dateLike: string | undefined, nowMs: number, days: number) {
+function isWithinLastDays(
+  dateLike: string | undefined,
+  nowMs: number,
+  days: number
+) {
   const dayMs = parseToUtcMidnight(dateLike);
   if (dayMs == null) return false;
   const today = getTodayUtcMidnight(nowMs);
@@ -59,37 +70,7 @@ function isWithinLastDays(dateLike: string | undefined, nowMs: number, days: num
   return dayMs >= start && dayMs <= today;
 }
 
-// --- storage shapes (minimal) ---
-
-type StoredInterview = {
-  id: string;
-  company?: string;
-  role?: string;
-  location?: string;
-  date?: string; // ISO
-};
-
-type StoredOfferReceived = {
-  id: string;
-  company?: string;
-  role?: string;
-  offerReceivedDate?: string;
-  decisionDate?: string; // legacy-ish fallback
-};
-
-// --- load helpers ---
-
-function safeReadArray<T = any>(key: string): T[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
+// --- local settings helpers ---
 
 function loadSettings(): GoalsSettings {
   if (typeof window === "undefined") return DEFAULT_SETTINGS;
@@ -100,19 +81,24 @@ function loadSettings(): GoalsSettings {
 
     const next: GoalsSettings = {
       interviews: {
-        target: Number(parsed?.interviews?.target) || DEFAULT_SETTINGS.interviews.target,
+        target:
+          Number(parsed?.interviews?.target) || DEFAULT_SETTINGS.interviews.target,
         periodDays:
-          Number(parsed?.interviews?.periodDays) || DEFAULT_SETTINGS.interviews.periodDays,
+          Number(parsed?.interviews?.periodDays) ||
+          DEFAULT_SETTINGS.interviews.periodDays,
       },
       offers: {
         target: Number(parsed?.offers?.target) || DEFAULT_SETTINGS.offers.target,
-        periodDays: Number(parsed?.offers?.periodDays) || DEFAULT_SETTINGS.offers.periodDays,
+        periodDays:
+          Number(parsed?.offers?.periodDays) || DEFAULT_SETTINGS.offers.periodDays,
       },
       overview: {
         weeklyTarget:
-          Number(parsed?.overview?.weeklyTarget) || DEFAULT_SETTINGS.overview.weeklyTarget,
+          Number(parsed?.overview?.weeklyTarget) ||
+          DEFAULT_SETTINGS.overview.weeklyTarget,
         monthlyTarget:
-          Number(parsed?.overview?.monthlyTarget) || DEFAULT_SETTINGS.overview.monthlyTarget,
+          Number(parsed?.overview?.monthlyTarget) ||
+          DEFAULT_SETTINGS.overview.monthlyTarget,
       },
     };
 
@@ -131,22 +117,17 @@ function persistSettings(next: GoalsSettings) {
   }
 }
 
-// --- counting logic ---
+// --- minimal shapes for counting ---
 
-function countInterviewsInLastDays(days: number, nowMs: number) {
-  const list = safeReadArray<StoredInterview>(INTERVIEWS_STORAGE_KEY);
-  return list.filter((i) => isWithinLastDays(i.date, nowMs, days)).length;
-}
-
-function countOffersReceivedInLastDays(days: number, nowMs: number) {
-  const list = safeReadArray<StoredOfferReceived>(OFFERS_RECEIVED_STORAGE_KEY);
-  return list.filter((o) =>
-    isWithinLastDays(o.offerReceivedDate ?? o.decisionDate, nowMs, days)
-  ).length;
-}
+type InterviewLike = { date?: string };
+type OfferLike = { offerReceivedDate?: string; decisionDate?: string };
 
 export default function GoalsCard() {
   const [settings, setSettings] = useState<GoalsSettings>(DEFAULT_SETTINGS);
+
+  // storage-backed lists
+  const [interviews, setInterviews] = useState<InterviewLike[]>([]);
+  const [offers, setOffers] = useState<OfferLike[]>([]);
 
   // counts
   const [nowMs, setNowMs] = useState<number | null>(null);
@@ -177,21 +158,75 @@ export default function GoalsCard() {
     return () => window.clearInterval(id);
   }, []);
 
-  // recompute counts when time or settings change
+  // ✅ load interviews/offers from storage (guest IDB/local mirror, user Supabase)
+  // ✅ refresh on COUNTS_EVENT + focus/visibility + auth changes
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    let alive = true;
+    const supabase = getSupabaseClient();
+
+    const loadAll = async () => {
+      try {
+        const [i, o] = await Promise.all([loadInterviews(), loadOffers()]);
+        if (!alive) return;
+
+        setInterviews((i.items as any[]) ?? []);
+        setOffers((o.items as any[]) ?? []);
+      } catch (err) {
+        console.error("GoalsCard: failed to load data:", err);
+      }
+    };
+
+    const refresh = () => void loadAll();
+
+    refresh();
+
+    window.addEventListener(COUNTS_EVENT, refresh);
+    window.addEventListener("focus", refresh);
+
+    const onVis = () => {
+      if (!document.hidden) refresh();
+    };
+    document.addEventListener("visibilitychange", onVis);
+
+    const { data: sub } = supabase.auth.onAuthStateChange(() => refresh());
+
+    return () => {
+      alive = false;
+      window.removeEventListener(COUNTS_EVENT, refresh);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", onVis);
+      sub?.subscription?.unsubscribe();
+    };
+  }, []);
+
+  // recompute counts when time, settings, or storage lists change
   useEffect(() => {
     if (!nowMs) return;
 
-    const iCount = countInterviewsInLastDays(settings.interviews.periodDays, nowMs);
-    const oCount = countOffersReceivedInLastDays(settings.offers.periodDays, nowMs);
+    const iCount = interviews.filter((i) =>
+      isWithinLastDays(i.date, nowMs, settings.interviews.periodDays)
+    ).length;
 
-    const wCount = countInterviewsInLastDays(7, nowMs);
-    const mCount = countInterviewsInLastDays(30, nowMs);
+    const oCount = offers.filter((o) =>
+      isWithinLastDays(o.offerReceivedDate ?? o.decisionDate, nowMs, settings.offers.periodDays)
+    ).length;
+
+    const wCount = interviews.filter((i) => isWithinLastDays(i.date, nowMs, 7)).length;
+    const mCount = interviews.filter((i) => isWithinLastDays(i.date, nowMs, 30)).length;
 
     setInterviewsCount(iCount);
     setOffersCount(oCount);
     setWeeklyCount(wCount);
     setMonthlyCount(mCount);
-  }, [nowMs, settings.interviews.periodDays, settings.offers.periodDays]);
+  }, [
+    nowMs,
+    settings.interviews.periodDays,
+    settings.offers.periodDays,
+    interviews,
+    offers,
+  ]);
 
   // top cards definition (2 cards only)
   const topGoals = useMemo(() => {
@@ -202,7 +237,6 @@ export default function GoalsCard() {
         current: interviewsCount,
         target: settings.interviews.target,
         periodDays: settings.interviews.periodDays,
-        // was: from-sky-500 to-cyan-400
         accent: "from-indigo-500 to-sky-400",
         hint: "Counted by interview date",
       },
@@ -212,13 +246,11 @@ export default function GoalsCard() {
         current: offersCount,
         target: settings.offers.target,
         periodDays: settings.offers.periodDays,
-        // was: from-amber-500 to-orange-400
         accent: "from-emerald-500 to-teal-400",
         hint: "Counted by offer received date",
       },
     ];
   }, [interviewsCount, offersCount, settings]);
-
 
   const openSingleSettings = (key: SingleGoalKey) => {
     setSettingsKey(key);
@@ -270,8 +302,9 @@ export default function GoalsCard() {
     1
   );
 
-  const streakBadge = `Nice! You scheduled ${weeklyCount} interview${weeklyCount === 1 ? "" : "s"
-    } this week 🎉`;
+  const streakBadge = `Nice! You scheduled ${weeklyCount} interview${
+    weeklyCount === 1 ? "" : "s"
+  } this week 🎉`;
 
   return (
     <>
@@ -283,8 +316,8 @@ export default function GoalsCard() {
           settingsMode === "overview"
             ? "Set weekly & monthly goals"
             : settingsKey === "offers"
-              ? "Set offers goal"
-              : "Set interviews goal"
+            ? "Set offers goal"
+            : "Set interviews goal"
         }
         description={
           settingsMode === "overview"
@@ -294,15 +327,15 @@ export default function GoalsCard() {
         initialValues={
           settingsMode === "overview"
             ? {
-              weeklyTarget: settings.overview.weeklyTarget,
-              monthlyTarget: settings.overview.monthlyTarget,
-            }
+                weeklyTarget: settings.overview.weeklyTarget,
+                monthlyTarget: settings.overview.monthlyTarget,
+              }
             : settingsKey === "offers"
-              ? {
+            ? {
                 target: settings.offers.target,
                 periodDays: settings.offers.periodDays,
               }
-              : {
+            : {
                 target: settings.interviews.target,
                 periodDays: settings.interviews.periodDays,
               }
@@ -320,16 +353,13 @@ export default function GoalsCard() {
       <section
         className={[
           "relative overflow-hidden rounded-2xl border border-neutral-200/70",
-          // was: from-amber-50 via-white to-sky-50
           "bg-gradient-to-br from-indigo-50 via-white to-emerald-50",
           "p-6 sm:p-7 shadow-md",
         ].join(" ")}
       >
         {/* blobs */}
-        {/* was amber + sky */}
         <div className="pointer-events-none absolute -top-24 -left-24 h-64 w-64 rounded-full bg-indigo-400/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 -right-24 h-64 w-64 rounded-full bg-emerald-400/20 blur-3xl" />
-
 
         <div className="relative z-10 space-y-5">
           {/* Header + streak */}
@@ -351,13 +381,8 @@ export default function GoalsCard() {
                   <Flame className="h-3.5 w-3.5" />
                 </span>
                 <div className="space-y-0.5">
-                  {/* We keep a friendly “streak” feel, but tie the badge to real weekly data */}
-                  <p className="font-semibold text-neutral-900">
-                    Weekly momentum
-                  </p>
-                  <p className="text-[11px] text-neutral-600">
-                    {streakBadge}
-                  </p>
+                  <p className="font-semibold text-neutral-900">Weekly momentum</p>
+                  <p className="text-[11px] text-neutral-600">{streakBadge}</p>
                 </div>
               </div>
             </div>
@@ -367,10 +392,7 @@ export default function GoalsCard() {
           <div className="space-y-4">
             <div className="grid gap-3 md:grid-cols-2">
               {topGoals.map((goal) => {
-                const ratio = Math.min(
-                  goal.current / Math.max(goal.target, 1),
-                  1
-                );
+                const ratio = Math.min(goal.current / Math.max(goal.target, 1), 1);
                 const pct = Math.round(
                   (goal.current / Math.max(goal.target, 1)) * 100
                 );
@@ -386,8 +408,8 @@ export default function GoalsCard() {
                           {goal.label}
                         </p>
                         <p className="mt-0.5 text-[11px] text-neutral-500">
-                          Last {goal.periodDays} day{goal.periodDays === 1 ? "" : "s"} •{" "}
-                          {goal.hint}
+                          Last {goal.periodDays} day
+                          {goal.periodDays === 1 ? "" : "s"} • {goal.hint}
                         </p>
                       </div>
 
@@ -426,7 +448,7 @@ export default function GoalsCard() {
               })}
             </div>
 
-            {/* Weekly + Monthly goal bars (structure stays, now user-set targets) */}
+            {/* Weekly + Monthly goal bars */}
             <div className="relative rounded-xl border border-neutral-200 bg-white/90 p-4 shadow-sm backdrop-blur">
               <div className="flex items-center justify-between gap-2">
                 <div>
