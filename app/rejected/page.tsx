@@ -22,6 +22,7 @@ import {
   loadRejected,
   upsertRejected,
   deleteRejected,
+  migrateGuestRejectedToUser,
   type RejectedStorageMode,
 } from "@/lib/storage/rejected";
 
@@ -114,6 +115,7 @@ export default function RejectedPage() {
       if (event === "SIGNED_IN" && session?.user) {
         setTimeout(async () => {
           if (!alive) return;
+          await migrateGuestRejectedToUser();
           await migrateGuestActivityToUser(); // ✅ migrates rejected activity too
           await loadAll();
         }, 0);

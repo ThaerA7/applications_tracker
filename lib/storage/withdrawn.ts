@@ -7,7 +7,6 @@ import type { WithdrawnRecord } from "@/app/withdrawn/WithdrawnCard";
 export type WithdrawnApplication = WithdrawnRecord;
 export type WithdrawnStorageMode = "guest" | "user";
 
-const GUEST_LOCAL_KEY = "job-tracker:withdrawn";
 const GUEST_IDB_KEY = "withdrawn";
 
 const TABLE = "applications";
@@ -27,50 +26,29 @@ function isObject(v: any) {
 
 function safeParseList(raw: any): WithdrawnApplication[] {
   if (!Array.isArray(raw)) return [];
-  return raw.filter(
-    (x) => isObject(x) && typeof x.id === "string"
-  ) as WithdrawnApplication[];
+  return raw.filter((x) => isObject(x) && typeof x.id === "string") as WithdrawnApplication[];
 }
 
-// ---------- guest storage ----------
+// ---------- guest storage (IndexedDB ONLY) ----------
 
 async function loadGuestWithdrawn(): Promise<WithdrawnApplication[]> {
-  // Prefer IDB
   try {
     const idb = await idbGet<WithdrawnApplication[]>(GUEST_IDB_KEY);
-    if (idb) return safeParseList(idb);
-  } catch {}
-
-  // Fallback localStorage
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(GUEST_LOCAL_KEY);
-    return safeParseList(raw ? JSON.parse(raw) : []);
+    return safeParseList(idb ?? []);
   } catch {
     return [];
   }
 }
 
 async function saveGuestWithdrawn(list: WithdrawnApplication[]) {
-  // Try IDB
   try {
     await idbSet(GUEST_IDB_KEY, list);
-  } catch {}
-
-  // Also mirror to localStorage (cheap backup)
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(GUEST_LOCAL_KEY, JSON.stringify(list));
   } catch {}
 }
 
 async function clearGuestWithdrawn() {
   try {
     await idbDel(GUEST_IDB_KEY);
-  } catch {}
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.removeItem(GUEST_LOCAL_KEY);
   } catch {}
 }
 
@@ -90,8 +68,10 @@ async function loadUserWithdrawn(): Promise<WithdrawnApplication[]> {
     return [];
   }
 
-  const mapped = (data ?? []).map((row: any) => ({ ...(row.data ?? {}), id: row.id }),
-  );
+  const mapped = (data ?? []).map((row: any) => ({
+    ...(row.data ?? {}),
+    id: row.id,
+  }));
 
   return safeParseList(mapped);
 }
@@ -118,11 +98,7 @@ async function upsertUserWithdrawn(app: WithdrawnApplication) {
 async function deleteUserWithdrawn(id: string) {
   const supabase = getSupabaseClient();
 
-  const { error } = await supabase
-    .from(TABLE)
-    .delete()
-    .eq("id", id)
-    .eq("bucket", BUCKET);
+  const { error } = await supabase.from(TABLE).delete().eq("id", id).eq("bucket", BUCKET);
 
   if (error) {
     console.error("Failed to delete withdrawn in Supabase:", error.message);
@@ -144,35 +120,24 @@ export async function loadWithdrawn(): Promise<{
   items: WithdrawnApplication[];
 }> {
   const mode = await detectWithdrawnMode();
-  const items =
-    mode === "user" ? await loadUserWithdrawn() : await loadGuestWithdrawn();
+  const items = mode === "user" ? await loadUserWithdrawn() : await loadGuestWithdrawn();
   return { mode, items };
 }
 
-export async function upsertWithdrawn(
-  app: WithdrawnApplication,
-  mode: WithdrawnStorageMode
-) {
+export async function upsertWithdrawn(app: WithdrawnApplication, mode: WithdrawnStorageMode) {
   if (mode === "user") {
     await upsertUserWithdrawn(app);
   } else {
     const prev = await loadGuestWithdrawn();
     const idx = prev.findIndex((x) => x.id === app.id);
-    const next =
-      idx === -1
-        ? [app, ...prev]
-        : prev.map((x) => (x.id === app.id ? app : x));
-
+    const next = idx === -1 ? [app, ...prev] : prev.map((x) => (x.id === app.id ? app : x));
     await saveGuestWithdrawn(next);
   }
 
   notifyCountsChanged();
 }
 
-export async function deleteWithdrawn(
-  id: string,
-  mode: WithdrawnStorageMode
-) {
+export async function deleteWithdrawn(id: string, mode: WithdrawnStorageMode) {
   if (mode === "user") {
     await deleteUserWithdrawn(id);
   } else {
@@ -186,7 +151,7 @@ export async function deleteWithdrawn(
 
 /**
  * When a user signs in, move guest Withdrawn data into Supabase.
- * This prevents data loss while keeping server as source of truth.
+ * Guest source is IndexedDB ONLY.
  */
 export async function migrateGuestWithdrawnToUser() {
   const supabase = getSupabaseClient();
@@ -202,15 +167,10 @@ export async function migrateGuestWithdrawnToUser() {
     data: app,
   }));
 
-  const { error } = await supabase.from(TABLE).upsert(payload, {
-    onConflict: "id",
-  });
+  const { error } = await supabase.from(TABLE).upsert(payload, { onConflict: "id" });
 
   if (error) {
-    console.error(
-      "Guest → user withdrawn migration failed:",
-      error.message
-    );
+    console.error("Guest → user withdrawn migration failed:", error.message);
     return;
   }
 

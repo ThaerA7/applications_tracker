@@ -17,6 +17,7 @@ import {
   loadWithdrawn,
   upsertWithdrawn,
   deleteWithdrawn,
+  migrateGuestWithdrawnToUser,
   type WithdrawnStorageMode,
 } from "@/lib/storage/withdrawn";
 
@@ -118,6 +119,7 @@ export default function WithdrawnPage() {
       if (event === "SIGNED_IN" && session?.user) {
         setTimeout(async () => {
           if (!alive) return;
+          await migrateGuestWithdrawnToUser();
           await migrateGuestActivityToUser(); // ✅ migrates withdrawn activity too
           await loadAll();
         }, 0);

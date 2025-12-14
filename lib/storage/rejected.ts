@@ -35,43 +35,29 @@ function safeParseList(raw: any): RejectedApplication[] {
 // ---------- guest storage ----------
 
 async function loadGuestRejected(): Promise<RejectedApplication[]> {
-  // Prefer IDB
+  
   try {
     const idb = await idbGet<RejectedApplication[]>(GUEST_IDB_KEY);
     if (idb) return safeParseList(idb);
   } catch {}
 
-  // Fallback localStorage
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(GUEST_LOCAL_KEY);
-    return safeParseList(raw ? JSON.parse(raw) : []);
-  } catch {
+ 
     return [];
-  }
+
 }
 
 async function saveGuestRejected(list: RejectedApplication[]) {
-  // Try IDB
   try {
     await idbSet(GUEST_IDB_KEY, list);
   } catch {}
 
-  // Also mirror to localStorage (cheap backup)
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(GUEST_LOCAL_KEY, JSON.stringify(list));
-  } catch {}
 }
 
 async function clearGuestRejected() {
   try {
     await idbDel(GUEST_IDB_KEY);
   } catch {}
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.removeItem(GUEST_LOCAL_KEY);
-  } catch {}
+ 
 }
 
 // ---------- user storage (Supabase) ----------

@@ -23,8 +23,7 @@ export type WishlistStorageMode = "guest" | "user";
 const BUCKET = "wishlist";
 const TABLE = "applications";
 
-// keep same guest key you already use
-const GUEST_LOCAL_KEY = "job-wishlist-v1";
+// ✅ IndexedDB-only guest key
 const GUEST_IDB_KEY = "wishlist-v1";
 
 // sidebar refresh event (same pattern as offers)
@@ -56,7 +55,12 @@ function isObject(v: any) {
 function safeParseList(raw: any): WishlistItem[] {
   if (!Array.isArray(raw)) return [];
   return raw
-    .filter((x) => isObject(x) && typeof x.company === "string" && typeof x.id === "string")
+    .filter(
+      (x) =>
+        isObject(x) &&
+        typeof x.company === "string" &&
+        typeof x.id === "string"
+    )
     .map((x) => x as WishlistItem);
 }
 
@@ -90,29 +94,17 @@ export async function detectWishlistMode(): Promise<WishlistStorageMode> {
   return data.session?.user ? "user" : "guest";
 }
 
-/* ---------------- guest ---------------- */
+/* ---------------- guest (IndexedDB ONLY) ---------------- */
 
 async function loadGuestWishlist(): Promise<WishlistItem[]> {
-  // Prefer IDB
   try {
     const idb = await idbGet<WishlistItem[]>(GUEST_IDB_KEY);
-    if (idb) {
-      const parsed = safeParseList(idb);
-      const { next, changed } = normalizeWishlist(parsed);
-      if (changed) await saveGuestWishlist(next);
-      return next;
-    }
-  } catch {}
-
-  // Fallback localStorage
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(GUEST_LOCAL_KEY);
-    const parsed = safeParseList(raw ? JSON.parse(raw) : []);
+    const parsed = safeParseList(idb ?? []);
     const { next, changed } = normalizeWishlist(parsed);
     if (changed) await saveGuestWishlist(next);
     return next;
   } catch {
+    // No fallback storage (localStorage removed by request)
     return [];
   }
 }
@@ -120,22 +112,17 @@ async function loadGuestWishlist(): Promise<WishlistItem[]> {
 async function saveGuestWishlist(list: WishlistItem[]) {
   try {
     await idbSet(GUEST_IDB_KEY, list);
-  } catch {}
-
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(GUEST_LOCAL_KEY, JSON.stringify(list));
-  } catch {}
+  } catch {
+    // No fallback storage (localStorage removed by request)
+  }
 }
 
 async function clearGuestWishlist() {
   try {
     await idbDel(GUEST_IDB_KEY);
-  } catch {}
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.removeItem(GUEST_LOCAL_KEY);
-  } catch {}
+  } catch {
+    // No fallback storage (localStorage removed by request)
+  }
 }
 
 /* ---------------- user (Supabase) ---------------- */
@@ -154,14 +141,12 @@ async function loadUserWishlist(): Promise<WishlistItem[]> {
     return [];
   }
 
-  const mapped = (data ?? []).map((row: any) => ({ ...(row.data ?? {}), id: row.id }),
-  );
+  const mapped = (data ?? []).map((row: any) => ({
+    ...(row.data ?? {}),
+    id: row.id,
+  }));
 
-  // data.id may exist; prefer row.id
-  const parsed = safeParseList(
-    mapped.map((m) => ({ ...m, id: String(m.id) }))
-  );
-
+  const parsed = safeParseList(mapped.map((m) => ({ ...m, id: String(m.id) })));
   return parsed;
 }
 
@@ -203,7 +188,8 @@ export async function loadWishlist(): Promise<{
   items: WishlistItem[];
 }> {
   const mode = await detectWishlistMode();
-  const items = mode === "user" ? await loadUserWishlist() : await loadGuestWishlist();
+  const items =
+    mode === "user" ? await loadUserWishlist() : await loadGuestWishlist();
   return { mode, items };
 }
 
@@ -221,7 +207,10 @@ export async function upsertWishlistItem(
   } else {
     const prev = await loadGuestWishlist();
     const idx = prev.findIndex((x) => x.id === item.id);
-    const next = idx === -1 ? [item, ...prev] : prev.map((x) => (x.id === item.id ? item : x));
+    const next =
+      idx === -1
+        ? [item, ...prev]
+        : prev.map((x) => (x.id === item.id ? item : x));
     await saveGuestWishlist(next);
   }
 
@@ -257,7 +246,9 @@ export async function migrateGuestWishlistToUser() {
     data: w,
   }));
 
-  const { error } = await supabase.from(TABLE).upsert(payload, { onConflict: "id" });
+  const { error } = await supabase
+    .from(TABLE)
+    .upsert(payload, { onConflict: "id" });
 
   if (error) {
     console.error("Guest → user wishlist migration failed:", error.message);

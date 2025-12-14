@@ -12,7 +12,6 @@ export type AppliedApplication = {
 
 export type AppliedStorageMode = "guest" | "user";
 
-const GUEST_LOCAL_KEY = "job-tracker:applied";
 const GUEST_IDB_KEY = "applied";
 
 const TABLE = "applications";
@@ -38,42 +37,25 @@ function safeParseList(raw: any): AppliedApplication[] {
 // ---------- guest storage ----------
 
 async function loadGuestApplied(): Promise<AppliedApplication[]> {
-  // Prefer IDB
   try {
     const idb = await idbGet<AppliedApplication[]>(GUEST_IDB_KEY);
-    if (idb) return safeParseList(idb);
+    return safeParseList(idb ?? []);
   } catch {}
 
-  // Fallback localStorage
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(GUEST_LOCAL_KEY);
-    return safeParseList(raw ? JSON.parse(raw) : []);
-  } catch {
+  
     return [];
-  }
+  
 }
 
 async function saveGuestApplied(list: AppliedApplication[]) {
-  // Try IDB
   try {
     await idbSet(GUEST_IDB_KEY, list);
-  } catch {}
-
-  // Also mirror to localStorage (cheap backup)
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(GUEST_LOCAL_KEY, JSON.stringify(list));
   } catch {}
 }
 
 async function clearGuestApplied() {
   try {
     await idbDel(GUEST_IDB_KEY);
-  } catch {}
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.removeItem(GUEST_LOCAL_KEY);
   } catch {}
 }
 

@@ -7,7 +7,6 @@ import type { OfferReceivedJob } from "@/app/offers-received/OffersReceivedCards
 
 export type OffersStorageMode = "guest" | "user";
 
-const GUEST_LOCAL_KEY = "job-tracker:offers-received";
 const GUEST_IDB_KEY = "offers-received";
 
 const TABLE = "applications";
@@ -53,43 +52,29 @@ function ensureUuid(id: string): string {
 // ---------- guest storage ----------
 
 async function loadGuestOffers(): Promise<OfferReceivedJob[]> {
-  // Prefer IDB
   try {
     const idb = await idbGet<OfferReceivedJob[]>(GUEST_IDB_KEY);
-    if (idb) return safeParseList(idb);
+    return safeParseList(idb ?? []);
   } catch {}
 
-  // Fallback localStorage
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(GUEST_LOCAL_KEY);
-    return safeParseList(raw ? JSON.parse(raw) : []);
-  } catch {
+  
     return [];
-  }
+  
 }
 
 async function saveGuestOffers(list: OfferReceivedJob[]) {
-  // Try IDB
   try {
     await idbSet(GUEST_IDB_KEY, list);
   } catch {}
 
-  // Mirror to localStorage as cheap backup
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(GUEST_LOCAL_KEY, JSON.stringify(list));
-  } catch {}
+  
 }
 
 async function clearGuestOffers() {
   try {
     await idbDel(GUEST_IDB_KEY);
   } catch {}
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.removeItem(GUEST_LOCAL_KEY);
-  } catch {}
+  
 }
 
 // ---------- user storage (Supabase) ----------

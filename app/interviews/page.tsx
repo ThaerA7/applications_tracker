@@ -31,6 +31,9 @@ import type { AcceptedDetails } from "../../components/dialogs/MoveToAcceptedDia
 
 import InterviewCard, { type InterviewWithStage } from "./InterviewCard";
 import { animateCardExit } from "../../components/dialogs/cardExitAnimation";
+import { upsertRejected, detectRejectedMode } from "@/lib/storage/rejected";
+import { upsertWithdrawn, detectWithdrawnMode } from "@/lib/storage/withdrawn";
+import { upsertOffer, detectOffersMode } from "@/lib/storage/offers";
 
 import ActivityLogSidebar from "@/components/ActivityLogSidebar";
 
@@ -59,10 +62,9 @@ import {
   type ActivityVariant,
   type ActivityStorageMode,
 } from "@/lib/storage/activity";
+import { OfferReceivedJob } from "../offers-received/OffersReceivedCards";
 
-const REJECTIONS_STORAGE_KEY = "job-tracker:rejected";
-const WITHDRAWN_STORAGE_KEY = "job-tracker:withdrawn";
-const ACCEPTED_STORAGE_KEY = "job-tracker:accepted";
+
 
 type ApplicationLike = ComponentProps<typeof ScheduleInterviewDialog>["application"];
 type MoveDialogApplication = ComponentProps<typeof MoveApplicationDialog>["application"];
@@ -224,9 +226,16 @@ function inferStageFromDate(iso: string | undefined | null): InterviewStage {
 }
 
 function ensureInterviewStage(interview: Interview | InterviewWithStage): InterviewWithStage {
-  const withAnyStage = interview as InterviewWithStage;
-  if (withAnyStage.stage) return withAnyStage;
-  return { ...interview, stage: inferStageFromDate((interview as Interview).date) };
+  const withStage = interview as InterviewWithStage;
+
+  // ✅ keep "done" as a manual state
+  if (withStage.stage === "done") return withStage;
+
+  // ✅ always derive past/upcoming from date (prevents stale stage)
+  return {
+    ...withStage,
+    stage: inferStageFromDate((interview as Interview).date),
+  };
 }
 
 // ✅ UUID helper (valid uuid even without crypto.randomUUID)
@@ -500,21 +509,8 @@ export default function InterviewsPage() {
     const source = moveTargetInterview;
     let newItem: RejectionRecord | null = null;
 
-    // 1) Append to rejected storage (still local for cards)
-    if (typeof window !== "undefined") {
-      try {
-        const raw = window.localStorage.getItem(REJECTIONS_STORAGE_KEY);
-        const parsed = raw ? JSON.parse(raw) : [];
-        const prev: RejectionRecord[] = Array.isArray(parsed) ? parsed : [];
-
-        newItem = { id: makeUuidV4(), ...details };
-
-        const nextRejected = [...prev, newItem];
-        window.localStorage.setItem(REJECTIONS_STORAGE_KEY, JSON.stringify(nextRejected));
-      } catch (err) {
-        console.error("Failed to persist rejected application from interview", err);
-      }
-    }
+    newItem = { id: makeUuidV4(), ...details };
+    await upsertRejected(newItem as any, await detectRejectedMode());
 
     // 1b) Log into Rejected activity (persistent)
     if (newItem && source) {
@@ -569,38 +565,25 @@ export default function InterviewsPage() {
 
     let newItem: WithdrawnRecord | null = null;
 
-    // 1) Append to withdrawn storage (still local for cards)
-    if (typeof window !== "undefined") {
-      try {
-        const raw = window.localStorage.getItem(WITHDRAWN_STORAGE_KEY);
-        const parsed = raw ? JSON.parse(raw) : [];
-        const prev: WithdrawnRecord[] = Array.isArray(parsed) ? parsed : [];
-
-        newItem = {
-          id: makeUuidV4(),
-          company: details.company || source.company,
-          role: details.role || source.role,
-          location: details.location || source.location,
-          appliedOn: details.appliedDate || source.appliedOn,
-          employmentType: details.employmentType || source.employmentType,
-          contactName: details.contactName || source.contact?.name,
-          contactEmail: details.contactEmail || source.contact?.email,
-          contactPhone: details.contactPhone || source.contact?.phone,
-          url: details.url || source.url,
-          logoUrl: details.logoUrl || source.logoUrl,
-          interviewDate: source.date,
-          interviewType: source.type,
-          notes: details.notes || source.notes,
-          withdrawnDate: details.withdrawnDate,
-          withdrawnReason: details.reason,
-        };
-
-        const nextWithdrawn = [...prev, newItem];
-        window.localStorage.setItem(WITHDRAWN_STORAGE_KEY, JSON.stringify(nextWithdrawn));
-      } catch (err) {
-        console.error("Failed to persist withdrawn application from interview", err);
-      }
-    }
+    newItem = {
+ id: makeUuidV4(),
+ company: details.company || source.company,
+ role: details.role || source.role,
+ location: details.location || source.location,
+ appliedOn: details.appliedDate || source.appliedOn,
+ employmentType: details.employmentType || source.employmentType,
+ contactName: details.contactName || source.contact?.name,
+ contactEmail: details.contactEmail || source.contact?.email,
+ contactPhone: details.contactPhone || source.contact?.phone,
+ url: details.url || source.url,
+ logoUrl: details.logoUrl || source.logoUrl,
+ interviewDate: source.date,
+ interviewType: source.type,
+ notes: details.notes || source.notes,
+ withdrawnDate: details.withdrawnDate,
+ withdrawnReason: details.reason,
+    };
+    await upsertWithdrawn(newItem as any, await detectWithdrawnMode());
 
     // 1b) Log into Withdrawn activity (persistent)
     if (newItem) {
@@ -646,55 +629,50 @@ export default function InterviewsPage() {
       return;
     }
 
-    let newItem: AcceptedRecord | null = null;
+    const newId = makeUuidV4();
+   const offerReceived = details.offerReceivedDate ?? details.decisionDate ?? source.appliedOn;
+   const offerAccepted = details.offerAcceptedDate ?? undefined;
 
-    // 1) Append to accepted storage (cards)
-    if (typeof window !== "undefined") {
-      try {
-        const raw = window.localStorage.getItem(ACCEPTED_STORAGE_KEY);
-        const parsed = raw ? JSON.parse(raw) : [];
-        const prev: AcceptedRecord[] = Array.isArray(parsed) ? parsed : [];
+   const newOffer: OfferReceivedJob = {
+id: newId,
+company: details.company || source.company,
+role: details.role || source.role,
+location: details.location || source.location,
+appliedOn: details.appliedOn || source.appliedOn,
+employmentType: details.employmentType || source.employmentType,
+url: details.url || source.url,
+logoUrl: details.logoUrl || source.logoUrl,
+notes: details.notes || source.notes,
+startDate: details.startDate,
+salary: details.salary,
+offerReceivedDate: offerReceived,
+decisionDate: offerReceived,
+offerAcceptedDate: offerAccepted,
+offerDeclinedDate: undefined,
+taken: Boolean(offerAccepted),
+   };
 
-        newItem = {
-          id: makeUuidV4(),
-          company: details.company || source.company,
-          role: details.role || source.role,
-          location: details.location || source.location,
-          appliedOn: details.appliedOn || source.appliedOn,
-          employmentType: details.employmentType || source.employmentType,
-          decisionDate: details.decisionDate,
-          startDate: details.startDate,
-          salary: details.salary,
-          url: details.url || source.url,
-          logoUrl: details.logoUrl || source.logoUrl,
-          notes: details.notes || source.notes,
-        };
-
-        const nextAccepted = [...prev, newItem];
-        window.localStorage.setItem(ACCEPTED_STORAGE_KEY, JSON.stringify(nextAccepted));
-      } catch (err) {
-        console.error("Failed to persist accepted application from interview", err);
-      }
-    }
+  await upsertOffer(newOffer, await detectOffersMode());
 
     // ✅ 1b) Log into Offers activity (persistent) as "OFFER ACCEPTED"
     // (Offers sidebar reads `type=edited` + `toStatus=accepted`)
-    if (newItem) {
+     {
       await logActivity(
         "offers" as ActivityVariant,
         "edited",
         source,
         {
-          company: newItem.company,
-          role: newItem.role,
-          location: newItem.location,
-          appliedOn: newItem.appliedOn,
+          company: newOffer.company,
+         role: newOffer.role,
+         location: newOffer.location,
+         appliedOn: newOffer.appliedOn,
           toStatus: "accepted",
           fromStatus: "Interview",
-          note: newItem.notes,
-          offerAcceptedDate: newItem.decisionDate,
+          note: newOffer.notes,
+         offerAcceptedDate: newOffer.offerAcceptedDate,
+         offerReceivedDate: newOffer.offerReceivedDate,
         },
-        newItem.id
+        newOffer.id
       );
     }
 

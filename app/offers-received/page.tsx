@@ -36,6 +36,7 @@ import {
   loadOffers,
   upsertOffer,
   deleteOffer,
+  migrateGuestOffersToUser,
   type OffersStorageMode,
 } from "@/lib/storage/offers";
 
@@ -222,10 +223,7 @@ export default function OffersReceivedPage() {
           const normalizedDemo = normalizeOffers(DEMO_OFFERS_RECEIVED);
           setItems(normalizedDemo);
 
-          // guests: persist demo via upsertOffer (guest path uses IDB/localStorage)
-          for (const offer of normalizedDemo) {
-            void upsertOffer(offer, mode);
-          }
+          
         } else {
           setItems(normalizeOffers(items));
         }
@@ -246,6 +244,7 @@ export default function OffersReceivedPage() {
       if (event === "SIGNED_IN" && session?.user) {
         setTimeout(async () => {
           if (!alive) return;
+          await migrateGuestOffersToUser(); 
           await migrateGuestActivityToUser(); // ✅ migrate all variants (including offers)
           await loadAll();
         }, 0);

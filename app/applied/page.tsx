@@ -16,13 +16,20 @@ import ApplicationCard, { type Application } from './ApplicationCard';
 import ActivityLogSidebar from '@/components/ActivityLogSidebar';
 
 import { getSupabaseClient } from '@/lib/supabase/client';
+ import {
+   loadApplied,
+   upsertApplied,
+   deleteApplied,
+   migrateGuestAppliedToUser,
+   type AppliedStorageMode,
+ } from '@/lib/storage/applied';
 import {
-  loadApplied,
-  upsertApplied,
-  deleteApplied,
-  migrateGuestAppliedToUser,
-  type AppliedStorageMode,
-} from '@/lib/storage/applied';
+  upsertInterview,
+  detectInterviewsMode,
+} from "@/lib/storage/interviews";
+import { upsertRejected, detectRejectedMode } from "@/lib/storage/rejected";
+import { upsertWithdrawn, detectWithdrawnMode } from "@/lib/storage/withdrawn";
+
 
 import ApplicationsFilter, {
   DEFAULT_APPLICATION_FILTERS,
@@ -60,9 +67,6 @@ type StoredWithdrawn = {
   withdrawnDate?: string;
   withdrawnReason?: WithdrawnDetails['reason'];
 };
-
-const REJECTIONS_STORAGE_KEY = 'job-tracker:rejected';
-const WITHDRAWN_STORAGE_KEY = 'job-tracker:withdrawn';
 
 function fmtDate(d: string) {
   const date = new Date(d);
@@ -358,26 +362,30 @@ export default function AppliedPage() {
     });
   };
 
-  const moveToInterviews = async (_interview: Interview) => {
-    if (!appBeingMoved) {
-      moveOutOfApplied();
-      return;
-    }
-
-    // ✅ log on Applied page
-    await logActivity('applied', 'moved_to_interviews', appBeingMoved, {
-      fromStatus: 'Applied',
-      toStatus: 'Interviews',
-    });
-
-    // ✅ ALSO log on Interviews page
-    await logActivity('interviews', 'moved_to_interviews', appBeingMoved, {
-      fromStatus: 'Applied',
-      toStatus: 'Interviews',
-    });
-
+  const moveToInterviews = async (interview: Interview) => {
+  if (!appBeingMoved) {
     moveOutOfApplied();
-  };
+    return;
+  }
+
+  // ✅ persist interview card
+  const interviewsMode = await detectInterviewsMode();
+  await upsertInterview(interview as any, interviewsMode);
+
+  // ✅ log on Applied page
+  await logActivity("applied", "moved_to_interviews", appBeingMoved, {
+    fromStatus: "Applied",
+    toStatus: "Interviews",
+  });
+
+  // ✅ log on Interviews page
+  await logActivity("interviews", "moved_to_interviews", appBeingMoved, {
+    fromStatus: "Applied",
+    toStatus: "Interviews",
+  });
+
+  moveOutOfApplied();
+};
 
   const moveToRejected = async (details: RejectionDetails) => {
     const id = makeUuidV4();
@@ -387,21 +395,7 @@ export default function AppliedPage() {
       ...details,
     };
 
-    // (your existing rejected-card persistence; keep as-is for now)
-    if (typeof window !== 'undefined') {
-      try {
-        const raw = window.localStorage.getItem(REJECTIONS_STORAGE_KEY);
-        let existing: StoredRejection[] = [];
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) existing = parsed;
-        }
-        const next = [...existing, newRejection];
-        window.localStorage.setItem(REJECTIONS_STORAGE_KEY, JSON.stringify(next));
-      } catch (err) {
-        console.error('Failed to persist rejected application', err);
-      }
-    }
+    await upsertRejected(newRejection as any, await detectRejectedMode());
 
     if (appBeingMoved) {
       // ✅ log on Applied page
@@ -458,18 +452,7 @@ export default function AppliedPage() {
       withdrawnReason: details.reason,
     };
 
-    // (your existing withdrawn-card persistence; keep as-is for now)
-    if (typeof window !== 'undefined') {
-      try {
-        const raw = window.localStorage.getItem(WITHDRAWN_STORAGE_KEY);
-        const parsed = raw ? JSON.parse(raw) : [];
-        const existing: StoredWithdrawn[] = Array.isArray(parsed) ? parsed : [];
-        const next = [...existing, newWithdrawn];
-        window.localStorage.setItem(WITHDRAWN_STORAGE_KEY, JSON.stringify(next));
-      } catch (err) {
-        console.error('Failed to persist withdrawn application', err);
-      }
-    }
+    await upsertWithdrawn(newWithdrawn as any, await detectWithdrawnMode());
 
     // ✅ log on Applied page
     await logActivity('applied', 'moved_to_withdrawn', source, {

@@ -23,7 +23,9 @@ export type RejectionType =
   | "after-second-interview";
 
 export type RejectionDetails = {
+  // ✅ kept for compatibility (we now derive it from rejectionType)
   reason: string;
+
   company: string;
   role: string;
   appliedDate?: string;
@@ -139,9 +141,11 @@ function todayISO() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-function makeInitialForm(
-  app: MoveToRejectedDialogProps["application"]
-): FormState {
+function labelForRejectionType(t: RejectionType) {
+  return REJECTION_OPTIONS.find((o) => o.value === t)?.label ?? "Rejected";
+}
+
+function makeInitialForm(app: MoveToRejectedDialogProps["application"]): FormState {
   const today = todayISO();
 
   return {
@@ -178,20 +182,20 @@ export default function MoveToRejectedDialog({
   const title = isEditMode
     ? "Edit rejected application"
     : isAddMode
-    ? "Add rejected application"
-    : "Move to the rejected section";
+      ? "Add rejected application"
+      : "Move to the rejected section";
 
   const description = isEditMode
     ? "Update the details of this rejected application."
     : isAddMode
-    ? "Record an application that ended in rejection."
-    : "Capture how and when this application was rejected.";
+      ? "Record an application that ended in rejection."
+      : "Capture how and when this application was rejected.";
 
   const submitLabel = isEditMode
     ? "Save changes"
     : isAddMode
-    ? "Save rejected application"
-    : "Save & move to rejected";
+      ? "Save rejected application"
+      : "Save & move to rejected";
 
   useEffect(() => {
     if (!open) return;
@@ -200,9 +204,7 @@ export default function MoveToRejectedDialog({
 
   const handleChange =
     (field: keyof FormState) =>
-    (
-      e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
-    ) => {
+    (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
       const { value } = e.target;
       setForm((prev) => ({ ...prev, [field]: value }));
     };
@@ -214,9 +216,7 @@ export default function MoveToRejectedDialog({
     const role = form.role.trim();
     const decisionDate = form.decisionDate.trim();
 
-    if (!company || !role || !decisionDate) {
-      return;
-    }
+    if (!company || !role || !decisionDate) return;
 
     const appliedDate = form.appliedDate.trim();
     const phoneScreenDate = form.phoneScreenDate.trim();
@@ -235,6 +235,7 @@ export default function MoveToRejectedDialog({
       role,
       decisionDate,
       rejectionType: form.rejectionType,
+      reason: labelForRejectionType(form.rejectionType), // ✅ ensures `reason` is always present
       logoUrl: application?.logoUrl,
     };
 
@@ -289,7 +290,6 @@ export default function MoveToRejectedDialog({
         {/* Header */}
         <div className="relative z-10 flex items-start justify-between border-b border-neutral-200/70 px-5 py-4">
           <div className="flex items-center gap-2">
-            {/* Title icon without background container */}
             <img
               src="/icons/cancel.png"
               alt="Rejected"
@@ -344,9 +344,7 @@ export default function MoveToRejectedDialog({
                     <div className="font-medium text-neutral-900">
                       {application.role || "Role not set"}
                     </div>
-                    <div className="text-neutral-600">
-                      {application.company}
-                    </div>
+                    <div className="text-neutral-600">{application.company}</div>
                   </div>
                 </div>
               </div>
@@ -355,19 +353,13 @@ export default function MoveToRejectedDialog({
                 <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-neutral-600">
                   {application.location && (
                     <span className="inline-flex items-center gap-1.5">
-                      <MapPin
-                        className="h-3.5 w-3.5 text-neutral-400"
-                        aria-hidden="true"
-                      />
+                      <MapPin className="h-3.5 w-3.5 text-neutral-400" aria-hidden="true" />
                       {application.location}
                     </span>
                   )}
                   {application.appliedOn && (
                     <span className="inline-flex items-center gap-1.5">
-                      <CalendarDays
-                        className="h-3.5 w-3.5 text-neutral-400"
-                        aria-hidden="true"
-                      />
+                      <CalendarDays className="h-3.5 w-3.5 text-neutral-400" aria-hidden="true" />
                       Applied {application.appliedOn}
                     </span>
                   )}
@@ -454,9 +446,7 @@ export default function MoveToRejectedDialog({
             </label>
 
             <label className="space-y-1 text-sm">
-              <span className="font-medium text-neutral-800">
-                Employment type
-              </span>
+              <span className="font-medium text-neutral-800">Employment type</span>
               <div className="relative">
                 <Briefcase
                   className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
@@ -498,13 +488,8 @@ export default function MoveToRejectedDialog({
           {/* Rejection details & timeline */}
           <div className="space-y-3 rounded-xl border border-neutral-200/80 bg-white/80 p-4">
             <div className="flex items-center gap-2">
-              <AlertCircle
-                className="h-4 w-4 text-rose-500"
-                aria-hidden="true"
-              />
-              <div className="text-sm font-medium text-neutral-900">
-                Rejection details
-              </div>
+              <AlertCircle className="h-4 w-4 text-rose-500" aria-hidden="true" />
+              <div className="text-sm font-medium text-neutral-900">Rejection details</div>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
@@ -512,29 +497,25 @@ export default function MoveToRejectedDialog({
                 <span className="font-medium text-neutral-800">
                   Type of rejection<span className="text-rose-500">*</span>
                 </span>
-                <div className="relative">
-                  <select
-                    value={form.rejectionType}
-                    onChange={handleChange("rejectionType")}
-                    className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 px-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-300"
-                    required
-                  >
-                    {REJECTION_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <select
+                  value={form.rejectionType}
+                  onChange={handleChange("rejectionType")}
+                  className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 px-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-300"
+                  required
+                >
+                  {REJECTION_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
                 <p className="mt-1 text-[11px] text-neutral-500">
                   This helps you remember at which stage the process ended.
                 </p>
               </label>
 
               <label className="space-y-1 text-sm">
-                <span className="font-medium text-neutral-800">
-                  Phone screening date
-                </span>
+                <span className="font-medium text-neutral-800">Phone screening date</span>
                 <div className="relative">
                   <CalendarDays
                     className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
@@ -550,9 +531,7 @@ export default function MoveToRejectedDialog({
               </label>
 
               <label className="space-y-1 text-sm">
-                <span className="font-medium text-neutral-800">
-                  First interview date
-                </span>
+                <span className="font-medium text-neutral-800">First interview date</span>
                 <div className="relative">
                   <CalendarDays
                     className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
@@ -568,9 +547,7 @@ export default function MoveToRejectedDialog({
               </label>
 
               <label className="space-y-1 text-sm">
-                <span className="font-medium text-neutral-800">
-                  2nd interview date
-                </span>
+                <span className="font-medium text-neutral-800">2nd interview date</span>
                 <div className="relative">
                   <CalendarDays
                     className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
@@ -589,15 +566,11 @@ export default function MoveToRejectedDialog({
 
           {/* Contact & job posting */}
           <div className="space-y-3 rounded-xl border border-neutral-200/80 bg-white/80 p-4">
-            <div className="text-sm font-medium text-neutral-900">
-              Contact & job posting
-            </div>
+            <div className="text-sm font-medium text-neutral-900">Contact & job posting</div>
 
             <div className="grid gap-4 md:grid-cols-2">
               <label className="space-y-1 text-sm">
-                <span className="font-medium text-neutral-800">
-                  Contact name
-                </span>
+                <span className="font-medium text-neutral-800">Contact name</span>
                 <div className="relative">
                   <User2
                     className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
@@ -614,9 +587,7 @@ export default function MoveToRejectedDialog({
               </label>
 
               <label className="space-y-1 text-sm">
-                <span className="font-medium text-neutral-800">
-                  Contact email
-                </span>
+                <span className="font-medium text-neutral-800">Contact email</span>
                 <div className="relative">
                   <Mail
                     className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
@@ -633,9 +604,7 @@ export default function MoveToRejectedDialog({
               </label>
 
               <label className="space-y-1 text-sm">
-                <span className="font-medium text-neutral-800">
-                  Contact phone
-                </span>
+                <span className="font-medium text-neutral-800">Contact phone</span>
                 <div className="relative">
                   <Phone
                     className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
@@ -652,9 +621,7 @@ export default function MoveToRejectedDialog({
               </label>
 
               <label className="space-y-1 text-sm md:col-span-2">
-                <span className="font-medium text-neutral-800">
-                  Job posting URL
-                </span>
+                <span className="font-medium text-neutral-800">Job posting URL</span>
                 <div className="relative">
                   <LinkIcon
                     className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"

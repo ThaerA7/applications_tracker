@@ -41,7 +41,7 @@ export type ActivityItem = {
 export type ActivityStorageMode = "guest" | "user";
 
 const TABLE = "activity_logs";
-const COUNTS_EVENT = "job-tracker:refresh-counts"; // optional, but keeps UI consistent
+const COUNTS_EVENT = "job-tracker:refresh-counts";
 const MAX_ITEMS = 200;
 
 function notifyCountsChanged() {
@@ -57,11 +57,20 @@ function isUuid(v: string) {
 }
 
 function makeUuidV4() {
-  // RFC4122 v4 using crypto.getRandomValues
-  const cryptoObj = globalThis.crypto;
+  const cryptoObj = globalThis.crypto as Crypto | undefined;
   if (cryptoObj?.randomUUID) return cryptoObj.randomUUID();
 
   const buf = new Uint8Array(16);
+
+  // If crypto is missing (very rare), fallback to Math.random uuid-ish
+  if (!cryptoObj?.getRandomValues) {
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === "x" ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  }
+
   cryptoObj.getRandomValues(buf);
 
   buf[6] = (buf[6] & 0x0f) | 0x40;
@@ -92,26 +101,15 @@ function safeParseList(raw: any): ActivityItem[] {
     .map((x) => x as ActivityItem);
 }
 
-// -------- guest storage (per-variant) --------
-function guestLocalKey(variant: ActivityVariant) {
-  return `job-tracker:activity:${variant}`;
-}
+// -------- guest storage (IndexedDB only; per-variant) --------
 function guestIdbKey(variant: ActivityVariant) {
   return `activity:${variant}`;
 }
 
 async function loadGuest(variant: ActivityVariant): Promise<ActivityItem[]> {
-  // Prefer IDB
   try {
     const idb = await idbGet<ActivityItem[]>(guestIdbKey(variant));
-    if (idb) return safeParseList(idb);
-  } catch {}
-
-  // Fallback localStorage
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(guestLocalKey(variant));
-    return safeParseList(raw ? JSON.parse(raw) : []);
+    return safeParseList(idb ?? []);
   } catch {
     return [];
   }
@@ -119,24 +117,14 @@ async function loadGuest(variant: ActivityVariant): Promise<ActivityItem[]> {
 
 async function saveGuest(variant: ActivityVariant, list: ActivityItem[]) {
   const trimmed = list.slice(0, MAX_ITEMS);
-
   try {
     await idbSet(guestIdbKey(variant), trimmed);
-  } catch {}
-
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(guestLocalKey(variant), JSON.stringify(trimmed));
   } catch {}
 }
 
 async function clearGuest(variant: ActivityVariant) {
   try {
     await idbDel(guestIdbKey(variant));
-  } catch {}
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.removeItem(guestLocalKey(variant));
   } catch {}
 }
 
@@ -157,7 +145,6 @@ async function loadUser(variant: ActivityVariant): Promise<ActivityItem[]> {
   }
 
   const mapped = (data ?? []).map((row: any) => ({ ...(row.data ?? {}), id: row.id }));
-
   return safeParseList(mapped);
 }
 
@@ -233,7 +220,7 @@ export async function appendActivity(
   }
 
   notifyCountsChanged();
-  return clean; // so the UI can push the exact normalized version
+  return clean;
 }
 
 export async function deleteActivity(
@@ -259,7 +246,8 @@ export async function clearActivity(variant: ActivityVariant, mode: ActivityStor
 }
 
 /**
- * Optional: call this after login (like your other migrations)
+ * Move guest activity (IndexedDB) into Supabase after login.
+ * Uses UPSERT to avoid duplicates (id is the conflict key).
  */
 export async function migrateGuestActivityToUser() {
   const supabase = getSupabaseClient();
@@ -278,7 +266,6 @@ export async function migrateGuestActivityToUser() {
     const guest = await loadGuest(v);
     if (guest.length === 0) continue;
 
-    // insert newest first (already newest-first in guest)
     const payload = guest.map((it) => {
       const clean = normalizeItem(it);
       return { id: clean.id, variant: v, data: clean };
