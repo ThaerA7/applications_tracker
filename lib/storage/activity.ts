@@ -156,10 +156,7 @@ async function loadUser(variant: ActivityVariant): Promise<ActivityItem[]> {
     return [];
   }
 
-  const mapped = (data ?? []).map((row: any) => ({
-    id: row.id,
-    ...(row.data ?? {}),
-  }));
+  const mapped = (data ?? []).map((row: any) => ({ ...(row.data ?? {}), id: row.id }));
 
   return safeParseList(mapped);
 }

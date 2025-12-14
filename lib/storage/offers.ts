@@ -108,10 +108,7 @@ async function loadUserOffers(): Promise<OfferReceivedJob[]> {
     return [];
   }
 
-  const mapped = (data ?? []).map((row: any) => ({
-    id: row.id,
-    ...(row.data ?? {}),
-  }));
+  const mapped = (data ?? []).map((row: any) => ({ ...(row.data ?? {}), id: row.id }));
 
   return safeParseList(mapped);
 }

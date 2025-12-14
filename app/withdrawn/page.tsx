@@ -34,10 +34,23 @@ const INTERVIEW_TYPE_LABEL: Record<InterviewType, string> = {
   "in-person": "In person",
 };
 
-const makeId = () =>
-  typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+function makeUuidV4() {
+  const cryptoObj = globalThis.crypto as Crypto | undefined;
+  if (cryptoObj?.randomUUID) return cryptoObj.randomUUID();
+  const buf = new Uint8Array(16);
+  cryptoObj?.getRandomValues?.(buf);
+  if (!cryptoObj?.getRandomValues) {
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === "x" ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  }
+  buf[6] = (buf[6] & 0x0f) | 0x40;
+  buf[8] = (buf[8] & 0x3f) | 0x80;
+ const hex = [...buf].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
 
 type ApplicationLike = React.ComponentProps<typeof MoveToWithdrawnDialog>["application"];
 
@@ -160,7 +173,7 @@ export default function WithdrawnPage() {
       });
 
       persistActivity({
-        id: makeId(),
+        id: makeUuidV4(),
         appId: target.id,
         type: "deleted",
         timestamp: new Date().toISOString(),
@@ -244,7 +257,7 @@ export default function WithdrawnPage() {
         });
 
         persistActivity({
-          id: makeId(),
+          id: makeUuidV4(),
           appId: updated.id,
           type: "edited",
           timestamp: new Date().toISOString(),
@@ -256,7 +269,7 @@ export default function WithdrawnPage() {
         });
       } else {
         const newItem: WithdrawnRecord = {
-          id: makeId(),
+          id: makeUuidV4(),
           company: details.company,
           role: details.role,
           location: details.location,
@@ -280,7 +293,7 @@ export default function WithdrawnPage() {
         });
 
         persistActivity({
-          id: makeId(),
+          id: makeUuidV4(),
           appId: newItem.id,
           type: "added",
           timestamp: new Date().toISOString(),

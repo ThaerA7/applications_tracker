@@ -35,10 +35,23 @@ import {
 
 type ApplicationLike = React.ComponentProps<typeof MoveToRejectedDialog>["application"];
 
-const makeId = () =>
-  typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+function makeUuidV4() {
+  const cryptoObj = globalThis.crypto as Crypto | undefined;
+  if (cryptoObj?.randomUUID) return cryptoObj.randomUUID();
+  const buf = new Uint8Array(16);
+  cryptoObj?.getRandomValues?.(buf);
+  if (!cryptoObj?.getRandomValues) {
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === "x" ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  }
+  buf[6] = (buf[6] & 0x0f) | 0x40;
+  buf[8] = (buf[8] & 0x3f) | 0x80;
+ const hex = [...buf].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
 
 export default function RejectedPage() {
   const [query, setQuery] = useState("");
@@ -169,7 +182,7 @@ export default function RejectedPage() {
 
       // log delete activity (persisted to guest/user activity storage)
       await persistActivity({
-        id: makeId(),
+        id: makeUuidV4(),
         appId: target.id,
         type: "deleted",
         timestamp: new Date().toISOString(),
@@ -209,7 +222,7 @@ export default function RejectedPage() {
       });
     } else {
       // create new
-      const newId = makeId();
+      const newId = makeUuidV4();
       target = { id: newId, ...details };
 
       setRejected((prev) => [...prev, target]);
@@ -221,7 +234,7 @@ export default function RejectedPage() {
 
     // log add / edit activity (persisted)
     await persistActivity({
-      id: makeId(),
+      id: makeUuidV4(),
       appId: target.id,
       type: editingRejection ? "edited" : "added",
       timestamp: new Date().toISOString(),

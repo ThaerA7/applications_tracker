@@ -154,10 +154,8 @@ async function loadUserWishlist(): Promise<WishlistItem[]> {
     return [];
   }
 
-  const mapped = (data ?? []).map((row: any) => ({
-    id: row.id,
-    ...(row.data ?? {}),
-  }));
+  const mapped = (data ?? []).map((row: any) => ({ ...(row.data ?? {}), id: row.id }),
+  );
 
   // data.id may exist; prefer row.id
   const parsed = safeParseList(

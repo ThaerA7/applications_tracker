@@ -382,63 +382,66 @@ export default function StatsCard() {
   // ✅ one mode is enough (derived from auth)
   const [mode, setMode] = useState<"guest" | "user">("guest");
 
-  // ✅ Load all data (guest via IDB/local mirror, user via Supabase)
-  // ✅ Refresh on auth changes + COUNTS_EVENT + focus/visibility
   useEffect(() => {
-    if (typeof window === "undefined") return;
+  if (typeof window === "undefined") return;
 
-    let alive = true;
-    const supabase = getSupabaseClient();
+  let alive = true;
+  const supabase = getSupabaseClient();
 
-    const loadAll = async () => {
-      try {
-        const [a, i, r, w, o] = await Promise.all([
-          loadApplied(),
-          loadInterviews(),
-          loadRejected(),
-          loadWithdrawn(),
-          loadOffers(),
-        ]);
+  const loadAll = async () => {
+    try {
+      const [a, i, r, w, o] = await Promise.all([
+        loadApplied(),
+        loadInterviews(),
+        loadRejected(),
+        loadWithdrawn(),
+        loadOffers(),
+      ]);
 
-        if (!alive) return;
+      if (!alive) return;
 
-        // mode is consistent across buckets (same session)
-        setMode(a.mode);
+      setMode(a.mode);
+      setApplied(a.items as AnyRecord[]);
+      setInterviews(i.items as AnyRecord[]);
+      setRejected(r.items as AnyRecord[]);
+      setWithdrawn(w.items as AnyRecord[]);
 
-        setApplied(a.items as AnyRecord[]);
-        setInterviews(i.items as AnyRecord[]);
-        setRejected(r.items as AnyRecord[]);
-        setWithdrawn(w.items as AnyRecord[]);
-        setOffers(normalizeOffers(o.items as any) as OfferReceivedJobLike[]);
-      } catch (err) {
-        console.error("StatsCard: failed to load data:", err);
-      }
-    };
+      // ✅ keep it, but also normalize if your stored shape varies
+      setOffers(normalizeOffers((o.items as OfferReceivedJobLike[]) ?? []));
 
-    const refresh = () => void loadAll();
+      setNow(new Date());
+    } catch (err) {
+      console.error("StatsCard: failed to load data:", err);
+    }
+  };
 
-    refresh();
+  const refresh = () => void loadAll();
 
-    window.addEventListener(COUNTS_EVENT, refresh);
-    window.addEventListener("focus", refresh);
+  // ✅ subscribe first
+  const { data: sub } = supabase.auth.onAuthStateChange(() => refresh());
 
-    const onVis = () => {
-      if (!document.hidden) refresh();
-    };
-    document.addEventListener("visibilitychange", onVis);
+  // ✅ then force session hydration, then load once
+  supabase.auth.getSession().finally(() => refresh());
 
-    const { data: sub } = supabase.auth.onAuthStateChange(() => refresh());
+  window.addEventListener(COUNTS_EVENT, refresh);
+  window.addEventListener("focus", refresh);
 
-    return () => {
-      alive = false;
-      window.removeEventListener(COUNTS_EVENT, refresh);
-      window.removeEventListener("focus", refresh);
-      document.removeEventListener("visibilitychange", onVis);
-      sub?.subscription?.unsubscribe();
-    };
-  }, []);
+  const onVis = () => {
+    if (!document.hidden) refresh();
+  };
+  document.addEventListener("visibilitychange", onVis);
 
-  const now = useMemo(() => new Date(), []);
+  return () => {
+    alive = false;
+    window.removeEventListener(COUNTS_EVENT, refresh);
+    window.removeEventListener("focus", refresh);
+    document.removeEventListener("visibilitychange", onVis);
+    sub?.subscription?.unsubscribe();
+  };
+}, []);
+
+
+  const [now, setNow] = useState(() => new Date());
 
   const weeklyActivity = useMemo(
     () =>
@@ -911,6 +914,7 @@ export default function StatsCard() {
         initialNote={null}
         onSave={(payload) => {
           upsertNoteToStorage(payload);
+          setOpenAddNote(false);
         }}
       />
     </>

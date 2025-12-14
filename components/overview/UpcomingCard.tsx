@@ -94,38 +94,42 @@ export default function UpcomingCard() {
     return () => window.clearInterval(id);
   }, []);
 
-  // ✅ Refresh on mount + global refresh events + focus/visibility + auth changes
   useEffect(() => {
-    if (typeof window === "undefined") return;
+  if (typeof window === "undefined") return;
 
-    let alive = true;
-    const supabase = getSupabaseClient();
+  let alive = true;
+  const supabase = getSupabaseClient();
 
-    const refresh = async () => {
-      if (!alive) return;
-      await refreshInterviewEvents();
-    };
+  const refresh = async () => {
+    if (!alive) return;
+    await refreshInterviewEvents();
+  };
 
-    refresh();
+  (async () => {
+    await supabase.auth.getSession(); // ✅ hydrate first
+    if (!alive) return;
+    await refresh();
+  })();
 
-    window.addEventListener(COUNTS_EVENT, refresh);
-    window.addEventListener("focus", refresh);
+  window.addEventListener(COUNTS_EVENT, refresh);
+  window.addEventListener("focus", refresh);
 
-    const onVis = () => {
-      if (!document.hidden) refresh();
-    };
-    document.addEventListener("visibilitychange", onVis);
+  const onVis = () => {
+    if (!document.hidden) refresh();
+  };
+  document.addEventListener("visibilitychange", onVis);
 
-    const { data: sub } = supabase.auth.onAuthStateChange(() => refresh());
+  const { data: sub } = supabase.auth.onAuthStateChange(() => refresh());
 
-    return () => {
-      alive = false;
-      window.removeEventListener(COUNTS_EVENT, refresh);
-      window.removeEventListener("focus", refresh);
-      document.removeEventListener("visibilitychange", onVis);
-      sub?.subscription?.unsubscribe();
-    };
-  }, [refreshInterviewEvents]);
+  return () => {
+    alive = false;
+    window.removeEventListener(COUNTS_EVENT, refresh);
+    window.removeEventListener("focus", refresh);
+    document.removeEventListener("visibilitychange", onVis);
+    sub?.subscription?.unsubscribe();
+  };
+}, [refreshInterviewEvents]);
+
 
   // Upcoming interviews (from now onwards)
   const upcomingInterviews = useMemo(() => {

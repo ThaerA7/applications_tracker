@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-
+import { getSupabaseClient } from "@/lib/supabase/client";
 import { loadApplied } from "@/lib/storage/applied";
 import { loadInterviews } from "@/lib/storage/interviews";
 import { loadWithdrawn } from "@/lib/storage/withdrawn";
@@ -54,110 +54,92 @@ export default function Sidebar({ collapsed }: SidebarProps) {
   const [notesCount, setNotesCount] = useState<number | null>(null);
 
   useEffect(() => {
-    let alive = true;
+  let alive = true;
+  const supabase = getSupabaseClient();
 
-    const safeSet = (fn: () => void) => {
-      if (alive) fn();
-    };
+  const safeSet = (fn: () => void) => {
+    if (alive) fn();
+  };
 
-    const refreshCounts = async () => {
-      // Run in parallel so the sidebar updates faster
-      const [
-        appliedRes,
-        interviewsRes,
-        withdrawnRes,
-        rejectedRes,
-        offersRes,
-        wishlistRes,
-        notesRes,
-      ] = await Promise.allSettled([
-        loadApplied(),
-        loadInterviews(),
-        loadWithdrawn(),
-        loadRejected(),
-        loadOffers(),
-        loadWishlist(),
-        loadNotes(),
-      ]);
+  const len = (v: any) => (Array.isArray(v?.items) ? v.items.length : 0);
 
-      // Applied
-      if (appliedRes.status === "fulfilled") {
-        safeSet(() => setAppliedCount(appliedRes.value.items.length));
-      } else {
-        console.error(
-          "Failed to load applied applications count",
-          appliedRes.reason
-        );
-        safeSet(() => setAppliedCount(0));
-      }
+  const refreshCounts = async () => {
+    const [
+      appliedRes,
+      interviewsRes,
+      withdrawnRes,
+      rejectedRes,
+      offersRes,
+      wishlistRes,
+      notesRes,
+    ] = await Promise.allSettled([
+      loadApplied(),
+      loadInterviews(),
+      loadWithdrawn(),
+      loadRejected(),
+      loadOffers(),
+      loadWishlist(),
+      loadNotes(),
+    ]);
 
-      // Interviews
-      if (interviewsRes.status === "fulfilled") {
-        safeSet(() => setInterviewsCount(interviewsRes.value.items.length));
-      } else {
-        console.error("Failed to load interviews count", interviewsRes.reason);
-        safeSet(() => setInterviewsCount(0));
-      }
+    // Applied
+    if (appliedRes.status === "fulfilled") safeSet(() => setAppliedCount(len(appliedRes.value)));
+    else safeSet(() => setAppliedCount(0));
 
-      // Withdrawn
-      if (withdrawnRes.status === "fulfilled") {
-        safeSet(() => setWithdrawnCount(withdrawnRes.value.items.length));
-      } else {
-        console.error("Failed to load withdrawn count", withdrawnRes.reason);
-        safeSet(() => setWithdrawnCount(0));
-      }
+    // Interviews
+    if (interviewsRes.status === "fulfilled") safeSet(() => setInterviewsCount(len(interviewsRes.value)));
+    else safeSet(() => setInterviewsCount(0));
 
-      // Rejected
-      if (rejectedRes.status === "fulfilled") {
-        safeSet(() => setRejectedCount(rejectedRes.value.items.length));
-      } else {
-        console.error("Failed to load rejected count", rejectedRes.reason);
-        safeSet(() => setRejectedCount(0));
-      }
+    // Withdrawn
+    if (withdrawnRes.status === "fulfilled") safeSet(() => setWithdrawnCount(len(withdrawnRes.value)));
+    else safeSet(() => setWithdrawnCount(0));
 
-      // Offers
-      if (offersRes.status === "fulfilled") {
-        safeSet(() => setOffersCount(offersRes.value.items.length));
-      } else {
-        console.error("Failed to load offers count", offersRes.reason);
-        safeSet(() => setOffersCount(0));
-      }
+    // Rejected
+    if (rejectedRes.status === "fulfilled") safeSet(() => setRejectedCount(len(rejectedRes.value)));
+    else safeSet(() => setRejectedCount(0));
 
-      // ✅ Wishlist (Supabase or guest)
-      if (wishlistRes.status === "fulfilled") {
-        safeSet(() => setWishlistCount(wishlistRes.value.items.length));
-      } else {
-        console.error("Failed to load wishlist count", wishlistRes.reason);
-        safeSet(() => setWishlistCount(0));
-      }
+    // Offers
+    if (offersRes.status === "fulfilled") safeSet(() => setOffersCount(len(offersRes.value)));
+    else safeSet(() => setOffersCount(0));
 
-      // ✅ Notes (Supabase or guest)
-      if (notesRes.status === "fulfilled") {
-        safeSet(() => setNotesCount(notesRes.value.items.length));
-      } else {
-        console.error("Failed to load notes count", notesRes.reason);
-        safeSet(() => setNotesCount(0));
-      }
-    };
+    // Wishlist
+    if (wishlistRes.status === "fulfilled") safeSet(() => setWishlistCount(len(wishlistRes.value)));
+    else safeSet(() => setWishlistCount(0));
 
+    // Notes
+    if (notesRes.status === "fulfilled") safeSet(() => setNotesCount(len(notesRes.value)));
+    else safeSet(() => setNotesCount(0));
+  };
+
+  // ✅ Subscribe FIRST so we catch INITIAL_SESSION on hard refresh
+  const { data: sub } = supabase.auth.onAuthStateChange((_event) => {
     void refreshCounts();
+  });
 
-    const handler = () => void refreshCounts();
-    const onFocus = () => void refreshCounts();
+  // ✅ Kick session hydration and then refresh once
+  supabase.auth.getSession().finally(() => {
+    void refreshCounts();
+  });
 
-    if (typeof window !== "undefined") {
-      window.addEventListener(COUNTS_EVENT, handler);
-      window.addEventListener("focus", onFocus);
-    }
+  const handler = () => void refreshCounts();
+  const onFocus = () => void refreshCounts();
+  const onVis = () => {
+    if (!document.hidden) refreshCounts();
+  };
 
-    return () => {
-      alive = false;
-      if (typeof window !== "undefined") {
-        window.removeEventListener(COUNTS_EVENT, handler);
-        window.removeEventListener("focus", onFocus);
-      }
-    };
-  }, [pathname]); // refresh on navigation too
+  window.addEventListener(COUNTS_EVENT, handler);
+  window.addEventListener("focus", onFocus);
+  document.addEventListener("visibilitychange", onVis);
+
+  return () => {
+    alive = false;
+    sub?.subscription?.unsubscribe();
+    window.removeEventListener(COUNTS_EVENT, handler);
+    window.removeEventListener("focus", onFocus);
+    document.removeEventListener("visibilitychange", onVis);
+  };
+}, [pathname]);
+ // refresh on navigation too
 
   return (
     <aside
@@ -239,7 +221,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
 
                   {!collapsed && isAppliedItem && appliedCount !== null && (
                     <span className="ml-2 inline-flex items-center justify-center rounded-full bg-zinc-800 px-2.5 py-0.5 text-xs font-semibold text-zinc-100">
-                      {appliedCount}
+                      {appliedCount?? "…"}
                     </span>
                   )}
 
@@ -247,19 +229,19 @@ export default function Sidebar({ collapsed }: SidebarProps) {
                     isInterviewsItem &&
                     interviewsCount !== null && (
                       <span className="ml-2 inline-flex items-center justify-center rounded-full bg-zinc-800 px-2.5 py-0.5 text-xs font-semibold text-zinc-100">
-                        {interviewsCount}
+                        {interviewsCount?? "…"}
                       </span>
                     )}
 
                   {!collapsed && isOffersItem && offersCount !== null && (
                     <span className="ml-2 inline-flex items-center justify-center rounded-full bg-zinc-800 px-2.5 py-0.5 text-xs font-semibold text-zinc-100">
-                      {offersCount}
+                      {offersCount?? "…"}
                     </span>
                   )}
 
                   {!collapsed && isRejectedItem && rejectedCount !== null && (
                     <span className="ml-2 inline-flex items-center justify-center rounded-full bg-zinc-800 px-2.5 py-0.5 text-xs font-semibold text-zinc-100">
-                      {rejectedCount}
+                      {rejectedCount?? "…"}
                     </span>
                   )}
 
@@ -267,21 +249,21 @@ export default function Sidebar({ collapsed }: SidebarProps) {
                     isWithdrawnItem &&
                     withdrawnCount !== null && (
                       <span className="ml-2 inline-flex items-center justify-center rounded-full bg-zinc-800 px-2.5 py-0.5 text-xs font-semibold text-zinc-100">
-                        {withdrawnCount}
+                        {withdrawnCount?? "…"}
                       </span>
                     )}
 
                   {/* ✅ Wishlist (Supabase + guest) */}
                   {!collapsed && isWishlistItem && wishlistCount !== null && (
                     <span className="ml-2 inline-flex items-center justify-center rounded-full bg-zinc-800 px-2.5 py-0.5 text-xs font-semibold text-zinc-100">
-                      {wishlistCount}
+                      {wishlistCount?? "…"}
                     </span>
                   )}
 
                   {/* ✅ Notes (Supabase + guest) */}
                   {!collapsed && isNotesItem && notesCount !== null && (
                     <span className="ml-2 inline-flex items-center justify-center rounded-full bg-zinc-800 px-2.5 py-0.5 text-xs font-semibold text-zinc-100">
-                      {notesCount}
+                      {notesCount?? "…"}
                     </span>
                   )}
                 </Link>

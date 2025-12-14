@@ -158,48 +158,52 @@ export default function GoalsCard() {
     return () => window.clearInterval(id);
   }, []);
 
-  // ✅ load interviews/offers from storage (guest IDB/local mirror, user Supabase)
-  // ✅ refresh on COUNTS_EVENT + focus/visibility + auth changes
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+ useEffect(() => {
+  if (typeof window === "undefined") return;
 
-    let alive = true;
-    const supabase = getSupabaseClient();
+  let alive = true;
+  const supabase = getSupabaseClient();
 
-    const loadAll = async () => {
-      try {
-        const [i, o] = await Promise.all([loadInterviews(), loadOffers()]);
-        if (!alive) return;
+  const loadAll = async () => {
+    try {
+      const [i, o] = await Promise.all([loadInterviews(), loadOffers()]);
+      if (!alive) return;
 
-        setInterviews((i.items as any[]) ?? []);
-        setOffers((o.items as any[]) ?? []);
-      } catch (err) {
-        console.error("GoalsCard: failed to load data:", err);
-      }
-    };
+      setInterviews((i.items as any[]) ?? []);
+      setOffers((o.items as any[]) ?? []);
+    } catch (err) {
+      console.error("GoalsCard: failed to load data:", err);
+    }
+  };
 
-    const refresh = () => void loadAll();
+  const refresh = () => void loadAll();
 
+  // ✅ IMPORTANT: hydrate auth/session first (prevents signed-in refresh showing empty)
+  (async () => {
+    await supabase.auth.getSession();
+    if (!alive) return;
     refresh();
+  })();
 
-    window.addEventListener(COUNTS_EVENT, refresh);
-    window.addEventListener("focus", refresh);
+  window.addEventListener(COUNTS_EVENT, refresh);
+  window.addEventListener("focus", refresh);
 
-    const onVis = () => {
-      if (!document.hidden) refresh();
-    };
-    document.addEventListener("visibilitychange", onVis);
+  const onVis = () => {
+    if (!document.hidden) refresh();
+  };
+  document.addEventListener("visibilitychange", onVis);
 
-    const { data: sub } = supabase.auth.onAuthStateChange(() => refresh());
+  const { data: sub } = supabase.auth.onAuthStateChange(() => refresh());
 
-    return () => {
-      alive = false;
-      window.removeEventListener(COUNTS_EVENT, refresh);
-      window.removeEventListener("focus", refresh);
-      document.removeEventListener("visibilitychange", onVis);
-      sub?.subscription?.unsubscribe();
-    };
-  }, []);
+  return () => {
+    alive = false;
+    window.removeEventListener(COUNTS_EVENT, refresh);
+    window.removeEventListener("focus", refresh);
+    document.removeEventListener("visibilitychange", onVis);
+    sub?.subscription?.unsubscribe();
+  };
+}, []);
+
 
   // recompute counts when time, settings, or storage lists change
   useEffect(() => {
