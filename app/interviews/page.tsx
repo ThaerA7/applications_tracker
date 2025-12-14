@@ -19,6 +19,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import Image from "next/image";
+
 import ScheduleInterviewDialog, {
   type Interview,
   type InterviewType,
@@ -27,15 +28,11 @@ import MoveApplicationDialog from "../../components/dialogs/MoveApplicationDialo
 import type { RejectionDetails } from "../../components/dialogs/MoveToRejectedDialog";
 import type { WithdrawnDetails } from "../../components/dialogs/MoveToWithdrawnDialog";
 import type { AcceptedDetails } from "../../components/dialogs/MoveToAcceptedDialog";
-import InterviewCard, {
-  type InterviewWithStage,
-} from "./InterviewCard";
+
+import InterviewCard, { type InterviewWithStage } from "./InterviewCard";
 import { animateCardExit } from "../../components/dialogs/cardExitAnimation";
 
-import ActivityLogSidebar, {
-  type ActivityItem,
-  type ActivityType,
-} from "@/components/ActivityLogSidebar";
+import ActivityLogSidebar from "@/components/ActivityLogSidebar";
 
 import InterviewsFilter, {
   DEFAULT_INTERVIEW_FILTERS,
@@ -52,20 +49,23 @@ import {
   type InterviewsStorageMode,
 } from "@/lib/storage/interviews";
 
+// ✅ NEW: persistent activity storage (guest + Supabase user)
+import {
+  loadActivity,
+  appendActivity,
+  migrateGuestActivityToUser,
+  type ActivityItem,
+  type ActivityType,
+  type ActivityVariant,
+  type ActivityStorageMode,
+} from "@/lib/storage/activity";
+
 const REJECTIONS_STORAGE_KEY = "job-tracker:rejected";
 const WITHDRAWN_STORAGE_KEY = "job-tracker:withdrawn";
-const INTERVIEWS_ACTIVITY_STORAGE_KEY = "job-tracker:interviews-activity";
-const REJECTIONS_ACTIVITY_STORAGE_KEY = "job-tracker:rejected-activity";
-const WITHDRAWN_ACTIVITY_STORAGE_KEY = "job-tracker:withdrawn-activity";
 const ACCEPTED_STORAGE_KEY = "job-tracker:accepted";
 
-type ApplicationLike = ComponentProps<
-  typeof ScheduleInterviewDialog
->["application"];
-
-type MoveDialogApplication = ComponentProps<
-  typeof MoveApplicationDialog
->["application"];
+type ApplicationLike = ComponentProps<typeof ScheduleInterviewDialog>["application"];
+type MoveDialogApplication = ComponentProps<typeof MoveApplicationDialog>["application"];
 
 type RejectionRecord = RejectionDetails & { id: string };
 
@@ -111,55 +111,23 @@ const STAGE_FILTERS: {
   shortLabel: string;
   icon: ComponentType<any>;
 }[] = [
-  {
-    id: "upcoming",
-    label: "Upcoming interviews",
-    shortLabel: "Upcoming",
-    icon: Calendar,
-  },
-  {
-    id: "past",
-    label: "Interviews with passed dates",
-    shortLabel: "Passed",
-    icon: History,
-  },
-  {
-    id: "done",
-    label: "Done • waiting for answer",
-    shortLabel: "Done",
-    icon: CheckCircle2,
-  },
+  { id: "upcoming", label: "Upcoming interviews", shortLabel: "Upcoming", icon: Calendar },
+  { id: "past", label: "Interviews with passed dates", shortLabel: "Passed", icon: History },
+  { id: "done", label: "Done • waiting for answer", shortLabel: "Done", icon: CheckCircle2 },
 ];
 
-const INTERVIEW_TYPE_META: Record<
-  InterviewType,
-  { label: string; Icon: ComponentType<any> }
-> = {
+const INTERVIEW_TYPE_META: Record<InterviewType, { label: string; Icon: ComponentType<any> }> = {
   phone: { label: "Phone screening", Icon: PhoneCall },
   video: { label: "Video call", Icon: Video },
   "in-person": { label: "In person", Icon: Users },
 };
 
-// --- Pure, deterministic date formatting for display (no Date/Intl) ---
+// --- deterministic display (no Intl) ---
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
-const MONTHS_SHORT = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-] as const;
+const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
 
 function getWeekday(year: number, month: number, day: number): string {
-  // Tomohiko Sakamoto's algorithm
   const t = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4];
   let y = year;
   let m = month;
@@ -187,24 +155,18 @@ function formatDateTime(iso: string) {
   const day = Number(dayStr);
 
   if (!year || !month || !day) {
-    return {
-      date: iso,
-      time: timePartRaw ? timePartRaw.slice(0, 5) : "",
-    };
+    return { date: iso, time: timePartRaw ? timePartRaw.slice(0, 5) : "" };
   }
 
   const weekday = getWeekday(year, month, day);
   const monthName = MONTHS_SHORT[month - 1] ?? String(month).padStart(2, "0");
-  const date = `${weekday}, ${String(day).padStart(
-    2,
-    "0"
-  )} ${monthName} ${year}`;
+  const date = `${weekday}, ${String(day).padStart(2, "0")} ${monthName} ${year}`;
   const time = timePartRaw ? timePartRaw.slice(0, 5) : "";
 
   return { date, time };
 }
 
-// --- Helpers for countdown / countup (client-only via `now`) ---
+// --- countdown helpers ---
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -225,10 +187,7 @@ function getTodayUtcMidnight(nowMs: number): number {
   return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
 }
 
-function getInterviewCountdownLabel(
-  interviewIso: string,
-  nowMs: number | null
-): string | null {
+function getInterviewCountdownLabel(interviewIso: string, nowMs: number | null): string | null {
   if (!nowMs) return null;
   const interviewDay = parseToUtcMidnight(interviewIso);
   if (interviewDay == null) return null;
@@ -243,10 +202,7 @@ function getInterviewCountdownLabel(
   return `${Math.abs(diffDays)} days ago`;
 }
 
-function getAppliedCountupLabel(
-  appliedDate: string | undefined,
-  nowMs: number | null
-): string | null {
+function getAppliedCountupLabel(appliedDate: string | undefined, nowMs: number | null): string | null {
   if (!nowMs || !appliedDate) return null;
   const appliedDay = parseToUtcMidnight(appliedDate);
   if (appliedDay == null) return null;
@@ -254,54 +210,10 @@ function getAppliedCountupLabel(
   const today = getTodayUtcMidnight(nowMs);
   const diffDays = Math.round((today - appliedDay) / MS_PER_DAY);
 
-  if (diffDays < 0) return null; // future applied date, ignore
+  if (diffDays < 0) return null;
   if (diffDays === 0) return "today";
   if (diffDays === 1) return "1 day ago";
   return `${diffDays} days ago`;
-}
-
-function makeId(existingLength: number): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-  return `${Date.now()}-${existingLength}`;
-}
-
-const makeActivityId = () =>
-  typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : Math.random().toString(36).slice(2);
-
-function appendRejectedActivity(entry: ActivityItem) {
-  if (typeof window === "undefined") return;
-  try {
-    const raw = window.localStorage.getItem(REJECTIONS_ACTIVITY_STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    const prev: ActivityItem[] = Array.isArray(parsed) ? parsed : [];
-    const next = [entry, ...prev].slice(0, 100);
-    window.localStorage.setItem(
-      REJECTIONS_ACTIVITY_STORAGE_KEY,
-      JSON.stringify(next)
-    );
-  } catch (err) {
-    console.error("Failed to persist rejected activity from interviews", err);
-  }
-}
-
-function appendWithdrawnActivity(entry: ActivityItem) {
-  if (typeof window === "undefined") return;
-  try {
-    const raw = window.localStorage.getItem(WITHDRAWN_ACTIVITY_STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    const prev: ActivityItem[] = Array.isArray(parsed) ? parsed : [];
-    const next = [entry, ...prev].slice(0, 100);
-    window.localStorage.setItem(
-      WITHDRAWN_ACTIVITY_STORAGE_KEY,
-      JSON.stringify(next)
-    );
-  } catch (err) {
-    console.error("Failed to persist withdrawn activity from interviews", err);
-  }
 }
 
 function inferStageFromDate(iso: string | undefined | null): InterviewStage {
@@ -311,17 +223,33 @@ function inferStageFromDate(iso: string | undefined | null): InterviewStage {
   return timeMs < Date.now() ? "past" : "upcoming";
 }
 
-function ensureInterviewStage(
-  interview: Interview | InterviewWithStage
-): InterviewWithStage {
+function ensureInterviewStage(interview: Interview | InterviewWithStage): InterviewWithStage {
   const withAnyStage = interview as InterviewWithStage;
-  if (withAnyStage.stage) {
-    return withAnyStage;
+  if (withAnyStage.stage) return withAnyStage;
+  return { ...interview, stage: inferStageFromDate((interview as Interview).date) };
+}
+
+// ✅ UUID helper (valid uuid even without crypto.randomUUID)
+function makeUuidV4() {
+  const cryptoObj = globalThis.crypto as Crypto | undefined;
+  if (cryptoObj?.randomUUID) return cryptoObj.randomUUID();
+
+  const buf = new Uint8Array(16);
+  cryptoObj?.getRandomValues?.(buf);
+
+  if (!cryptoObj?.getRandomValues) {
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === "x" ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
   }
-  return {
-    ...interview,
-    stage: inferStageFromDate((interview as Interview).date),
-  };
+
+  buf[6] = (buf[6] & 0x0f) | 0x40;
+  buf[8] = (buf[8] & 0x3f) | 0x80;
+
+  const hex = [...buf].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 // --- Component ---
@@ -330,106 +258,55 @@ export default function InterviewsPage() {
   const [query, setQuery] = useState("");
   const [items, setItems] = useState<InterviewWithStage[]>([]);
   const [stageFilter, setStageFilter] = useState<InterviewStage>("upcoming");
-  const [filters, setFilters] = useState<InterviewFilters>(
-    DEFAULT_INTERVIEW_FILTERS
-  );
+  const [filters, setFilters] = useState<InterviewFilters>(DEFAULT_INTERVIEW_FILTERS);
 
-  const [storageMode, setStorageMode] =
-    useState<InterviewsStorageMode>("guest");
+  const [storageMode, setStorageMode] = useState<InterviewsStorageMode>("guest");
 
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [dialogApplication, setDialogApplication] =
-    useState<ApplicationLike>(null);
-  const [editingInterview, setEditingInterview] =
-    useState<InterviewWithStage | null>(null);
+  const [dialogApplication, setDialogApplication] = useState<ApplicationLike>(null);
+  const [editingInterview, setEditingInterview] = useState<InterviewWithStage | null>(null);
 
-  // For countdown / countup, only on client to avoid hydration issues
   const [now, setNow] = useState<number | null>(null);
 
-  // Delete confirmation dialog target
-  const [deleteTarget, setDeleteTarget] = useState<InterviewWithStage | null>(
-    null
-  );
+  const [deleteTarget, setDeleteTarget] = useState<InterviewWithStage | null>(null);
 
-  // Move dialog state (reusing MoveApplicationDialog)
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
-  const [moveDialogApplication, setMoveDialogApplication] =
-    useState<MoveDialogApplication>(null);
-  const [moveTargetInterview, setMoveTargetInterview] =
-    useState<InterviewWithStage | null>(null);
+  const [moveDialogApplication, setMoveDialogApplication] = useState<MoveDialogApplication>(null);
+  const [moveTargetInterview, setMoveTargetInterview] = useState<InterviewWithStage | null>(null);
 
-  // Activity log state for interviews
+  // ✅ Activity log state (persistent, guest + user)
   const [activityOpen, setActivityOpen] = useState(false);
   const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
-
-  // Helper to log interview activity (also persists to localStorage)
-  const logActivity = (
-    type: ActivityType,
-    interview: InterviewWithStage | null,
-    extras?: Partial<ActivityItem>
-  ) => {
-    if (!interview) return;
-
-    const id =
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : Math.random().toString(36).slice(2);
-
-    const timestamp = new Date().toISOString();
-
-    const base: ActivityItem = {
-      id,
-      appId: interview.id,
-      type,
-      timestamp,
-      company: interview.company,
-      role: interview.role,
-      location: interview.location,
-      appliedOn: interview.appliedOn,
-      ...extras,
-    };
-
-    setActivityItems((prev) => {
-      const next = [base, ...prev].slice(0, 100);
-      if (typeof window !== "undefined") {
-        try {
-          window.localStorage.setItem(
-            INTERVIEWS_ACTIVITY_STORAGE_KEY,
-            JSON.stringify(next)
-          );
-        } catch (err) {
-          console.error("Failed to persist interview activity log", err);
-        }
-      }
-      return next;
-    });
-  };
+  const [activityMode, setActivityMode] = useState<ActivityStorageMode>("guest");
 
   // keep "now" ticking
   useEffect(() => {
     if (typeof window === "undefined") return;
     setNow(Date.now());
-    const id = window.setInterval(() => {
-      setNow(Date.now());
-    }, 60_000); // update every minute
+    const id = window.setInterval(() => setNow(Date.now()), 60_000);
     return () => window.clearInterval(id);
   }, []);
 
-    // Load interview items from guest/user storage + handle auth changes
+  // Load interviews + activity, and handle auth changes
   useEffect(() => {
     let alive = true;
     const supabase = getSupabaseClient();
 
-    const load = async () => {
-      const { mode, items } = await loadInterviews();
+    const loadAll = async () => {
+      const [{ mode, items }, act] = await Promise.all([
+        loadInterviews(),
+        loadActivity("interviews"),
+      ]);
+
       if (!alive) return;
 
       setStorageMode(mode);
       setItems(items.map((i) => ensureInterviewStage(i as Interview)));
+      setActivityMode(act.mode);
+      setActivityItems(act.items);
     };
 
-    // Initial load
-    void load();
+    void loadAll();
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (!alive) return;
@@ -438,12 +315,13 @@ export default function InterviewsPage() {
         setTimeout(async () => {
           if (!alive) return;
           await migrateGuestInterviewsToUser();
-          await load();
+          await migrateGuestActivityToUser(); // ✅ migrates all variants
+          await loadAll();
         }, 0);
       } else if (event === "SIGNED_OUT") {
         setTimeout(async () => {
           if (!alive) return;
-          await load();
+          await loadAll();
         }, 0);
       }
     });
@@ -454,26 +332,35 @@ export default function InterviewsPage() {
     };
   }, []);
 
+  // ✅ persistent activity logger
+  const logActivity = async (
+    variant: ActivityVariant,
+    type: ActivityType,
+    interviewOrSource: InterviewWithStage | null,
+    extras?: Partial<ActivityItem>,
+    overrideAppId?: string
+  ) => {
+    if (!interviewOrSource) return;
 
+    const entry: ActivityItem = {
+      id: makeUuidV4(),
+      appId: overrideAppId ?? interviewOrSource.id,
+      type,
+      timestamp: new Date().toISOString(),
+      company: interviewOrSource.company,
+      role: interviewOrSource.role,
+      location: interviewOrSource.location,
+      appliedOn: interviewOrSource.appliedOn,
+      ...extras,
+    };
 
-  // Load existing interview activity log
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+    const saved = await appendActivity(variant, entry, activityMode);
 
-    try {
-      const rawActivity = window.localStorage.getItem(
-        INTERVIEWS_ACTIVITY_STORAGE_KEY
-      );
-      if (rawActivity) {
-        const parsed = JSON.parse(rawActivity);
-        if (Array.isArray(parsed)) {
-          setActivityItems(parsed);
-        }
-      }
-    } catch (err) {
-      console.error("Failed to load interview activity log", err);
+    // keep Interviews sidebar state in sync
+    if (variant === "interviews") {
+      setActivityItems((prev) => [saved, ...prev].slice(0, 100));
     }
-  }, []);
+  };
 
   const handleAdd = () => {
     setEditingInterview(null);
@@ -536,11 +423,10 @@ export default function InterviewsPage() {
     setDeleteTarget(item);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
 
-    // log before removing
-    logActivity("deleted", deleteTarget, {
+    await logActivity("interviews", "deleted", deleteTarget, {
       fromStatus: "Interview",
       note: "Interview deleted",
     });
@@ -550,16 +436,12 @@ export default function InterviewsPage() {
 
     animateCardExit(elementId, "delete", async () => {
       setItems((prev) => prev.filter((i) => i.id !== id));
-
       await deleteInterview(id, storageMode);
-
       setDeleteTarget(null);
     });
   };
 
-  const handleCancelDelete = () => {
-    setDeleteTarget(null);
-  };
+  const handleCancelDelete = () => setDeleteTarget(null);
 
   const handleDialogClose = () => {
     setDialogOpen(false);
@@ -573,30 +455,18 @@ export default function InterviewsPage() {
       : ensureInterviewStage(created);
 
     setItems((prev) => {
-      let next: InterviewWithStage[];
       if (editingInterview) {
-        // Replace existing interview by id
-        next = prev.map((item) =>
-          item.id === editingInterview.id ? createdWithStage : item
-        );
-      } else {
-        // Add new interview
-        next = [...prev, createdWithStage];
+        return prev.map((item) => (item.id === editingInterview.id ? createdWithStage : item));
       }
-      return next;
+      return [...prev, createdWithStage];
     });
 
     void upsertInterview(createdWithStage, storageMode);
 
-    // activity
     if (editingInterview) {
-      logActivity("edited", createdWithStage, {
-        note: "Interview updated",
-      });
+      void logActivity("interviews", "edited", createdWithStage, { note: "Interview updated" });
     } else {
-      logActivity("added", createdWithStage, {
-        note: "Interview scheduled",
-      });
+      void logActivity("interviews", "added", createdWithStage, { note: "Interview scheduled" });
     }
 
     setDialogOpen(false);
@@ -606,13 +476,11 @@ export default function InterviewsPage() {
 
   const handleStageChange = (interviewId: string, newStage: InterviewStage) => {
     setItems((prev) => {
-      const next = prev.map((item) =>
-        item.id === interviewId ? { ...item, stage: newStage } : item
-      );
+      const next = prev.map((item) => (item.id === interviewId ? { ...item, stage: newStage } : item));
 
       const target = next.find((item) => item.id === interviewId) || null;
       if (target) {
-        logActivity("edited", target, {
+        void logActivity("interviews", "edited", target, {
           note:
             newStage === "done"
               ? "Marked as done – waiting for answer"
@@ -628,71 +496,63 @@ export default function InterviewsPage() {
     });
   };
 
-  const handleMoveToRejectedFromInterviews = (details: RejectionDetails) => {
+  const handleMoveToRejectedFromInterviews = async (details: RejectionDetails) => {
     const source = moveTargetInterview;
     let newItem: RejectionRecord | null = null;
 
-    // 1) Append to rejected storage
+    // 1) Append to rejected storage (still local for cards)
     if (typeof window !== "undefined") {
       try {
         const raw = window.localStorage.getItem(REJECTIONS_STORAGE_KEY);
         const parsed = raw ? JSON.parse(raw) : [];
         const prev: RejectionRecord[] = Array.isArray(parsed) ? parsed : [];
 
-        newItem = {
-          id: makeId(prev.length),
-          ...details,
-        };
+        newItem = { id: makeUuidV4(), ...details };
 
         const nextRejected = [...prev, newItem];
-        window.localStorage.setItem(
-          REJECTIONS_STORAGE_KEY,
-          JSON.stringify(nextRejected)
-        );
+        window.localStorage.setItem(REJECTIONS_STORAGE_KEY, JSON.stringify(nextRejected));
       } catch (err) {
-        console.error(
-          "Failed to persist rejected application from interview",
-          err
-        );
+        console.error("Failed to persist rejected application from interview", err);
       }
     }
 
-    // 1b) Also log into Rejected activity log
-    if (newItem) {
-      appendRejectedActivity({
-        id: makeActivityId(),
-        appId: newItem.id,
-        type: "moved_to_rejected",
-        timestamp: new Date().toISOString(),
-        company: newItem.company,
-        role: newItem.role,
-        location: newItem.location,
-        appliedOn: newItem.appliedDate,
-        fromStatus: "Interview",
-        toStatus: "Rejected",
-        note: newItem.notes,
-      });
+    // 1b) Log into Rejected activity (persistent)
+    if (newItem && source) {
+      await logActivity(
+        "rejected",
+        "moved_to_rejected",
+        source,
+        {
+          timestamp: new Date().toISOString(),
+          company: newItem.company,
+          role: newItem.role,
+          location: newItem.location,
+          appliedOn: newItem.appliedDate,
+          fromStatus: "Interview",
+          toStatus: "Rejected",
+          note: newItem.notes,
+        },
+        newItem.id
+      );
     }
 
-    // 2) log move in Interviews activity
+    // 2) Log move in Interviews activity
     if (source) {
-      logActivity("moved_to_rejected", source, {
+      await logActivity("interviews", "moved_to_rejected", source, {
         fromStatus: "Interview",
         toStatus: "Rejected",
         note: (details as any).reason || "Moved to rejected",
       });
     }
 
-    // 3) Remove from interviews with animation + delete from storage
+    // 3) Remove from interviews + delete storage
     if (source) {
       const sourceId = source.id;
       const elementId = `interview-card-${sourceId}`;
 
       animateCardExit(elementId, "move", async () => {
         setItems((prev) => prev.filter((i) => i.id !== sourceId));
-
         await deleteInterview(sourceId, storageMode);
-
         handleMoveDialogClose();
       });
     } else {
@@ -700,7 +560,7 @@ export default function InterviewsPage() {
     }
   };
 
-  const handleMoveToWithdrawnFromInterviews = (details: WithdrawnDetails) => {
+  const handleMoveToWithdrawnFromInterviews = async (details: WithdrawnDetails) => {
     const source = moveTargetInterview;
     if (!source) {
       handleMoveDialogClose();
@@ -709,7 +569,7 @@ export default function InterviewsPage() {
 
     let newItem: WithdrawnRecord | null = null;
 
-    // 1) Append to withdrawn storage
+    // 1) Append to withdrawn storage (still local for cards)
     if (typeof window !== "undefined") {
       try {
         const raw = window.localStorage.getItem(WITHDRAWN_STORAGE_KEY);
@@ -717,7 +577,7 @@ export default function InterviewsPage() {
         const prev: WithdrawnRecord[] = Array.isArray(parsed) ? parsed : [];
 
         newItem = {
-          id: makeId(prev.length),
+          id: makeUuidV4(),
           company: details.company || source.company,
           role: details.role || source.role,
           location: details.location || source.location,
@@ -736,56 +596,50 @@ export default function InterviewsPage() {
         };
 
         const nextWithdrawn = [...prev, newItem];
-        window.localStorage.setItem(
-          WITHDRAWN_STORAGE_KEY,
-          JSON.stringify(nextWithdrawn)
-        );
+        window.localStorage.setItem(WITHDRAWN_STORAGE_KEY, JSON.stringify(nextWithdrawn));
       } catch (err) {
-        console.error(
-          "Failed to persist withdrawn application from interview",
-          err
-        );
+        console.error("Failed to persist withdrawn application from interview", err);
       }
     }
 
-    // 1b) Also log into Withdrawn activity log
+    // 1b) Log into Withdrawn activity (persistent)
     if (newItem) {
-      appendWithdrawnActivity({
-        id: makeActivityId(),
-        appId: newItem.id,
-        type: "moved_to_withdrawn",
-        timestamp: new Date().toISOString(),
-        company: newItem.company,
-        role: newItem.role,
-        location: newItem.location,
-        appliedOn: newItem.appliedOn,
-        fromStatus: "Interview",
-        toStatus: "Withdrawn",
-        note: newItem.notes || newItem.withdrawnReason,
-      });
+      await logActivity(
+        "withdrawn",
+        "moved_to_withdrawn",
+        source,
+        {
+          company: newItem.company,
+          role: newItem.role,
+          location: newItem.location,
+          appliedOn: newItem.appliedOn,
+          fromStatus: "Interview",
+          toStatus: "Withdrawn",
+          note: newItem.notes || newItem.withdrawnReason,
+        },
+        newItem.id
+      );
     }
 
-    // 2) log move in Interviews activity
-    logActivity("moved_to_withdrawn", source, {
+    // 2) Log move in Interviews activity
+    await logActivity("interviews", "moved_to_withdrawn", source, {
       fromStatus: "Interview",
       toStatus: "Withdrawn",
       note: details.reason || "Moved to withdrawn",
     });
 
-    // 3) Remove from interviews with animation + delete from storage
+    // 3) Remove from interviews + delete storage
     const sourceId = source.id;
     const elementId = `interview-card-${sourceId}`;
 
     animateCardExit(elementId, "move", async () => {
       setItems((prev) => prev.filter((i) => i.id !== sourceId));
-
       await deleteInterview(sourceId, storageMode);
-
       handleMoveDialogClose();
     });
   };
 
-  const handleMoveToAcceptedFromInterviews = (details: AcceptedDetails) => {
+  const handleMoveToAcceptedFromInterviews = async (details: AcceptedDetails) => {
     const source = moveTargetInterview;
     if (!source) {
       handleMoveDialogClose();
@@ -794,7 +648,7 @@ export default function InterviewsPage() {
 
     let newItem: AcceptedRecord | null = null;
 
-    // 1) Append to accepted storage
+    // 1) Append to accepted storage (cards)
     if (typeof window !== "undefined") {
       try {
         const raw = window.localStorage.getItem(ACCEPTED_STORAGE_KEY);
@@ -802,7 +656,7 @@ export default function InterviewsPage() {
         const prev: AcceptedRecord[] = Array.isArray(parsed) ? parsed : [];
 
         newItem = {
-          id: makeId(prev.length),
+          id: makeUuidV4(),
           company: details.company || source.company,
           role: details.role || source.role,
           location: details.location || source.location,
@@ -817,34 +671,47 @@ export default function InterviewsPage() {
         };
 
         const nextAccepted = [...prev, newItem];
-        window.localStorage.setItem(
-          ACCEPTED_STORAGE_KEY,
-          JSON.stringify(nextAccepted)
-        );
+        window.localStorage.setItem(ACCEPTED_STORAGE_KEY, JSON.stringify(nextAccepted));
       } catch (err) {
-        console.error(
-          "Failed to persist accepted application from interview",
-          err
-        );
+        console.error("Failed to persist accepted application from interview", err);
       }
     }
 
-    // 2) log move in Interviews activity (using existing type)
-    logActivity("edited", source, {
+    // ✅ 1b) Log into Offers activity (persistent) as "OFFER ACCEPTED"
+    // (Offers sidebar reads `type=edited` + `toStatus=accepted`)
+    if (newItem) {
+      await logActivity(
+        "offers" as ActivityVariant,
+        "edited",
+        source,
+        {
+          company: newItem.company,
+          role: newItem.role,
+          location: newItem.location,
+          appliedOn: newItem.appliedOn,
+          toStatus: "accepted",
+          fromStatus: "Interview",
+          note: newItem.notes,
+          offerAcceptedDate: newItem.decisionDate,
+        },
+        newItem.id
+      );
+    }
+
+    // 2) Log move in Interviews activity
+    await logActivity("interviews", "edited", source, {
       fromStatus: "Interview",
       toStatus: "Accepted",
       note: details.notes || "Moved to accepted",
     });
 
-    // 3) Remove from interviews with animation + delete from storage
+    // 3) Remove from interviews + delete storage
     const sourceId = source.id;
     const elementId = `interview-card-${sourceId}`;
 
     animateCardExit(elementId, "move", async () => {
       setItems((prev) => prev.filter((i) => i.id !== sourceId));
-
       await deleteInterview(sourceId, storageMode);
-
       handleMoveDialogClose();
     });
   };
@@ -859,7 +726,6 @@ export default function InterviewsPage() {
     [items, stageFilter]
   );
 
-  // per-stage counts (respecting search + filters)
   const cardsPerStage = useMemo(() => {
     const stages: InterviewStage[] = ["upcoming", "past", "done"];
     const result = {} as Record<InterviewStage, number>;
@@ -869,10 +735,8 @@ export default function InterviewsPage() {
     return result;
   }, [items, query, filters]);
 
-  // number of cards currently visible (current stage + filters + search)
   const cardCount = filtered.length;
 
-  // Formatting + status styles for MoveApplicationDialog
   const fmtDate = (date: string) => date;
   const statusClasses = (status: string) => {
     if (status.toLowerCase().includes("interview")) {
@@ -893,7 +757,6 @@ export default function InterviewsPage() {
         items={activityItems}
       />
 
-      {/* Dialog shared for Add + Edit */}
       <ScheduleInterviewDialog
         open={dialogOpen}
         onClose={handleDialogClose}
@@ -902,14 +765,11 @@ export default function InterviewsPage() {
         mode={editingInterview ? "edit" : "add"}
       />
 
-      {/* Move dialog (reusing MoveApplicationDialog with 2 buttons + accepted) */}
       <MoveApplicationDialog
         open={moveDialogOpen && !!moveDialogApplication}
         application={moveDialogApplication}
         onClose={handleMoveDialogClose}
-        onMoveToInterviews={() => {
-          // Not used when mode="from-interviews"
-        }}
+        onMoveToInterviews={() => {}}
         onMoveToRejected={handleMoveToRejectedFromInterviews}
         onMoveToWithdrawn={handleMoveToWithdrawnFromInterviews}
         onMoveToAccepted={handleMoveToAcceptedFromInterviews}
@@ -921,31 +781,24 @@ export default function InterviewsPage() {
       {/* Delete confirmation dialog */}
       {deleteTarget && (
         <div className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[13000] flex items-center justify-center px-4 py-8">
-          {/* Backdrop */}
           <div
             className="absolute inset-0 bg-neutral-900/40"
             aria-hidden="true"
             onClick={handleCancelDelete}
           />
-
-          {/* Panel */}
           <div
             className={[
               "relative z-10 w-full max-w-sm rounded-2xl border border-neutral-200/80",
               "bg-white shadow-2xl p-5",
             ].join(" ")}
           >
-            <h2 className="text-sm font-semibold text-neutral-900">
-              Delete interview?
-            </h2>
+            <h2 className="text-sm font-semibold text-neutral-900">Delete interview?</h2>
             <p className="mt-2 text-sm text-neutral-700">
               This will permanently remove the interview with{" "}
-              <span className="font-medium">{deleteTarget.company}</span> for
-              the role <span className="font-medium">{deleteTarget.role}</span>.
+              <span className="font-medium">{deleteTarget.company}</span> for the role{" "}
+              <span className="font-medium">{deleteTarget.role}</span>.
             </p>
-            <p className="mt-1 text-xs text-neutral-500">
-              This action cannot be undone.
-            </p>
+            <p className="mt-1 text-xs text-neutral-500">This action cannot be undone.</p>
 
             <div className="mt-4 flex justify-end gap-2">
               <button
@@ -974,11 +827,9 @@ export default function InterviewsPage() {
           "p-8 shadow-md",
         ].join(" ")}
       >
-        {/* soft emerald/teal blobs */}
         <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-emerald-400/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-teal-400/20 blur-3xl" />
 
-        {/* header row with activity button */}
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Image
@@ -989,10 +840,7 @@ export default function InterviewsPage() {
               aria-hidden="true"
               className="shrink-0 -mt-1"
             />
-            <h1 className="text-2xl font-semibold text-neutral-900">
-              Interviews
-            </h1>
-            {/* Card count indicator */}
+            <h1 className="text-2xl font-semibold text-neutral-900">Interviews</h1>
             <span className="inline-flex items-center rounded-full border border-neutral-200 bg-white/80 px-2.5 py-0.5 text-xs font-medium text-neutral-800 shadow-sm">
               {cardCount} card{cardCount === 1 ? "" : "s"}
             </span>
@@ -1022,9 +870,7 @@ export default function InterviewsPage() {
           Track upcoming and past interviews, outcomes, and notes.
         </p>
 
-        {/* Toolbar */}
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-          {/* Search */}
           <div className="relative flex-1">
             <Search
               className="pointer-events-none absolute left-3 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-neutral-400"
@@ -1048,7 +894,6 @@ export default function InterviewsPage() {
             />
           </div>
 
-          {/* Add */}
           <button
             type="button"
             onClick={handleAdd}
@@ -1063,7 +908,6 @@ export default function InterviewsPage() {
             Add
           </button>
 
-          {/* Interviews filter */}
           <InterviewsFilter
             items={items}
             filters={filters}
@@ -1073,7 +917,6 @@ export default function InterviewsPage() {
           />
         </div>
 
-        {/* Stage view toggle */}
         <div className="mt-3 w-full">
           <div
             className={[
@@ -1095,26 +938,18 @@ export default function InterviewsPage() {
                   onClick={() => setStageFilter(option.id)}
                   className={[
                     "flex items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-[11px] font-medium transition",
-                    active
-                      ? "bg-emerald-600 text-white shadow-sm"
-                      : "text-neutral-700 hover:bg-neutral-50",
+                    active ? "bg-emerald-600 text-white shadow-sm" : "text-neutral-700 hover:bg-neutral-50",
                   ].join(" ")}
                   aria-pressed={active}
                   role="tab"
                 >
                   <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-                  <span className="hidden sm:inline">
-                    {option.label}
-                  </span>
-                  <span className="sm:hidden">
-                    {option.shortLabel}
-                  </span>
+                  <span className="hidden sm:inline">{option.label}</span>
+                  <span className="sm:hidden">{option.shortLabel}</span>
                   <span
                     className={[
                       "ml-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-[10px] font-semibold",
-                      active
-                        ? "bg-white/90 text-emerald-700"
-                        : "bg-neutral-200/80 text-neutral-800",
+                      active ? "bg-white/90 text-emerald-700" : "bg-neutral-200/80 text-neutral-800",
                     ].join(" ")}
                   >
                     {stageCount}
@@ -1125,12 +960,10 @@ export default function InterviewsPage() {
           </div>
         </div>
 
-        {/* Grid */}
         <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((item) => {
             const { date, time } = formatDateTime(item.date);
-            const { label: typeLabel, Icon: TypeIcon } =
-              INTERVIEW_TYPE_META[item.type];
+            const { label: typeLabel, Icon: TypeIcon } = INTERVIEW_TYPE_META[item.type];
             const countdownLabel = getInterviewCountdownLabel(item.date, now);
             const appliedLabel = getAppliedCountupLabel(item.appliedOn, now);
 
@@ -1147,9 +980,7 @@ export default function InterviewsPage() {
                 onEdit={handleEdit}
                 onMove={handleMove}
                 onDelete={openDeleteDialog}
-                onStageChange={(newStage) =>
-                  handleStageChange(item.id, newStage)
-                }
+                onStageChange={(newStage) => handleStageChange(item.id, newStage)}
               />
             );
           })}
@@ -1170,8 +1001,7 @@ export default function InterviewsPage() {
                     .
                   </p>
                   <p className="mt-1 text-xs text-neutral-500">
-                    Click <span className="font-medium">Add</span> to schedule
-                    your next interview.
+                    Click <span className="font-medium">Add</span> to schedule your next interview.
                   </p>
                 </>
               ) : (

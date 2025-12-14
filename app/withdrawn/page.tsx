@@ -10,9 +10,9 @@ import MoveToWithdrawnDialog, {
   type WithdrawnDetails,
 } from "@/components/dialogs/MoveToWithdrawnDialog";
 import { animateCardExit } from "@/components/dialogs/cardExitAnimation";
-import ActivityLogSidebar, {
-  type ActivityItem,
-} from "@/components/ActivityLogSidebar";
+import ActivityLogSidebar, { type ActivityItem } from "@/components/ActivityLogSidebar";
+
+import { getSupabaseClient } from "@/lib/supabase/client";
 import {
   loadWithdrawn,
   upsertWithdrawn,
@@ -20,7 +20,13 @@ import {
   type WithdrawnStorageMode,
 } from "@/lib/storage/withdrawn";
 
-const WITHDRAWN_ACTIVITY_STORAGE_KEY = "job-tracker:withdrawn-activity";
+// ✅ NEW: persistent activity storage (guest + Supabase user)
+import {
+  loadActivity,
+  appendActivity as appendActivityToStorage,
+  migrateGuestActivityToUser,
+  type ActivityStorageMode,
+} from "@/lib/storage/activity";
 
 const INTERVIEW_TYPE_LABEL: Record<InterviewType, string> = {
   phone: "Phone screening",
@@ -33,91 +39,87 @@ const makeId = () =>
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-type ApplicationLike = React.ComponentProps<
-  typeof MoveToWithdrawnDialog
->["application"];
+type ApplicationLike = React.ComponentProps<typeof MoveToWithdrawnDialog>["application"];
 
 export default function WithdrawnPage() {
   const [withdrawn, setWithdrawn] = useState<WithdrawnRecord[]>([]);
-  const [storageMode, setStorageMode] =
-    useState<WithdrawnStorageMode>("guest");
+  const [storageMode, setStorageMode] = useState<WithdrawnStorageMode>("guest");
   const [query, setQuery] = useState("");
-  const [deleteTarget, setDeleteTarget] = useState<WithdrawnRecord | null>(
-    null
-  );
+  const [deleteTarget, setDeleteTarget] = useState<WithdrawnRecord | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
   // Add/edit dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [dialogApplication, setDialogApplication] =
-    useState<ApplicationLike>(null);
-  const [editingWithdrawn, setEditingWithdrawn] =
-    useState<WithdrawnRecord | null>(null);
+  const [dialogApplication, setDialogApplication] = useState<ApplicationLike>(null);
+  const [editingWithdrawn, setEditingWithdrawn] = useState<WithdrawnRecord | null>(null);
 
-  // Activity log sidebar & data
+  // ✅ Activity log sidebar & data (guest + user)
   const [activityOpen, setActivityOpen] = useState(false);
   const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
+  const [activityMode, setActivityMode] = useState<ActivityStorageMode>("guest");
 
-  // helper to append to activity log (and persist)
-  const appendActivity = (entry: ActivityItem) => {
-    setActivityItems((prev) => {
-      const next = [entry, ...prev].slice(0, 100);
-      if (typeof window !== "undefined") {
-        try {
-          window.localStorage.setItem(
-            WITHDRAWN_ACTIVITY_STORAGE_KEY,
-            JSON.stringify(next)
-          );
-        } catch (err) {
-          console.error(
-            "Failed to persist withdrawn activity to localStorage",
-            err
-          );
-        }
-      }
-      return next;
-    });
+  // ✅ Persist activity (guest + user)
+  const persistActivity = (entry: ActivityItem) => {
+    appendActivityToStorage("withdrawn", entry, activityMode)
+      .then((saved) => {
+        setActivityItems((prev) => [saved, ...prev].slice(0, 100));
+      })
+      .catch((err) => {
+        console.error("Failed to persist withdrawn activity", err);
+        // fallback: still show it in UI
+        setActivityItems((prev) => [entry, ...prev].slice(0, 100));
+      });
   };
 
-  // Load withdrawn records (guest or user) on mount
+  // ✅ Load withdrawn + withdrawn activity, and handle auth switching
   useEffect(() => {
-    let cancelled = false;
+    let alive = true;
+    const supabase = getSupabaseClient();
 
-    (async () => {
+    const loadAll = async () => {
       try {
-        const { mode, items } = await loadWithdrawn();
-        if (cancelled) return;
+        const [{ mode, items }, act] = await Promise.all([
+          loadWithdrawn(),
+          loadActivity("withdrawn"),
+        ]);
+
+        if (!alive) return;
+
         setStorageMode(mode);
         setWithdrawn(items as WithdrawnRecord[]);
+
+        setActivityMode(act.mode);
+        setActivityItems(act.items as ActivityItem[]);
       } catch (err) {
-        console.error("Failed to load withdrawn applications:", err);
+        console.error("Failed to load withdrawn/activity:", err);
       } finally {
-        if (!cancelled) setHydrated(true);
+        if (alive) setHydrated(true);
       }
-    })();
+    };
+
+    void loadAll();
+
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!alive) return;
+
+      if (event === "SIGNED_IN" && session?.user) {
+        setTimeout(async () => {
+          if (!alive) return;
+          await migrateGuestActivityToUser(); // ✅ migrates withdrawn activity too
+          await loadAll();
+        }, 0);
+      } else if (event === "SIGNED_OUT") {
+        setTimeout(async () => {
+          if (!alive) return;
+          await loadAll();
+        }, 0);
+      }
+    });
 
     return () => {
-      cancelled = true;
+      alive = false;
+      sub?.subscription?.unsubscribe();
     };
-  }, []);
-
-  // Load activity log from localStorage on mount
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    try {
-      const rawActivity = window.localStorage.getItem(
-        WITHDRAWN_ACTIVITY_STORAGE_KEY
-      );
-      if (rawActivity) {
-        const parsedActivity = JSON.parse(rawActivity);
-        if (Array.isArray(parsedActivity)) {
-          setActivityItems(parsedActivity);
-        }
-      }
-    } catch (err) {
-      console.error("Failed to load withdrawn activity from localStorage", err);
-    }
   }, []);
 
   const filtered = useMemo(() => {
@@ -133,21 +135,16 @@ export default function WithdrawnPage() {
         item.contactName,
         item.contactEmail,
         item.notes,
-        item.interviewType
-          ? INTERVIEW_TYPE_LABEL[item.interviewType]
-          : undefined,
+        item.interviewType ? INTERVIEW_TYPE_LABEL[item.interviewType] : undefined,
       ]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q))
     );
   }, [query, withdrawn]);
 
-  // how many cards are currently visible (after search)
   const cardCount = filtered.length;
 
-  const openDeleteDialog = (item: WithdrawnRecord) => {
-    setDeleteTarget(item);
-  };
+  const openDeleteDialog = (item: WithdrawnRecord) => setDeleteTarget(item);
 
   const handleConfirmDelete = () => {
     if (!deleteTarget) return;
@@ -158,15 +155,12 @@ export default function WithdrawnPage() {
     animateCardExit(elementId, "delete", () => {
       setWithdrawn((prev) => prev.filter((i) => i.id !== id));
 
-      // persist delete via storage layer
       deleteWithdrawn(id, storageMode).catch((err) => {
         console.error("Failed to delete withdrawn application:", err);
       });
 
-      // log delete activity
-      const activityId = makeId();
-      appendActivity({
-        id: activityId,
+      persistActivity({
+        id: makeId(),
         appId: target.id,
         type: "deleted",
         timestamp: new Date().toISOString(),
@@ -181,9 +175,7 @@ export default function WithdrawnPage() {
     });
   };
 
-  const handleCancelDelete = () => {
-    setDeleteTarget(null);
-  };
+  const handleCancelDelete = () => setDeleteTarget(null);
 
   // --- Add / Edit withdrawn via MoveToWithdrawnDialog ---
 
@@ -207,10 +199,8 @@ export default function WithdrawnPage() {
       offerUrl: item.url,
       logoUrl: item.logoUrl,
       notes: item.notes,
-      // used by dialog to prefill existing withdrawn data
       withdrawnDate: item.withdrawnDate,
       reason: item.withdrawnReason,
-      // prefill stage info
       interviewDate: item.interviewDate,
       interviewType: item.interviewType,
     };
@@ -229,7 +219,6 @@ export default function WithdrawnPage() {
   const handleSaveWithdrawn = useCallback(
     (details: WithdrawnDetails) => {
       if (editingWithdrawn) {
-        // Update existing withdrawn record
         const updated: WithdrawnRecord = {
           ...editingWithdrawn,
           company: details.company,
@@ -238,31 +227,24 @@ export default function WithdrawnPage() {
           appliedOn: details.appliedDate ?? editingWithdrawn.appliedOn,
           withdrawnDate: details.withdrawnDate,
           withdrawnReason: details.reason,
-          employmentType:
-            details.employmentType ?? editingWithdrawn.employmentType,
+          employmentType: details.employmentType ?? editingWithdrawn.employmentType,
           contactName: details.contactName ?? editingWithdrawn.contactName,
           contactEmail: details.contactEmail ?? editingWithdrawn.contactEmail,
           contactPhone: details.contactPhone ?? editingWithdrawn.contactPhone,
           url: details.url ?? editingWithdrawn.url,
           logoUrl: details.logoUrl ?? editingWithdrawn.logoUrl,
           notes: details.notes ?? editingWithdrawn.notes,
-          interviewType:
-            details.interviewType ?? editingWithdrawn.interviewType,
+          interviewType: details.interviewType ?? editingWithdrawn.interviewType,
         };
 
-        setWithdrawn((prev) =>
-          prev.map((item) => (item.id === updated.id ? updated : item))
-        );
+        setWithdrawn((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
 
-        // persist via storage layer
         upsertWithdrawn(updated, storageMode).catch((err) => {
           console.error("Failed to persist edited withdrawn application:", err);
         });
 
-        // log edit activity
-        const activityId = makeId();
-        appendActivity({
-          id: activityId,
+        persistActivity({
+          id: makeId(),
           appId: updated.id,
           type: "edited",
           timestamp: new Date().toISOString(),
@@ -273,7 +255,6 @@ export default function WithdrawnPage() {
           note: updated.notes,
         });
       } else {
-        // Create new withdrawn record
         const newItem: WithdrawnRecord = {
           id: makeId(),
           company: details.company,
@@ -290,23 +271,16 @@ export default function WithdrawnPage() {
           logoUrl: details.logoUrl,
           notes: details.notes,
           interviewType: details.interviewType,
-          // interviewDate left empty here (withdrawn before interview, unless you add it later)
         };
 
         setWithdrawn((prev) => [...prev, newItem]);
 
-        // persist via storage layer
         upsertWithdrawn(newItem, storageMode).catch((err) => {
-          console.error(
-            "Failed to persist newly created withdrawn application:",
-            err
-          );
+          console.error("Failed to persist newly created withdrawn application:", err);
         });
 
-        // log add activity
-        const activityId = makeId();
-        appendActivity({
-          id: activityId,
+        persistActivity({
+          id: makeId(),
           appId: newItem.id,
           type: "added",
           timestamp: new Date().toISOString(),
@@ -322,7 +296,7 @@ export default function WithdrawnPage() {
       setEditingWithdrawn(null);
       setDialogApplication(null);
     },
-    [editingWithdrawn, storageMode]
+    [editingWithdrawn, storageMode, activityMode] // activityMode is used indirectly via persistActivity
   );
 
   return (
@@ -349,17 +323,13 @@ export default function WithdrawnPage() {
               "bg-white shadow-2xl p-5",
             ].join(" ")}
           >
-            <h2 className="text-sm font-semibold text-neutral-900">
-              Delete withdrawn application?
-            </h2>
+            <h2 className="text-sm font-semibold text-neutral-900">Delete withdrawn application?</h2>
             <p className="mt-2 text-sm text-neutral-700">
               This will permanently remove the withdrawn application at{" "}
-              <span className="font-medium">{deleteTarget.company}</span> for
-              the role <span className="font-medium">{deleteTarget.role}</span>.
+              <span className="font-medium">{deleteTarget.company}</span> for the role{" "}
+              <span className="font-medium">{deleteTarget.role}</span>.
             </p>
-            <p className="mt-1 text-xs text-neutral-500">
-              This action cannot be undone.
-            </p>
+            <p className="mt-1 text-xs text-neutral-500">This action cannot be undone.</p>
 
             <div className="mt-4 flex justify-end gap-2">
               <button
@@ -388,11 +358,9 @@ export default function WithdrawnPage() {
           "p-8 shadow-md overflow-hidden",
         ].join(" ")}
       >
-        {/* soft amber/rose blobs */}
         <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-amber-400/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-rose-400/20 blur-3xl" />
 
-        {/* header row with activity button */}
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Image
@@ -403,10 +371,7 @@ export default function WithdrawnPage() {
               aria-hidden="true"
               className="shrink-0 -mt-1"
             />
-            <h1 className="text-2xl font-semibold text-neutral-900">
-              Withdrawn
-            </h1>
-            {/* card count indicator */}
+            <h1 className="text-2xl font-semibold text-neutral-900">Withdrawn</h1>
             <span className="inline-flex items-center rounded-full border border-neutral-200 bg-white/80 px-2.5 py-0.5 text-xs font-medium text-neutral-800 shadow-sm">
               {cardCount} card{cardCount === 1 ? "" : "s"}
             </span>
@@ -432,13 +397,9 @@ export default function WithdrawnPage() {
           </button>
         </div>
 
-        <p className="mt-1 text-neutral-700">
-          Applications you chose to step away from.
-        </p>
+        <p className="mt-1 text-neutral-700">Applications you chose to step away from.</p>
 
-        {/* Toolbar: Search + Add + Filter */}
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-          {/* Search */}
           <div className="relative flex-1">
             <Search
               className="pointer-events-none absolute left-3 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-neutral-400"
@@ -462,7 +423,6 @@ export default function WithdrawnPage() {
             />
           </div>
 
-          {/* Add */}
           <button
             type="button"
             onClick={handleAdd}
@@ -477,7 +437,7 @@ export default function WithdrawnPage() {
             Add
           </button>
 
-          {/* Filter (placeholder) */}
+          {/* (still placeholder) */}
           <button
             type="button"
             className={[
@@ -492,7 +452,6 @@ export default function WithdrawnPage() {
           </button>
         </div>
 
-        {/* Grid */}
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((item) => (
             <WithdrawnCard
@@ -504,7 +463,7 @@ export default function WithdrawnPage() {
           ))}
 
           {hydrated && filtered.length === 0 && (
-            <div className="col-span-full flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text:center backdrop-blur">
+            <div className="col-span-full flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
               <div className="mb-2 text-5xl">🚪</div>
 
               {withdrawn.length === 0 ? (
@@ -513,8 +472,7 @@ export default function WithdrawnPage() {
                     You don&apos;t have any withdrawn applications yet.
                   </p>
                   <p className="mt-1 text-xs text-neutral-500">
-                    When you move an application to withdrawn or add one
-                    manually, it will show up here.
+                    When you move an application to withdrawn or add one manually, it will show up here.
                   </p>
                 </>
               ) : (
@@ -527,7 +485,6 @@ export default function WithdrawnPage() {
         </div>
       </section>
 
-      {/* Manual add/edit withdrawn dialog */}
       <MoveToWithdrawnDialog
         open={dialogOpen}
         onClose={handleDialogClose}

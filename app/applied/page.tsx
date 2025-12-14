@@ -1,11 +1,6 @@
 'use client';
 
-import {
-  useEffect,
-  useMemo,
-  useState,
-  useCallback,
-} from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { Search, Plus, History, X } from 'lucide-react';
 import Image from 'next/image';
 import { animateCardExit } from '../../components/dialogs/cardExitAnimation';
@@ -18,10 +13,7 @@ import type { RejectionDetails } from '../../components/dialogs/MoveToRejectedDi
 import type { WithdrawnDetails } from '../../components/dialogs/MoveToWithdrawnDialog';
 import type { Interview } from '../../components/dialogs/ScheduleInterviewDialog';
 import ApplicationCard, { type Application } from './ApplicationCard';
-import ActivityLogSidebar, {
-  type ActivityItem,
-  type ActivityType,
-} from '@/components/ActivityLogSidebar';
+import ActivityLogSidebar from '@/components/ActivityLogSidebar';
 
 import { getSupabaseClient } from '@/lib/supabase/client';
 import {
@@ -38,6 +30,17 @@ import ApplicationsFilter, {
   filterApplications,
   type ApplicationFilters,
 } from '@/components/filters/ApplicationsFilter';
+
+// ✅ NEW: persistent activity storage
+import {
+  loadActivity,
+  appendActivity,
+  migrateGuestActivityToUser,
+  type ActivityItem,
+  type ActivityType,
+  type ActivityVariant,
+  type ActivityStorageMode,
+} from '@/lib/storage/activity';
 
 type StoredRejection = RejectionDetails & { id: string };
 
@@ -60,10 +63,6 @@ type StoredWithdrawn = {
 
 const REJECTIONS_STORAGE_KEY = 'job-tracker:rejected';
 const WITHDRAWN_STORAGE_KEY = 'job-tracker:withdrawn';
-
-// target activity logs (read by RejectedPage and WithdrawnPage)
-const REJECTIONS_ACTIVITY_STORAGE_KEY = 'job-tracker:rejected-activity';
-const WITHDRAWN_ACTIVITY_STORAGE_KEY = 'job-tracker:withdrawn-activity';
 
 function fmtDate(d: string) {
   const date = new Date(d);
@@ -96,41 +95,32 @@ function appToForm(app: Application): NewApplicationForm {
   return rest;
 }
 
-const makeActivityId = () =>
-  typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? crypto.randomUUID()
-    : Math.random().toString(36).slice(2);
+// ✅ UUID helper (valid uuid even without crypto.randomUUID)
+function makeUuidV4() {
+  const cryptoObj = globalThis.crypto as Crypto | undefined;
+  if (cryptoObj?.randomUUID) return cryptoObj.randomUUID();
 
-function appendRejectedActivity(entry: ActivityItem) {
-  if (typeof window === 'undefined') return;
-  try {
-    const raw = window.localStorage.getItem(REJECTIONS_ACTIVITY_STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    const prev: ActivityItem[] = Array.isArray(parsed) ? parsed : [];
-    const next = [entry, ...prev].slice(0, 100);
-    window.localStorage.setItem(
-      REJECTIONS_ACTIVITY_STORAGE_KEY,
-      JSON.stringify(next),
-    );
-  } catch (err) {
-    console.error('Failed to persist rejected activity log', err);
-  }
-}
+  const buf = new Uint8Array(16);
+  cryptoObj?.getRandomValues?.(buf);
 
-function appendWithdrawnActivity(entry: ActivityItem) {
-  if (typeof window === 'undefined') return;
-  try {
-    const raw = window.localStorage.getItem(WITHDRAWN_ACTIVITY_STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    const prev: ActivityItem[] = Array.isArray(parsed) ? parsed : [];
-    const next = [entry, ...prev].slice(0, 100);
-    window.localStorage.setItem(
-      WITHDRAWN_ACTIVITY_STORAGE_KEY,
-      JSON.stringify(next),
-    );
-  } catch (err) {
-    console.error('Failed to persist withdrawn activity log', err);
+  // If crypto is missing (very rare in modern browsers), fallback to a fixed-ish uuid shape
+  if (!cryptoObj?.getRandomValues) {
+    const s = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+    return s;
   }
+
+  buf[6] = (buf[6] & 0x0f) | 0x40;
+  buf[8] = (buf[8] & 0x3f) | 0x80;
+
+  const hex = [...buf].map((b) => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(
+    16,
+    20,
+  )}-${hex.slice(20)}`;
 }
 
 export default function AppliedPage() {
@@ -148,44 +138,57 @@ export default function AppliedPage() {
   // Delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState<Application | null>(null);
 
-  // Activity sidebar / log state (for Applied page)
+  // Activity sidebar / log state (Applied page)
   const [activityOpen, setActivityOpen] = useState(false);
   const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
+  const [activityMode, setActivityMode] = useState<ActivityStorageMode>('guest');
 
-  // Shared filters state (can be reused on other pages)
+  // Shared filters state
   const [filters, setFilters] =
     useState<ApplicationFilters>(DEFAULT_APPLICATION_FILTERS);
 
-    // ---------- load initial data + auth switching ----------
+  // ---------- load initial data + auth switching ----------
   useEffect(() => {
     let alive = true;
     const supabase = getSupabaseClient();
 
-    const load = async () => {
+    const loadApps = async () => {
       const { mode, items } = await loadApplied();
       if (!alive) return;
       setStorageMode(mode);
       setApplications(items);
     };
 
-    // Initial load – uses whatever session exists (guest or user)
-    void load();
+    const loadAppliedActivity = async () => {
+      const { mode, items } = await loadActivity('applied');
+      if (!alive) return;
+      setActivityMode(mode);
+      setActivityItems(items);
+    };
+
+    // Initial load
+    void loadApps();
+    void loadAppliedActivity();
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (!alive) return;
 
-      if (event === "SIGNED_IN" && session?.user) {
-        // Migrate guest data + reload AFTER this callback finishes
+      if (event === 'SIGNED_IN' && session?.user) {
         setTimeout(async () => {
           if (!alive) return;
+
+          // ✅ migrate guest data (apps + ALL activity variants) then reload
           await migrateGuestAppliedToUser();
-          await load();
+          await migrateGuestActivityToUser();
+
+          await loadApps();
+          await loadAppliedActivity();
         }, 0);
-      } else if (event === "SIGNED_OUT") {
-        // Reload in guest mode
+      } else if (event === 'SIGNED_OUT') {
         setTimeout(async () => {
           if (!alive) return;
-          await load();
+          await loadApps();
+          await loadAppliedActivity();
         }, 0);
       }
     });
@@ -196,28 +199,26 @@ export default function AppliedPage() {
     };
   }, []);
 
-
-
+  /**
+   * ✅ persistent logger:
+   * - writes to Supabase if user, else guest store
+   * - updates local state
+   */
   const logActivity = useCallback(
-    (
+    async (
+      variant: ActivityVariant,
       type: ActivityType,
       app: Application | null,
       extras?: Partial<ActivityItem>,
+      overrideAppId?: string, // when the target page card uses a different id (e.g. rejected/withdrawn new record)
     ) => {
       if (!app) return;
 
-      const id =
-        typeof crypto !== 'undefined' && 'randomUUID' in crypto
-          ? crypto.randomUUID()
-          : Math.random().toString(36).slice(2);
-
-      const timestamp = new Date().toISOString();
-
-      const base: ActivityItem = {
-        id,
-        appId: app.id,
+      const entry: ActivityItem = {
+        id: makeUuidV4(),
+        appId: overrideAppId ?? app.id,
         type,
-        timestamp,
+        timestamp: new Date().toISOString(),
         company: app.company,
         role: app.role,
         location: app.location,
@@ -225,12 +226,17 @@ export default function AppliedPage() {
         ...extras,
       };
 
-      setActivityItems((prev) => [base, ...prev].slice(0, 100));
+      const saved = await appendActivity(variant, entry, activityMode);
+
+      // only keep Applied page sidebar state in sync when logging for "applied"
+      if (variant === 'applied') {
+        setActivityItems((prev) => [saved, ...prev].slice(0, 100));
+      }
     },
-    [],
+    [activityMode],
   );
 
-  // ---------- filtered list using shared helper ----------
+  // ---------- filtered list ----------
   const filtered = useMemo(
     () => filterApplications(applications, query, filters),
     [applications, query, filters],
@@ -245,10 +251,7 @@ export default function AppliedPage() {
 
   // ---------- create / update ----------
   const handleCreate = async (data: NewApplicationForm) => {
-    const id =
-      typeof crypto !== 'undefined' && 'randomUUID' in crypto
-        ? crypto.randomUUID()
-        : Math.random().toString(36).slice(2);
+    const id = makeUuidV4();
 
     const newApp: Application = {
       id,
@@ -260,7 +263,7 @@ export default function AppliedPage() {
     // persist (guest or user)
     await upsertApplied(newApp, storageMode);
 
-    logActivity('added', newApp, {
+    await logActivity('applied', 'added', newApp, {
       toStatus: newApp.status,
       note: 'Application created',
     });
@@ -277,7 +280,7 @@ export default function AppliedPage() {
 
     await upsertApplied(updatedApp, storageMode);
 
-    logActivity('edited', updatedApp, {
+    await logActivity('applied', 'edited', updatedApp, {
       fromStatus: editingApp.status,
       toStatus: data.status,
     });
@@ -307,7 +310,7 @@ export default function AppliedPage() {
     const id = deleteTarget.id;
     const elementId = `application-card-${id}`;
 
-    logActivity('deleted', deleteTarget, {
+    await logActivity('applied', 'deleted', deleteTarget, {
       fromStatus: deleteTarget.status,
       note: 'Application removed from Applied list',
     });
@@ -338,8 +341,7 @@ export default function AppliedPage() {
     setAppBeingMoved(null);
   };
 
-  // When moving an application OUT of "Applied",
-  // we play the move animation, then remove it from this list.
+  // When moving an application OUT of "Applied"
   const moveOutOfApplied = () => {
     if (!appBeingMoved) return;
 
@@ -356,13 +358,20 @@ export default function AppliedPage() {
     });
   };
 
-  const moveToInterviews = (_interview: Interview) => {
+  const moveToInterviews = async (_interview: Interview) => {
     if (!appBeingMoved) {
       moveOutOfApplied();
       return;
     }
 
-    logActivity('moved_to_interviews', appBeingMoved, {
+    // ✅ log on Applied page
+    await logActivity('applied', 'moved_to_interviews', appBeingMoved, {
+      fromStatus: 'Applied',
+      toStatus: 'Interviews',
+    });
+
+    // ✅ ALSO log on Interviews page
+    await logActivity('interviews', 'moved_to_interviews', appBeingMoved, {
       fromStatus: 'Applied',
       toStatus: 'Interviews',
     });
@@ -370,74 +379,67 @@ export default function AppliedPage() {
     moveOutOfApplied();
   };
 
-  const moveToRejected = (details: RejectionDetails) => {
-    const id =
-      typeof crypto !== 'undefined' && 'randomUUID' in crypto
-        ? crypto.randomUUID()
-        : Math.random().toString(36).slice(2);
+  const moveToRejected = async (details: RejectionDetails) => {
+    const id = makeUuidV4();
 
     const newRejection: StoredRejection = {
       id,
       ...details,
     };
 
+    // (your existing rejected-card persistence; keep as-is for now)
     if (typeof window !== 'undefined') {
       try {
         const raw = window.localStorage.getItem(REJECTIONS_STORAGE_KEY);
         let existing: StoredRejection[] = [];
         if (raw) {
           const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) {
-            existing = parsed;
-          }
+          if (Array.isArray(parsed)) existing = parsed;
         }
         const next = [...existing, newRejection];
-        window.localStorage.setItem(
-          REJECTIONS_STORAGE_KEY,
-          JSON.stringify(next),
-        );
+        window.localStorage.setItem(REJECTIONS_STORAGE_KEY, JSON.stringify(next));
       } catch (err) {
         console.error('Failed to persist rejected application', err);
       }
     }
 
     if (appBeingMoved) {
-      logActivity('moved_to_rejected', appBeingMoved, {
+      // ✅ log on Applied page
+      await logActivity('applied', 'moved_to_rejected', appBeingMoved, {
         fromStatus: 'Applied',
         toStatus: 'Rejected',
         note: 'Marked as rejected',
       });
-    }
 
-    appendRejectedActivity({
-      id: makeActivityId(),
-      appId: newRejection.id,
-      type: 'moved_to_rejected',
-      timestamp: new Date().toISOString(),
-      company: newRejection.company,
-      role: newRejection.role,
-      location: newRejection.location,
-      appliedOn: newRejection.appliedDate,
-      fromStatus: 'Applied',
-      toStatus: 'Rejected',
-      note: newRejection.notes,
-    });
+      // ✅ ALSO log on Rejected page (note appId should match the rejected-card id)
+      await logActivity(
+        'rejected',
+        'moved_to_rejected',
+        appBeingMoved,
+        {
+          fromStatus: 'Applied',
+          toStatus: 'Rejected',
+          note: newRejection.notes,
+          appliedOn: newRejection.appliedDate,
+          company: newRejection.company,
+          role: newRejection.role,
+          location: newRejection.location,
+        },
+        newRejection.id,
+      );
+    }
 
     moveOutOfApplied();
   };
 
-  const moveToWithdrawn = (details: WithdrawnDetails) => {
+  const moveToWithdrawn = async (details: WithdrawnDetails) => {
     if (!appBeingMoved) {
       moveOutOfApplied();
       return;
     }
 
     const source = appBeingMoved;
-
-    const id =
-      typeof crypto !== 'undefined' && 'randomUUID' in crypto
-        ? crypto.randomUUID()
-        : Math.random().toString(36).slice(2);
+    const id = makeUuidV4();
 
     const newWithdrawn: StoredWithdrawn = {
       id,
@@ -456,40 +458,42 @@ export default function AppliedPage() {
       withdrawnReason: details.reason,
     };
 
+    // (your existing withdrawn-card persistence; keep as-is for now)
     if (typeof window !== 'undefined') {
       try {
         const raw = window.localStorage.getItem(WITHDRAWN_STORAGE_KEY);
         const parsed = raw ? JSON.parse(raw) : [];
         const existing: StoredWithdrawn[] = Array.isArray(parsed) ? parsed : [];
         const next = [...existing, newWithdrawn];
-        window.localStorage.setItem(
-          WITHDRAWN_STORAGE_KEY,
-          JSON.stringify(next),
-        );
+        window.localStorage.setItem(WITHDRAWN_STORAGE_KEY, JSON.stringify(next));
       } catch (err) {
         console.error('Failed to persist withdrawn application', err);
       }
     }
 
-    logActivity('moved_to_withdrawn', source, {
+    // ✅ log on Applied page
+    await logActivity('applied', 'moved_to_withdrawn', source, {
       fromStatus: 'Applied',
       toStatus: 'Withdrawn',
       note: details.reason || 'Moved to withdrawn',
     });
 
-    appendWithdrawnActivity({
-      id: makeActivityId(),
-      appId: newWithdrawn.id,
-      type: 'moved_to_withdrawn',
-      timestamp: new Date().toISOString(),
-      company: newWithdrawn.company,
-      role: newWithdrawn.role,
-      location: newWithdrawn.location,
-      appliedOn: newWithdrawn.appliedOn,
-      fromStatus: 'Applied',
-      toStatus: 'Withdrawn',
-      note: newWithdrawn.notes || newWithdrawn.withdrawnReason,
-    });
+    // ✅ ALSO log on Withdrawn page (appId should match withdrawn-card id)
+    await logActivity(
+      'withdrawn',
+      'moved_to_withdrawn',
+      source,
+      {
+        fromStatus: 'Applied',
+        toStatus: 'Withdrawn',
+        note: newWithdrawn.notes || newWithdrawn.withdrawnReason,
+        appliedOn: newWithdrawn.appliedOn,
+        company: newWithdrawn.company,
+        role: newWithdrawn.role,
+        location: newWithdrawn.location,
+      },
+      newWithdrawn.id,
+    );
 
     moveOutOfApplied();
   };
@@ -581,7 +585,6 @@ export default function AppliedPage() {
               <h1 className="text-2xl font-semibold text-neutral-900">
                 Applied
               </h1>
-              {/* Card count indicator */}
               <span className="inline-flex items-center rounded-full border border-neutral-200 bg-white/80 px-2.5 py-0.5 text-xs font-medium text-neutral-800 shadow-sm">
                 {cardCount} card{cardCount === 1 ? '' : 's'}
               </span>
@@ -653,7 +656,6 @@ export default function AppliedPage() {
               Add
             </button>
 
-            {/* Reusable filter */}
             <ApplicationsFilter
               applications={applications}
               filters={filters}
@@ -663,7 +665,7 @@ export default function AppliedPage() {
             />
           </div>
 
-          {/* Results grid – same structure as Interviews: 2 cols (sm), 3 cols (lg) */}
+          {/* Results grid */}
           <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((app) => (
               <ApplicationCard

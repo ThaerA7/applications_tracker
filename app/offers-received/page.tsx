@@ -1,12 +1,7 @@
 // app/offers/page.tsx
 "use client";
 
-import {
-  useEffect,
-  useMemo,
-  useState,
-  type ComponentType,
-} from "react";
+import { useEffect, useMemo, useState, type ComponentType } from "react";
 import Image from "next/image";
 import {
   PartyPopper,
@@ -33,9 +28,9 @@ import OffersReceivedCards, {
   isPendingOffer,
 } from "./OffersReceivedCards";
 
-import ActivityLogSidebar, {
-  type ActivityItem,
-} from "@/components/ActivityLogSidebar";
+import ActivityLogSidebar from "@/components/ActivityLogSidebar";
+
+import { getSupabaseClient } from "@/lib/supabase/client";
 
 import {
   loadOffers,
@@ -44,9 +39,15 @@ import {
   type OffersStorageMode,
 } from "@/lib/storage/offers";
 
-// Activity log key (only for sidebar log, not actual offers data)
-const OFFERS_RECEIVED_ACTIVITY_STORAGE_KEY =
-  "job-tracker:offers-received-activity";
+// ✅ NEW: persistent activity storage (guest + Supabase user)
+import {
+  loadActivity,
+  appendActivity as appendActivityToStorage,
+  migrateGuestActivityToUser,
+  type ActivityItem,
+  type ActivityVariant,
+  type ActivityStorageMode,
+} from "@/lib/storage/activity";
 
 const VIEW_FILTERS: {
   id: OffersReceivedView;
@@ -54,27 +55,15 @@ const VIEW_FILTERS: {
   shortLabel: string;
   icon: ComponentType<any>;
 }[] = [
-  {
-    id: "received",
-    label: "Offers received",
-    shortLabel: "Received",
-    icon: Trophy,
-  },
-  {
-    id: "declined",
-    label: "Offers declined",
-    shortLabel: "Declined",
-    icon: XCircle,
-  },
+  { id: "received", label: "Offers received", shortLabel: "Received", icon: Trophy },
+  { id: "declined", label: "Offers declined", shortLabel: "Declined", icon: XCircle },
   {
     id: "accepted",
     label: "Offers accepted",
     short: "Accepted",
     icon: CheckCircle2,
-  } as any, // keep type happy if 'short' vs 'shortLabel' typo appears
-].map((v) =>
-  "short" in v ? { ...v, shortLabel: (v as any).short } : v
-) as {
+  } as any,
+].map((v) => ("short" in v ? { ...v, shortLabel: (v as any).short } : v)) as {
   id: OffersReceivedView;
   label: string;
   shortLabel: string;
@@ -131,8 +120,7 @@ const DEMO_OFFERS_RECEIVED: OfferReceivedJob[] = [
 
 const normalizeOffers = (list: OfferReceivedJob[]) => {
   return list.map((j) => {
-    const offerReceivedDate =
-      j.offerReceivedDate ?? j.decisionDate ?? undefined;
+    const offerReceivedDate = j.offerReceivedDate ?? j.decisionDate ?? undefined;
 
     const offerAcceptedDate =
       j.offerAcceptedDate && j.offerAcceptedDate.trim() !== ""
@@ -160,9 +148,7 @@ const normalizeOffers = (list: OfferReceivedJob[]) => {
   });
 };
 
-const getOfferReceivedForActivity = (
-  job?: Partial<OfferReceivedJob> | null
-) => {
+const getOfferReceivedForActivity = (job?: Partial<OfferReceivedJob> | null) => {
   if (!job) return undefined;
   return job.offerReceivedDate ?? job.decisionDate ?? job.appliedOn ?? undefined;
 };
@@ -173,13 +159,11 @@ const VIEW_STATUS_LABEL: Record<OfferDecisionStatus, string> = {
   declined: "Declined",
 };
 
-// ✅ helper to generate a **real UUID** for Supabase
+// ✅ helper to generate a real UUID (safe for Supabase UUID columns)
 function makeUuid(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
   }
-
-  // Fallback RFC4122-ish implementation (should still satisfy Postgres uuid)
   const template = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx";
   return template.replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
@@ -190,67 +174,55 @@ function makeUuid(): string {
 
 export default function OffersReceivedPage() {
   const [items, setItems] = useState<OfferReceivedJob[]>([]);
-  const [storageMode, setStorageMode] =
-    useState<OffersStorageMode>("guest");
+  const [storageMode, setStorageMode] = useState<OffersStorageMode>("guest");
   const [hydrated, setHydrated] = useState(false);
 
-  const [view, setView] =
-    useState<OffersReceivedView>("received");
+  const [view, setView] = useState<OffersReceivedView>("received");
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingItem, setEditingItem] =
-    useState<OfferReceivedJob | null>(null);
+  const [editingItem, setEditingItem] = useState<OfferReceivedJob | null>(null);
 
   const [isTagDialogOpen, setIsTagDialogOpen] = useState(false);
-  const [taggingItem, setTaggingItem] =
-    useState<OfferReceivedJob | null>(null);
+  const [taggingItem, setTaggingItem] = useState<OfferReceivedJob | null>(null);
 
-  // Activity log sidebar & data
+  // ✅ Activity log sidebar & persistent storage mode
   const [activityOpen, setActivityOpen] = useState(false);
   const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
+  const [activityMode, setActivityMode] = useState<ActivityStorageMode>("guest");
 
   // Delete confirmation dialog target
-  const [deleteTarget, setDeleteTarget] = useState<OfferReceivedJob | null>(
-    null
-  );
+  const [deleteTarget, setDeleteTarget] = useState<OfferReceivedJob | null>(null);
 
-  // helper to append to activity log (and persist)
-  const appendActivity = (entry: ActivityItem) => {
-    setActivityItems((prev) => {
-      const next = [entry, ...prev].slice(0, 100);
-      if (typeof window !== "undefined") {
-        try {
-          window.localStorage.setItem(
-            OFFERS_RECEIVED_ACTIVITY_STORAGE_KEY,
-            JSON.stringify(next)
-          );
-        } catch (err) {
-          console.error(
-            "Failed to persist offers activity to localStorage",
-            err
-          );
-        }
-      }
-      return next;
-    });
+  // ✅ persist activity (guest + user)
+  const persistActivity = async (entry: ActivityItem) => {
+    const saved = await appendActivityToStorage("offers", entry, activityMode);
+    setActivityItems((prev) => [saved, ...prev].slice(0, 100));
   };
 
-  // Load offers from Supabase/guest storage on mount
+  // Load offers + offers activity (and handle auth switching)
   useEffect(() => {
-    let cancelled = false;
+    let alive = true;
+    const supabase = getSupabaseClient();
 
-    (async () => {
+    const loadAll = async () => {
       try {
-        const { mode, items } = await loadOffers();
-        if (cancelled) return;
+        const [{ mode, items }, act] = await Promise.all([
+          loadOffers(),
+          loadActivity("offers"),
+        ]);
+
+        if (!alive) return;
 
         setStorageMode(mode);
+        setActivityMode(act.mode);
+        setActivityItems(act.items);
 
         if (items.length === 0 && mode === "guest") {
           // Seed demo only for guests with empty storage
           const normalizedDemo = normalizeOffers(DEMO_OFFERS_RECEIVED);
           setItems(normalizedDemo);
-          // guests: we can persist demo via upsertOffer (guest path uses IDB/localStorage)
+
+          // guests: persist demo via upsertOffer (guest path uses IDB/localStorage)
           for (const offer of normalizedDemo) {
             void upsertOffer(offer, mode);
           }
@@ -258,41 +230,37 @@ export default function OffersReceivedPage() {
           setItems(normalizeOffers(items));
         }
       } catch (err) {
-        console.error("Failed to load offers:", err);
-        if (!cancelled) {
-          const normalizedDemo = normalizeOffers(DEMO_OFFERS_RECEIVED);
-          setItems(normalizedDemo);
-        }
+        console.error("Failed to load offers/activity:", err);
+        if (!alive) return;
+        setItems(normalizeOffers(DEMO_OFFERS_RECEIVED));
       } finally {
-        if (!cancelled) setHydrated(true);
+        if (alive) setHydrated(true);
       }
-    })();
+    };
+
+    void loadAll();
+
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!alive) return;
+
+      if (event === "SIGNED_IN" && session?.user) {
+        setTimeout(async () => {
+          if (!alive) return;
+          await migrateGuestActivityToUser(); // ✅ migrate all variants (including offers)
+          await loadAll();
+        }, 0);
+      } else if (event === "SIGNED_OUT") {
+        setTimeout(async () => {
+          if (!alive) return;
+          await loadAll();
+        }, 0);
+      }
+    });
 
     return () => {
-      cancelled = true;
+      alive = false;
+      sub?.subscription?.unsubscribe();
     };
-  }, []);
-
-  // Load offers activity log from localStorage
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    try {
-      const rawActivity = window.localStorage.getItem(
-        OFFERS_RECEIVED_ACTIVITY_STORAGE_KEY
-      );
-      if (rawActivity) {
-        const parsedActivity = JSON.parse(rawActivity);
-        if (Array.isArray(parsedActivity)) {
-          setActivityItems(parsedActivity);
-        }
-      }
-    } catch (err) {
-      console.error(
-        "Failed to load offers activity from localStorage",
-        err
-      );
-    }
   }, []);
 
   // Delete flow
@@ -302,22 +270,15 @@ export default function OffersReceivedPage() {
     setDeleteTarget(target);
   };
 
-  const handleCancelDelete = () => {
-    setDeleteTarget(null);
-  };
+  const handleCancelDelete = () => setDeleteTarget(null);
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
-
-    const activityId =
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-offer-delete`;
 
     const received = getOfferReceivedForActivity(deleteTarget);
 
-    appendActivity({
-      id: activityId,
+    await persistActivity({
+      id: makeUuid(),
       appId: deleteTarget.id,
       type: "deleted",
       timestamp: new Date().toISOString(),
@@ -325,10 +286,8 @@ export default function OffersReceivedPage() {
       role: deleteTarget.role,
       location: deleteTarget.location,
 
-      // fallback compatibility
-      appliedOn: received,
+      appliedOn: received, // compatibility fallback
 
-      // offer-specific dates
       offerReceivedDate: received,
       offerAcceptedDate: deleteTarget.offerAcceptedDate,
       offerDeclinedDate: deleteTarget.offerDeclinedDate,
@@ -370,22 +329,16 @@ export default function OffersReceivedPage() {
     setTaggingItem(null);
   };
 
-  const handleTagSave = (details: OfferAcceptanceTagDetails) => {
+  const handleTagSave = async (details: OfferAcceptanceTagDetails) => {
     if (!taggingItem) return;
-
-    const activityId =
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-offer-tag`;
 
     const prevStatusLabel = isAcceptedOffer(taggingItem)
       ? "Accepted"
       : isDeclinedOffer(taggingItem)
-      ? "Declined"
-      : "Received";
+        ? "Declined"
+        : "Received";
 
     const nextStatusLabel = VIEW_STATUS_LABEL[details.status];
-
     const received = getOfferReceivedForActivity(taggingItem);
 
     const nextAcceptedDate =
@@ -398,8 +351,8 @@ export default function OffersReceivedPage() {
         ? details.offerDeclinedDate || taggingItem.offerDeclinedDate
         : undefined;
 
-    appendActivity({
-      id: activityId,
+    await persistActivity({
+      id: makeUuid(),
       appId: taggingItem.id,
       type: "edited",
       timestamp: new Date().toISOString(),
@@ -459,16 +412,9 @@ export default function OffersReceivedPage() {
     closeTagDialog();
   };
 
-  const handleOfferCreated = (details: AcceptedDetails) => {
-    const mkActivityId = (suffix: string) =>
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-${suffix}`;
-
+  const handleOfferCreated = async (details: AcceptedDetails) => {
     // Edit flow
     if (editingItem) {
-      const activityId = mkActivityId("offer-edit");
-
       const receivedForActivity =
         details.offerReceivedDate ??
         details.decisionDate ??
@@ -479,11 +425,12 @@ export default function OffersReceivedPage() {
       const acceptedForActivity =
         details.offerAcceptedDate ?? editingItem.offerAcceptedDate;
 
-      const declinedForActivity =
-        acceptedForActivity ? undefined : editingItem.offerDeclinedDate;
+      const declinedForActivity = acceptedForActivity
+        ? undefined
+        : editingItem.offerDeclinedDate;
 
-      appendActivity({
-        id: activityId,
+      await persistActivity({
+        id: makeUuid(),
         appId: editingItem.id,
         type: "edited",
         timestamp: new Date().toISOString(),
@@ -515,8 +462,9 @@ export default function OffersReceivedPage() {
           const nextOfferAccepted =
             details.offerAcceptedDate ?? job.offerAcceptedDate;
 
-          const nextOfferDeclined =
-            nextOfferAccepted ? undefined : job.offerDeclinedDate;
+          const nextOfferDeclined = nextOfferAccepted
+            ? undefined
+            : job.offerDeclinedDate;
 
           const updatedJob: OfferReceivedJob = {
             ...job,
@@ -532,8 +480,7 @@ export default function OffersReceivedPage() {
                 ? details.notes
                 : job.notes,
             appliedOn: details.appliedOn || job.appliedOn,
-            employmentType:
-              details.employmentType || job.employmentType,
+            employmentType: details.employmentType || job.employmentType,
 
             offerReceivedDate: nextOfferReceived,
             decisionDate: nextOfferReceived,
@@ -560,12 +507,10 @@ export default function OffersReceivedPage() {
       return;
     }
 
-    // ✅ Add flow – use a **UUID** instead of "received-..."
+    // Add flow (UUID id)
     const newId = makeUuid();
 
-    const newOfferReceived =
-      details.offerReceivedDate ?? details.decisionDate;
-
+    const newOfferReceived = details.offerReceivedDate ?? details.decisionDate;
     const newOfferAccepted = details.offerAcceptedDate;
 
     const newItem: OfferReceivedJob = {
@@ -588,10 +533,8 @@ export default function OffersReceivedPage() {
       taken: Boolean(newOfferAccepted),
     };
 
-    const activityId = mkActivityId("offer-add");
-
-    appendActivity({
-      id: activityId,
+    await persistActivity({
+      id: makeUuid(),
       appId: newId,
       type: "added",
       timestamp: new Date().toISOString(),
@@ -618,12 +561,8 @@ export default function OffersReceivedPage() {
   const firstJob = items[0];
 
   const filteredItems = useMemo(() => {
-    if (view === "accepted") {
-      return items.filter(isAcceptedOffer);
-    }
-    if (view === "declined") {
-      return items.filter(isDeclinedOffer);
-    }
+    if (view === "accepted") return items.filter(isAcceptedOffer);
+    if (view === "declined") return items.filter(isDeclinedOffer);
     return items.filter(isPendingOffer);
   }, [items, view]);
 
@@ -641,7 +580,7 @@ export default function OffersReceivedPage() {
 
   return (
     <>
-      {/* Add / edit offer received dialog */}
+      {/* Add / edit offer dialog */}
       <MoveToAcceptedDialog
         open={isDialogOpen}
         onClose={handleCloseDialog}
@@ -660,8 +599,7 @@ export default function OffersReceivedPage() {
                 notes: editingItem.notes,
                 decisionDate: editingItem.decisionDate,
                 offerReceivedDate:
-                  editingItem.offerReceivedDate ??
-                  editingItem.decisionDate,
+                  editingItem.offerReceivedDate ?? editingItem.decisionDate,
                 offerAcceptedDate: editingItem.offerAcceptedDate,
               }
             : null
@@ -681,31 +619,24 @@ export default function OffersReceivedPage() {
       {/* Delete confirmation dialog */}
       {deleteTarget && (
         <div className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[13000] flex items-center justify-center px-4 py-8">
-          {/* Backdrop */}
           <div
             className="absolute inset-0 bg-neutral-900/40"
             aria-hidden="true"
             onClick={handleCancelDelete}
           />
-
-          {/* Panel */}
           <div
             className={[
               "relative z-10 w-full max-w-sm rounded-2xl border border-neutral-200/80",
               "bg-white shadow-2xl p-5",
             ].join(" ")}
           >
-            <h2 className="text-sm font-semibold text-neutral-900">
-              Delete offer?
-            </h2>
+            <h2 className="text-sm font-semibold text-neutral-900">Delete offer?</h2>
             <p className="mt-2 text-sm text-neutral-700">
               This will permanently remove the offer from{" "}
-              <span className="font-medium">{deleteTarget.company}</span> for
-              the role <span className="font-medium">{deleteTarget.role}</span>.
+              <span className="font-medium">{deleteTarget.company}</span> for the role{" "}
+              <span className="font-medium">{deleteTarget.role}</span>.
             </p>
-            <p className="mt-1 text-xs text-neutral-500">
-              This action cannot be undone.
-            </p>
+            <p className="mt-1 text-xs text-neutral-500">This action cannot be undone.</p>
 
             <div className="mt-4 flex justify-end gap-2">
               <button
@@ -734,11 +665,9 @@ export default function OffersReceivedPage() {
           "p-8 shadow-md overflow-hidden",
         ].join(" ")}
       >
-        {/* cheerful blobs */}
         <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-emerald-400/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-lime-400/20 blur-3xl" />
 
-        {/* header row */}
         <div className="flex items-center justify-between gap-3 relative z-10">
           <div>
             <div className="flex items-center gap-2">
@@ -752,11 +681,12 @@ export default function OffersReceivedPage() {
                 />
                 <span>Offers</span>
               </h1>
-              {/* Card count indicator */}
+
               <span className="inline-flex items-center rounded-full border border-neutral-200 bg-white/80 px-2.5 py-0.5 text-xs font-medium text-neutral-800 shadow-sm">
                 {cardCount} card{cardCount === 1 ? "" : "s"}
               </span>
             </div>
+
             <p className="mt-1 text-sm text-neutral-700">
               This is your win board – every card here is a{" "}
               <span className="font-semibold text-emerald-700">
@@ -765,9 +695,7 @@ export default function OffersReceivedPage() {
             </p>
           </div>
 
-          {/* Right-side buttons */}
           <div className="flex items-center gap-2">
-            {/* Activity button */}
             <button
               type="button"
               onClick={() => setActivityOpen(true)}
@@ -778,10 +706,7 @@ export default function OffersReceivedPage() {
                 "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-300",
               ].join(" ")}
             >
-              <History
-                className="h-4 w-4 text-emerald-700"
-                aria-hidden="true"
-              />
+              <History className="h-4 w-4 text-emerald-700" aria-hidden="true" />
               <span>Activity log</span>
               {activityItems.length > 0 && (
                 <span className="ml-1 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-semibold text-neutral-700">
@@ -790,7 +715,6 @@ export default function OffersReceivedPage() {
               )}
             </button>
 
-            {/* Top-right Add button */}
             <button
               type="button"
               onClick={openAddDialog}
@@ -807,7 +731,7 @@ export default function OffersReceivedPage() {
           </div>
         </div>
 
-        {/* celebration banner */}
+        {/* banner */}
         <div className="mt-6 relative z-10">
           <div
             className={[
@@ -832,31 +756,23 @@ export default function OffersReceivedPage() {
                 <p className="mt-1 text-sm text-neutral-800">
                   {totalReceived === 0 && (
                     <>
-                      The first contract offer you get will land here.
-                      Until then, every application is training
-                      for that moment.
+                      The first contract offer you get will land here. Until then,
+                      every application is training for that moment.
                     </>
                   )}
                   {totalReceived === 1 && firstJob && (
                     <>
                       You already turned your effort into a real offer:{" "}
-                      <span className="font-semibold">
-                        {firstJob.role}
-                      </span>{" "}
-                      at{" "}
-                      <span className="font-semibold">
-                        {firstJob.company}
-                      </span>
-                      . This page is proof you can do it again.
+                      <span className="font-semibold">{firstJob.role}</span> at{" "}
+                      <span className="font-semibold">{firstJob.company}</span>.
+                      This page is proof you can do it again.
                     </>
                   )}
                   {totalReceived > 1 && firstJob && (
                     <>
                       Look at this stack of wins. From{" "}
-                      <span className="font-semibold">
-                        {firstJob.company}
-                      </span>{" "}
-                      to every card below – each offer is a milestone.
+                      <span className="font-semibold">{firstJob.company}</span> to
+                      every card below – each offer is a milestone.
                     </>
                   )}
                 </p>
@@ -876,17 +792,11 @@ export default function OffersReceivedPage() {
                     "shadow-sm",
                   ].join(" ")}
                 >
-                  <Trophy
-                    className="h-4 w-4 text-amber-500"
-                    aria-hidden="true"
-                  />
+                  <Trophy className="h-4 w-4 text-amber-500" aria-hidden="true" />
                   <span>
-                    {totalReceived === 0 &&
-                      "Your celebration wall is waiting 🎈"}
-                    {totalReceived === 1 &&
-                      "1 offer received – huge step forward."}
-                    {totalReceived > 1 &&
-                      `${totalReceived} offers received – keep stacking wins.`}
+                    {totalReceived === 0 && "Your celebration wall is waiting 🎈"}
+                    {totalReceived === 1 && "1 offer received – huge step forward."}
+                    {totalReceived > 1 && `${totalReceived} offers received – keep stacking wins.`}
                   </span>
                 </div>
 
@@ -953,9 +863,7 @@ export default function OffersReceivedPage() {
                   <span
                     className={[
                       "ml-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-[10px] font-semibold",
-                      active
-                        ? activeBadgeClasses
-                        : "bg-neutral-200/80 text-neutral-800",
+                      active ? activeBadgeClasses : "bg-neutral-200/80 text-neutral-800",
                     ].join(" ")}
                   >
                     {viewCount}
@@ -963,19 +871,10 @@ export default function OffersReceivedPage() {
                 </button>
               );
             })}
-
-            <div
-              className="pointer-events-none absolute inset-x-0 top-0 h-0 bg-gradient-to-r from-pink-500 via-orange-400 to-amber-300"
-              aria-hidden="true"
-            />
-            <div
-              className="pointer-events-none absolute inset-x-0 bottom-0 h-0 bg-gradient-to-r from-pink-500 via-orange-400 to-amber-300"
-              aria-hidden="true"
-            />
           </div>
         </div>
 
-        {/* cards grid */}
+        {/* cards */}
         <OffersReceivedCards
           items={hydrated ? filteredItems : []}
           view={view}
@@ -987,7 +886,7 @@ export default function OffersReceivedPage() {
 
       {/* Activity log sidebar */}
       <ActivityLogSidebar
-        variant="offers"
+        variant={"offers" as ActivityVariant}
         open={activityOpen}
         onClose={() => setActivityOpen(false)}
         items={activityItems}
