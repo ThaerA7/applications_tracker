@@ -33,21 +33,28 @@ import WishlistFilter, {
   type WishlistFilters,
 } from "@/components/filters/WishlistFilter";
 
-const WISHLIST_STORAGE_KEY = "job-wishlist-v1";
+import {
+  loadWishlist,
+  upsertWishlistItem,
+  deleteWishlistItem,
+  type WishlistItem,
+  type WishlistStorageMode,
+} from "@/lib/storage/wishlist";
+
+/** sidebar refresh event name used across the app */
 const COUNTS_EVENT = "job-tracker:refresh-counts";
 
-export type WishlistItem = {
-  id: string;
-  company: string;
-  role?: string;
-  location?: string;
-  priority?: "Dream" | "High" | "Medium" | "Low";
-  logoUrl?: string;
-  website?: string;
-  notes?: string;
-  startDate?: string | null;
-  offerType?: string;
-};
+function makeUuid(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  const template = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx";
+  return template.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
 
 function priorityClasses(priority?: WishlistItem["priority"]) {
   switch (priority) {
@@ -199,9 +206,7 @@ function AddWishlistItemDialog({ open, onClose, onSave }: AddDialogProps) {
       logoInputRef.current.value = "";
     }
     const t = firstFieldRef.current;
-    if (t) {
-      setTimeout(() => t.focus(), 10);
-    }
+    if (t) setTimeout(() => t.focus(), 10);
   }, [open]);
 
   // Close on Escape
@@ -224,6 +229,7 @@ function AddWishlistItemDialog({ open, onClose, onSave }: AddDialogProps) {
       setForm((f) => ({ ...f, [field]: value }));
     };
 
+  // ✅ Persistable logo: read as Data URL (base64)
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
 
@@ -236,15 +242,19 @@ function AddWishlistItemDialog({ open, onClose, onSave }: AddDialogProps) {
     const maxSizeBytes = 3 * 1024 * 1024; // 3 MB
     if (file.size > maxSizeBytes) {
       setLogoError("Logo must be smaller than 3 MB.");
-      if (logoInputRef.current) {
-        logoInputRef.current.value = "";
-      }
+      if (logoInputRef.current) logoInputRef.current.value = "";
       return;
     }
 
     setLogoError(null);
-    const objectUrl = URL.createObjectURL(file);
-    setForm((f) => ({ ...f, logoUrl: objectUrl }));
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      setForm((f) => ({ ...f, logoUrl: result }));
+    };
+    reader.onerror = () => setLogoError("Failed to read the image file.");
+    reader.readAsDataURL(file);
   };
 
   const canSubmit =
@@ -502,31 +512,51 @@ function AddWishlistItemDialog({ open, onClose, onSave }: AddDialogProps) {
 
 export default function WishlistPage() {
   const [items, setItems] = useState<WishlistItem[]>([]);
+  const [storageMode, setStorageMode] = useState<WishlistStorageMode>("guest");
+
   const [query, setQuery] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [filters, setFilters] = useState<WishlistFilters>(
     DEFAULT_WISHLIST_FILTERS
   );
 
-  // Load wishlist items from localStorage (no demo data)
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+  const reload = async () => {
     try {
-      const raw = window.localStorage.getItem(WISHLIST_STORAGE_KEY);
-      if (!raw) {
-        setItems([]);
-        return;
-      }
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        setItems(parsed);
-      } else {
-        setItems([]);
-      }
+      const { mode, items } = await loadWishlist();
+      setStorageMode(mode);
+      setItems(items);
     } catch (err) {
       console.error("Failed to load wishlist", err);
       setItems([]);
     }
+  };
+
+  // Load on mount + refresh when other pages change wishlist
+  useEffect(() => {
+    let alive = true;
+
+    const run = async () => {
+      const { mode, items } = await loadWishlist().catch(() => ({
+        mode: "guest" as WishlistStorageMode,
+        items: [] as WishlistItem[],
+      }));
+      if (!alive) return;
+      setStorageMode(mode);
+      setItems(items);
+    };
+
+    void run();
+
+    const handler = () => void run();
+    if (typeof window !== "undefined") {
+      window.addEventListener(COUNTS_EVENT, handler);
+    }
+    return () => {
+      alive = false;
+      if (typeof window !== "undefined") {
+        window.removeEventListener(COUNTS_EVENT, handler);
+      }
+    };
   }, []);
 
   const filtered = useMemo(
@@ -536,49 +566,34 @@ export default function WishlistPage() {
 
   const cardCount = filtered.length;
 
-  function persistWishlist(next: WishlistItem[]) {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(WISHLIST_STORAGE_KEY, JSON.stringify(next));
-      // 🔔 notify sidebar to refresh counts
-      window.dispatchEvent(new Event(COUNTS_EVENT));
-    } catch (err) {
-      console.error("Failed to update wishlist", err);
-    }
-  }
-
   // Delete from wishlist via star
   function handleDelete(id: string) {
-    setItems((prev) => {
-      const next = prev.filter((item) => item.id !== id);
-      persistWishlist(next);
-      return next;
-    });
+    setItems((prev) => prev.filter((item) => item.id !== id));
+    void deleteWishlistItem(id, storageMode);
   }
 
   // Add from dialog
   function handleAddFromDialog(data: NewWishlistItemForm) {
-    setItems((prev) => {
-      const id =
-        typeof crypto !== "undefined" && "randomUUID" in crypto
-          ? crypto.randomUUID()
-          : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const website = data.offerUrl.trim() || undefined;
 
-      const nextItem: WishlistItem = {
-        id,
-        company: data.company.trim(),
-        role: data.role.trim() || undefined,
-        location: data.location.trim() || undefined,
-        logoUrl: data.logoUrl?.trim() || undefined,
-        website: data.offerUrl.trim() || undefined, // used by "View" button
-        startDate: data.startDate || null,
-        offerType: data.employmentType.trim() || undefined, // shown as pill
-      };
+    const sourceKey =
+      website ||
+      `${data.company.trim()}|${data.role.trim()}|${data.location.trim()}`.toLowerCase();
 
-      const next = [...prev, nextItem];
-      persistWishlist(next);
-      return next;
-    });
+    const nextItem: WishlistItem = {
+      id: makeUuid(),
+      sourceKey,
+      company: data.company.trim(),
+      role: data.role.trim() || undefined,
+      location: data.location.trim() || undefined,
+      logoUrl: data.logoUrl?.trim() || undefined,
+      website,
+      startDate: data.startDate || null,
+      offerType: data.employmentType.trim() || undefined,
+    };
+
+    setItems((prev) => [nextItem, ...prev]);
+    void upsertWishlistItem(nextItem, storageMode);
   }
 
   return (
@@ -586,7 +601,7 @@ export default function WishlistPage() {
       className={[
         "relative rounded-2xl border border-yellow-100/80",
         "bg-gradient-to-br from-yellow-50 via-white to-amber-50",
-        "p-8 shadow-md", // no overflow-hidden so filter panel can fully show
+        "p-8 shadow-md",
       ].join(" ")}
     >
       {/* soft accent blobs */}
@@ -603,11 +618,12 @@ export default function WishlistPage() {
           className="shrink-0 -mt-1"
         />
         <h1 className="text-2xl font-semibold text-neutral-900">Wishlist</h1>
-        {/* card count indicator */}
+
         <span className="inline-flex items-center rounded-full border border-neutral-200 bg-white/80 px-2.5 py-0.5 text-xs font-medium text-neutral-800 shadow-sm">
           {cardCount} item{cardCount === 1 ? "" : "s"}
         </span>
       </div>
+
       <p className="mt-1 text-neutral-700">
         Offers you starred from the Offers page or saved manually.
       </p>
@@ -692,10 +708,7 @@ export default function WishlistPage() {
                   {idx}
                 </div>
                 <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-yellow-50 via-amber-50 to-orange-50">
-                  <Icon
-                    className="h-7 w-7 text-yellow-700"
-                    aria-hidden="true"
-                  />
+                  <Icon className="h-7 w-7 text-yellow-700" aria-hidden="true" />
                 </div>
                 {item.logoUrl && (
                   <img

@@ -36,6 +36,29 @@ import {
   Star,
 } from "lucide-react";
 
+import {
+  loadWishlist,
+  upsertWishlistItem,
+  deleteWishlistItem,
+  type WishlistItem,
+  type WishlistStorageMode,
+} from "@/lib/storage/wishlist";
+
+/** sidebar refresh event name used across the app */
+const COUNTS_EVENT = "job-tracker:refresh-counts";
+
+function makeUuid(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  const template = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx";
+  return template.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 type JobRow = {
   title: string;
   employer: string;
@@ -46,22 +69,6 @@ type JobRow = {
   distanceKm?: number;
   offerType?: string; // human-readable label from API
   startDate?: string | null;
-};
-
-// shared wishlist key + type
-const WISHLIST_STORAGE_KEY = "job-wishlist-v1";
-
-type WishlistItem = {
-  id: string;
-  company: string;
-  role?: string;
-  location?: string;
-  priority?: "Dream" | "High" | "Medium" | "Low";
-  logoUrl?: string;
-  website?: string;
-  notes?: string;
-  startDate?: string | null;
-  offerType?: string;
 };
 
 // ---------- utils ----------
@@ -87,25 +94,45 @@ function rankedSuggestions(source: string[], q: string, max = 8) {
 
 function pickJobIcon(title: string) {
   const t = title.toLowerCase();
-  if (/(dev|software|frontend|backend|full[- ]?stack|react|angular|vue|typescript|engineer|programm)/.test(t))
+  if (
+    /(dev|software|frontend|backend|full[- ]?stack|react|angular|vue|typescript|engineer|programm)/.test(
+      t
+    )
+  )
     return Code2;
-  if (/(data|ml|ai|cloud|devops|kubernetes|docker|sysadmin|sre|platform|server)/.test(t))
+  if (
+    /(data|ml|ai|cloud|devops|kubernetes|docker|sysadmin|sre|platform|server)/.test(
+      t
+    )
+  )
     return Server;
   if (/(nurse|pfleg|arzt|ärzt|medizin|therap|apothe|health|care)/.test(t))
     return Stethoscope;
-  if (/(mechanic|mechatron|installat|wartung|techniker|elektrik|elektron|service)/.test(t))
+  if (
+    /(mechanic|mechatron|installat|wartung|techniker|elektrik|elektron|service)/.test(
+      t
+    )
+  )
     return Wrench;
   if (/(bau|construction|maurer|zimmerer|tiefbau|hochbau|handwerk)/.test(t))
     return Hammer;
   if (/(driver|fahrer|logistik|liefer|kurier|transport|truck|flotte)/.test(t))
     return Truck;
-  if (/(koch|küche|chef|gastronomie|restaurant|küchenhilfe|kitchen|cook)/.test(t))
+  if (
+    /(koch|küche|chef|gastronomie|restaurant|küchenhilfe|kitchen|cook)/.test(t)
+  )
     return ChefHat;
   if (/(design|ux|ui|grafik|creative|art|produktdesign)/.test(t))
     return Palette;
-  if (/(teacher|ausbilder|trainer|schule|bildung|dozent|professor|ausbildung)/.test(t))
+  if (
+    /(teacher|ausbilder|trainer|schule|bildung|dozent|professor|ausbildung)/.test(
+      t
+    )
+  )
     return GraduationCap;
-  if (/(factory|produktion|fertigung|betrieb|warehouse|lager|industrie)/.test(t))
+  if (
+    /(factory|produktion|fertigung|betrieb|warehouse|lager|industrie)/.test(t)
+  )
     return Building2;
   if (/(sales|vertrieb|account|customer|kunden|business|consult)/.test(t))
     return Briefcase;
@@ -193,7 +220,7 @@ function formatStartDate(raw?: string | null): string | null {
 
 function extractTotal(json: any): number | null {
   const candidates = [
-    json?.total, // from our own API
+    json?.total,
     json?.maxErgebnisse,
     json?.baPage?.maxErgebnisse,
     json?.baPage?.stellenangeboteGesamt,
@@ -281,7 +308,7 @@ function FloatingMenu({
     }
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
-  }, [open, onClose]);
+  }, [open, onClose, anchorRef]);
 
   if (!open) return null;
 
@@ -336,6 +363,7 @@ function AutoCompleteInput({
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLUListElement>(null);
+
   const items = useMemo(
     () => rankedSuggestions(suggestionsSource, value, 8),
     [suggestionsSource, value]
@@ -356,7 +384,9 @@ function AutoCompleteInput({
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
-  const [pos, setPos] = useState<{ left: number; top: number; width: number } | null>(null);
+  const [pos, setPos] = useState<{ left: number; top: number; width: number } | null>(
+    null
+  );
 
   useLayoutEffect(() => {
     if (!open || !inputRef.current) return;
@@ -368,12 +398,13 @@ function AutoCompleteInput({
       const approxHeight = Math.min(8 * 36 + 12, 320);
       const spaceBelow = window.innerHeight - rect.bottom;
       const spaceAbove = rect.top;
-      if (spaceBelow < approxHeight && spaceAbove > spaceBelow)
+      if (spaceBelow < approxHeight && spaceAbove > spaceBelow) {
         top = rect.top + window.scrollY - Math.min(approxHeight, spaceAbove) - 8;
+      }
       setPos({ left, top, width: rect.width });
     };
     update();
-    const events = ["scroll", "resize"];
+    const events = ["scroll", "resize"] as const;
     events.forEach((ev) =>
       window.addEventListener(ev, update, { passive: true } as any)
     );
@@ -466,8 +497,9 @@ function AutoCompleteInput({
               return;
             }
           }
-          if (e.key === "Enter")
+          if (e.key === "Enter") {
             (inputRef.current?.form as HTMLFormElement | undefined)?.requestSubmit();
+          }
         }}
         className={[
           "h-11 w-full rounded-lg text-sm text-neutral-900 placeholder:text-neutral-500",
@@ -499,7 +531,7 @@ function useDebounced<T>(value: T, delay = 200) {
   return debounced;
 }
 
-const DISTANCES = ["5","10","15","20","25","30","35","40","45","50"] as const;
+const DISTANCES = ["5", "10", "15", "20", "25", "30", "35", "40", "45", "50"] as const;
 const PAGE_SIZE = 20;
 
 function jobIdentity(j: JobRow): string {
@@ -532,8 +564,12 @@ function sortStartValue(raw?: string | null): number {
 
 function sortJobsByDistanceThenStart(list: JobRow[]): JobRow[] {
   return [...list].sort((a, b) => {
-    const ad = Number.isFinite(a.distanceKm as number) ? (a.distanceKm as number) : Number.POSITIVE_INFINITY;
-    const bd = Number.isFinite(b.distanceKm as number) ? (b.distanceKm as number) : Number.POSITIVE_INFINITY;
+    const ad = Number.isFinite(a.distanceKm as number)
+      ? (a.distanceKm as number)
+      : Number.POSITIVE_INFINITY;
+    const bd = Number.isFinite(b.distanceKm as number)
+      ? (b.distanceKm as number)
+      : Number.POSITIVE_INFINITY;
     if (ad !== bd) return ad - bd;
 
     const asv = sortStartValue(a.startDate);
@@ -546,10 +582,12 @@ function sortJobsByDistanceThenStart(list: JobRow[]): JobRow[] {
 
 export default function JobSearchPage() {
   const router = useRouter();
+
   const [q, setQ] = useState("");
   const [wo, setWo] = useState("");
   const [distance, setDistance] = useState<string>(""); // km
   const [offerType, setOfferType] = useState<string>(""); // UI filter only
+
   const [offerOpen, setOfferOpen] = useState(false);
   const [distanceOpen, setDistanceOpen] = useState(false);
   const offerBtnRef = useRef<HTMLButtonElement | null>(null);
@@ -561,121 +599,112 @@ export default function JobSearchPage() {
   const [page, setPage] = useState(1);
   const [totalAvailable, setTotalAvailable] = useState<number | null>(null);
 
-  // wishlist ids (for filled stars)
-  const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
+  // ✅ wishlist state (sourceKey-based)
+  const [wishlistKeys, setWishlistKeys] = useState<Set<string>>(new Set());
+  const [wishlistIndex, setWishlistIndex] = useState<Map<string, string>>(new Map()); // sourceKey -> uuid id
+  const [wishlistMode, setWishlistMode] = useState<WishlistStorageMode>("guest");
 
   const [kwSugs, setKwSugs] = useState<string[]>([]);
   const [locSugs, setLocSugs] = useState<string[]>([]);
   const dq = useDebounced(q, 220);
   const dwo = useDebounced(wo, 220);
 
-  // load wishlist ids on mount
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+  const syncWishlist = async () => {
     try {
-      const raw = window.localStorage.getItem(WISHLIST_STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as WishlistItem[] | null;
-      if (!Array.isArray(parsed)) return;
-      const ids = new Set<string>();
-      for (const item of parsed) {
-        if (item && typeof item.id === "string") {
-          ids.add(item.id);
-        }
+      const { mode, items } = await loadWishlist();
+      setWishlistMode(mode);
+
+      const keys = new Set<string>();
+      const index = new Map<string, string>();
+
+      for (const w of items) {
+        const k = (w.sourceKey || w.website || w.id).trim();
+        if (!k) continue;
+        keys.add(k);
+        index.set(k, w.id);
       }
-      setWishlistIds(ids);
+
+      setWishlistKeys(keys);
+      setWishlistIndex(index);
     } catch (err) {
       console.error("Failed to load wishlist", err);
     }
+  };
+
+  // Load wishlist on mount + refresh when other pages change it
+  useEffect(() => {
+    let alive = true;
+
+    const run = async () => {
+      await syncWishlist();
+    };
+
+    void run();
+
+    const handler = () => {
+      if (!alive) return;
+      void run();
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener(COUNTS_EVENT, handler);
+    }
+
+    return () => {
+      alive = false;
+      if (typeof window !== "undefined") {
+        window.removeEventListener(COUNTS_EVENT, handler);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // toggle wishlist entry for a job
+  // toggle wishlist entry for a job (uuid id in storage, sourceKey for toggling)
   function toggleWishlist(job: JobRow) {
-    const id = jobIdentity(job);
-    if (!id) return;
-    if (typeof window === "undefined") return;
+    const sourceKey = jobIdentity(job);
+    if (!sourceKey) return;
 
-    setWishlistIds((prev) => {
+    const existingId = wishlistIndex.get(sourceKey);
+
+    // optimistic UI update
+    setWishlistKeys((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(sourceKey)) next.delete(sourceKey);
+      else next.add(sourceKey);
       return next;
     });
 
-    try {
-      const raw = window.localStorage.getItem(WISHLIST_STORAGE_KEY);
-      let items: WishlistItem[] = [];
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) items = parsed;
-      }
-
-      const idx = items.findIndex((w) => w.id === id);
-      if (idx >= 0) {
-        items.splice(idx, 1);
-      } else {
-        const entry: WishlistItem = {
-          id,
-          company: job.employer || "Unbekannter Arbeitgeber",
-          role: job.title,
-          location: job.location,
-          logoUrl: job.logoUrl,
-          website: job.detailUrl,
-          notes: "",
-          startDate: job.startDate ?? null,
-          offerType: job.offerType,
-        };
-        items.push(entry);
-      }
-
-      window.localStorage.setItem(WISHLIST_STORAGE_KEY, JSON.stringify(items));
-    } catch (err) {
-      console.error("Failed to update wishlist", err);
+    if (existingId) {
+      setWishlistIndex((prev) => {
+        const next = new Map(prev);
+        next.delete(sourceKey);
+        return next;
+      });
+      void deleteWishlistItem(existingId, wishlistMode);
+      return;
     }
+
+    const entry: WishlistItem = {
+      id: makeUuid(),
+      sourceKey,
+      company: job.employer || "Unbekannter Arbeitgeber",
+      role: job.title,
+      location: job.location,
+      logoUrl: job.logoUrl,
+      website: job.detailUrl,
+      notes: "",
+      startDate: job.startDate ?? null,
+      offerType: job.offerType,
+    };
+
+    setWishlistIndex((prev) => {
+      const next = new Map(prev);
+      next.set(sourceKey, entry.id);
+      return next;
+    });
+
+    void upsertWishlistItem(entry, wishlistMode);
   }
-
-  // suggestions
-  useEffect(() => {
-    if (!dq.trim()) {
-      setKwSugs([]);
-      return;
-    }
-    const ac = new AbortController();
-    (async () => {
-      try {
-        const r = await fetch(
-          `/api/suggest/keywords?q=${encodeURIComponent(dq)}`,
-          { signal: ac.signal, cache: "no-store" }
-        );
-        const j = await r.json().catch(() => ({ suggestions: [] }));
-        setKwSugs(Array.isArray(j?.suggestions) ? j.suggestions : []);
-      } catch {
-        if (!ac.signal.aborted) setKwSugs([]);
-      }
-    })();
-    return () => ac.abort();
-  }, [dq]);
-
-  useEffect(() => {
-    if (!dwo.trim()) {
-      setLocSugs([]);
-      return;
-    }
-    const ac = new AbortController();
-    (async () => {
-      try {
-        const r = await fetch(
-          `/api/suggest/locations?q=${encodeURIComponent(dwo)}`,
-          { signal: ac.signal, cache: "no-store" }
-        );
-        const j = await r.json().catch(() => ({ suggestions: [] }));
-        setLocSugs(Array.isArray(j?.suggestions) ? j.suggestions : []);
-      } catch {
-        if (!ac.signal.aborted) setLocSugs([]);
-      }
-    })();
-    return () => ac.abort();
-  }, [dwo]);
 
   function pushUrl(nextUiPage = 1) {
     const params = new URLSearchParams();
@@ -705,14 +734,10 @@ export default function JobSearchPage() {
     params.set("size", String(PAGE_SIZE));
     params.set("page", String(oneBased));
 
-    const res = await fetch(`/api/jobs?${params.toString()}`, {
-      cache: "no-store",
-    });
+    const res = await fetch(`/api/jobs?${params.toString()}`, { cache: "no-store" });
     const json = await res.json();
     if (!res.ok) {
-      throw new Error(
-        `${json?.error || `HTTP ${res.status}`}\n${json?.forwardedUrl || ""}`
-      );
+      throw new Error(`${json?.error || `HTTP ${res.status}`}\n${json?.forwardedUrl || ""}`);
     }
 
     const batch: JobRow[] = Array.isArray(json?.results) ? json.results : [];
@@ -739,6 +764,57 @@ export default function JobSearchPage() {
     }
   }
 
+  // suggestions
+  useEffect(() => {
+    if (!dq.trim()) {
+      setKwSugs([]);
+      return;
+    }
+    const ac = new AbortController();
+    (async () => {
+      try {
+        const r = await fetch(`/api/suggest/keywords?q=${encodeURIComponent(dq)}`, {
+          signal: ac.signal,
+          cache: "no-store",
+        });
+        const j = await r.json().catch(() => ({ suggestions: [] }));
+        setKwSugs(Array.isArray(j?.suggestions) ? j.suggestions : []);
+      } catch {
+        if (!ac.signal.aborted) setKwSugs([]);
+      }
+    })();
+    return () => ac.abort();
+  }, [dq]);
+
+  useEffect(() => {
+    if (!dwo.trim()) {
+      setLocSugs([]);
+      return;
+    }
+    const ac = new AbortController();
+    (async () => {
+      try {
+        const r = await fetch(`/api/suggest/locations?q=${encodeURIComponent(dwo)}`, {
+          signal: ac.signal,
+          cache: "no-store",
+        });
+        const j = await r.json().catch(() => ({ suggestions: [] }));
+        setLocSugs(Array.isArray(j?.suggestions) ? j.suggestions : []);
+      } catch {
+        if (!ac.signal.aborted) setLocSugs([]);
+      }
+    })();
+    return () => ac.abort();
+  }, [dwo]);
+
+  // auto-refresh on filter change (offerType, distance)
+  useEffect(() => {
+    const ready = q.trim() && wo.trim();
+    if (!ready) return;
+    runSearch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [distance, offerType]);
+
   const totalKnown = Number.isFinite(totalAvailable as number);
   const knownTotal = totalKnown ? (totalAvailable as number) : null;
   const effectiveTotal = knownTotal ?? allResults.length;
@@ -750,10 +826,7 @@ export default function JobSearchPage() {
   const canPrev = page > 1;
   const canNext = totalKnown ? page < totalPages : true;
 
-  const sortedResults = useMemo(
-    () => sortJobsByDistanceThenStart(allResults),
-    [allResults]
-  );
+  const sortedResults = useMemo(() => sortJobsByDistanceThenStart(allResults), [allResults]);
 
   const startIndex = (page - 1) * PAGE_SIZE;
   const displayed = sortedResults.slice(startIndex, startIndex + PAGE_SIZE);
@@ -779,12 +852,9 @@ export default function JobSearchPage() {
 
       const prevLen = allResults.length;
       const { batch, total } = await fetchPage(next);
-      if (Number.isFinite(Number(total)) && total !== null)
-        setTotalAvailable(total as number);
+      if (Number.isFinite(Number(total)) && total !== null) setTotalAvailable(total as number);
       if (!batch || batch.length === 0) {
-        setTotalAvailable((prev) =>
-          Number.isFinite(prev as number) ? (prev as number) : prevLen
-        );
+        setTotalAvailable((prev) => (Number.isFinite(prev as number) ? (prev as number) : prevLen));
         return;
       }
 
@@ -806,14 +876,6 @@ export default function JobSearchPage() {
       setPageLoading(false);
     }
   };
-
-  // auto-refresh on filter change (offerType, distance)
-  useEffect(() => {
-    const ready = q.trim() && wo.trim();
-    if (!ready) return;
-    runSearch();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [distance, offerType]);
 
   const submitDisabled = !q.trim() || !wo.trim();
   const btnInside = [
@@ -843,9 +905,7 @@ export default function JobSearchPage() {
           aria-hidden="true"
           className="shrink-0 -mt-1"
         />
-        <h1 className="text-2xl font-semibold text-neutral-900">
-          Job Search
-        </h1>
+        <h1 className="text-2xl font-semibold text-neutral-900">Job Search</h1>
       </div>
 
       <p className="mt-1 text-neutral-700">
@@ -886,9 +946,7 @@ export default function JobSearchPage() {
                   </span>
                 </button>
                 <FloatingMenu
-                  anchorRef={
-                    offerBtnRef as unknown as React.RefObject<HTMLElement>
-                  }
+                  anchorRef={offerBtnRef as unknown as React.RefObject<HTMLElement>}
                   open={offerOpen}
                   onClose={() => setOfferOpen(false)}
                   width={224}
@@ -904,9 +962,7 @@ export default function JobSearchPage() {
                       }}
                       className={[
                         "block w-full px-3 py-2 text-left text-sm hover:bg-neutral-50",
-                        o.value === offerType
-                          ? "bg-amber-50 text-amber-800"
-                          : "text-neutral-800",
+                        o.value === offerType ? "bg-amber-50 text-amber-800" : "text-neutral-800",
                       ].join(" ")}
                       role="menuitem"
                     >
@@ -946,9 +1002,7 @@ export default function JobSearchPage() {
                   </span>
                 </button>
                 <FloatingMenu
-                  anchorRef={
-                    distanceBtnRef as unknown as React.RefObject<HTMLElement>
-                  }
+                  anchorRef={distanceBtnRef as unknown as React.RefObject<HTMLElement>}
                   open={distanceOpen}
                   onClose={() => setDistanceOpen(false)}
                   width={176}
@@ -958,9 +1012,7 @@ export default function JobSearchPage() {
                     type="button"
                     className={[
                       "block w-full px-3 py-2 text-left text-sm hover:bg-neutral-50",
-                      distance === ""
-                        ? "bg-amber-50 text-amber-800"
-                        : "text-neutral-800",
+                      distance === "" ? "bg-amber-50 text-amber-800" : "text-neutral-800",
                     ].join(" ")}
                     onClick={() => {
                       setDistance("");
@@ -970,6 +1022,7 @@ export default function JobSearchPage() {
                   >
                     Any distance
                   </button>
+
                   {DISTANCES.map((d) => (
                     <button
                       key={d}
@@ -980,9 +1033,7 @@ export default function JobSearchPage() {
                       }}
                       className={[
                         "block w-full px-3 py-2 text-left text-sm hover:bg-neutral-50",
-                        distance === d
-                          ? "bg-amber-50 text-amber-800"
-                          : "text-neutral-800",
+                        distance === d ? "bg-amber-50 text-amber-800" : "text-neutral-800",
                       ].join(" ")}
                       role="menuitem"
                     >
@@ -1039,9 +1090,7 @@ export default function JobSearchPage() {
           <span>
             Page <span className="font-semibold">{page}</span> /{" "}
             <span className="font-semibold">{totalPages}</span>
-            {!Number.isFinite(totalAvailable as number) && allResults.length > 0
-              ? " +"
-              : ""}
+            {!Number.isFinite(totalAvailable as number) && allResults.length > 0 ? " +" : ""}
           </span>
         </div>
       </div>
@@ -1068,12 +1117,10 @@ export default function JobSearchPage() {
             const idx = startIndex + i + 1;
             const identity = jobIdentity(job);
             const key = identity || `idx-${idx}`;
-            const isWishlisted = identity ? wishlistIds.has(identity) : false;
+            const isWishlisted = identity ? wishlistKeys.has(identity) : false;
 
             const apiOfferLabel =
-              job.offerType && job.offerType.trim().length > 0
-                ? job.offerType.trim()
-                : "Job";
+              job.offerType && job.offerType.trim().length > 0 ? job.offerType.trim() : "Job";
 
             const startLabel = formatStartDate(job.startDate ?? null);
 
@@ -1103,8 +1150,7 @@ export default function JobSearchPage() {
                       alt={`${job.employer || "Company"} logo`}
                       className="absolute inset-0 h-full w-full object-contain p-1.5"
                       onError={(e) => {
-                        (e.currentTarget as HTMLImageElement).style.display =
-                          "none";
+                        (e.currentTarget as HTMLImageElement).style.display = "none";
                       }}
                       loading="lazy"
                     />
@@ -1118,33 +1164,25 @@ export default function JobSearchPage() {
                     </h2>
                     <span className="text-sm text-neutral-600">• {job.title}</span>
                   </div>
+
                   <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-neutral-700">
                     {!!job.location && (
                       <span className="inline-flex items-center gap-1.5">
-                        <MapPin
-                          className="h-4 w-4 text-neutral-400"
-                          aria-hidden="true"
-                        />
+                        <MapPin className="h-4 w-4 text-neutral-400" aria-hidden="true" />
                         {job.location}
                       </span>
                     )}
 
                     {Number.isFinite(job.distanceKm as number) && (
                       <span className="inline-flex items-center gap-1.5">
-                        <MapPin
-                          className="h-4 w-4 text-neutral-400"
-                          aria-hidden="true"
-                        />
+                        <MapPin className="h-4 w-4 text-neutral-400" aria-hidden="true" />
                         {Math.round(job.distanceKm as number)} km
                       </span>
                     )}
 
                     {startLabel && (
                       <span className="inline-flex items-center gap-1.5">
-                        <CalendarDays
-                          className="h-4 w-4 text-neutral-400"
-                          aria-hidden="true"
-                        />
+                        <CalendarDays className="h-4 w-4 text-neutral-400" aria-hidden="true" />
                         {startLabel}
                       </span>
                     )}
@@ -1162,9 +1200,7 @@ export default function JobSearchPage() {
                     type="button"
                     onClick={() => toggleWishlist(job)}
                     aria-pressed={isWishlisted}
-                    aria-label={
-                      isWishlisted ? "Remove from wishlist" : "Add to wishlist"
-                    }
+                    aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
                     className={[
                       "inline-flex items-center justify-center",
                       "text-sm rounded-full",
@@ -1230,10 +1266,7 @@ export default function JobSearchPage() {
             <div className="text-sm text-neutral-700">
               Page <span className="font-semibold">{page}</span> /{" "}
               <span className="font-semibold">{totalPages}</span>
-              {!Number.isFinite(totalAvailable as number) &&
-              allResults.length > 0
-                ? " +"
-                : ""}
+              {!Number.isFinite(totalAvailable as number) && allResults.length > 0 ? " +" : ""}
             </div>
 
             <button
