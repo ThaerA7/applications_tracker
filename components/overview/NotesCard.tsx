@@ -1,137 +1,19 @@
-// app/components/NotesOverviewCard.tsx
-
+// app/components/NotesCard.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FileText, Palette, Plus, Tag, Save, X } from "lucide-react";
 
-export type ColorKey =
-  | "gray"
-  | "blue"
-  | "green"
-  | "yellow"
-  | "orange"
-  | "red"
-  | "pink"
-  | "purple";
+import {
+  loadNotes,
+  migrateGuestNotesToUser,
+  upsertNote,
+  type Note,
+  type ColorKey,
+  type NotesStorageMode,
+} from "@/lib/storage/notes";
 
-/**
- * ✅ Shared note shape (matches your Notes page style)
- */
-export type NoteItem = {
-  id: string;
-  title: string;
-  content: string;
-  tags: string[];
-  updatedAt: string; // ISO
-  pinned?: boolean;
-  color?: ColorKey;
-};
-
-export const NOTES_STORAGE_KEY = "job-tracker:notes";
-
-const INITIAL_OVERVIEW_NOTES = [
-  {
-    id: "seed-1",
-    title: "Globex — Phone screen prep",
-    content:
-      "Review behavioral stories (STAR), brush up on async patterns in TS, and common React perf pitfalls.\n\nQuestions to ask: team structure, on-call, growth path.",
-    tags: ["Interview", "Prep", "Phone screen"],
-    color: "yellow" as ColorKey,
-    updatedAt: "2025-11-02T09:15:00.000Z",
-  },
-  {
-    id: "seed-2",
-    title: "Acme — Frontend system design",
-    content:
-      "Component architecture, state boundaries, data fetching patterns (React Server Components + caching). Consider monitoring/observability.",
-    tags: ["System design", "Frontend", "Architecture"],
-    color: "blue" as ColorKey,
-    updatedAt: "2025-10-31T17:42:00.000Z",
-  },
-  {
-    id: "seed-3",
-    title: "Research: Stripe career site",
-    content:
-      "Look for roles aligned with DX and UI platforms. Note interview format; collect links to recent posts.",
-    tags: ["Research", "Stripe", "Career site"],
-    color: "gray" as ColorKey,
-    updatedAt: "2025-10-28T14:03:00.000Z",
-  },
-] satisfies NoteItem[];
-
-/**
- * ✅ Helpers shared with Stats card
- */
-export function readNotesFromStorage(): NoteItem[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(NOTES_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as NoteItem[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-export function writeNotesToStorage(list: NoteItem[]) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(list));
-  } catch (err) {
-    console.error("Failed to persist notes", err);
-  }
-}
-
-/**
- * Upsert helper for external callers (Stats card)
- */
-export function upsertNoteToStorage(input: {
-  id?: string;
-  title: string;
-  content: string;
-  tags: string[];
-  color?: ColorKey;
-}) {
-  const existing = readNotesFromStorage();
-  const id =
-    input.id ??
-    (typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : `${Date.now()}`);
-
-  const nowIso = new Date().toISOString();
-
-  const idx = existing.findIndex((n) => n.id === id);
-
-  let next: NoteItem[];
-  if (idx >= 0) {
-    next = [...existing];
-    next[idx] = {
-      ...next[idx],
-      title: input.title,
-      content: input.content,
-      tags: input.tags,
-      color: input.color ?? next[idx].color,
-      updatedAt: nowIso,
-    };
-  } else {
-    const newNote: NoteItem = {
-      id,
-      title: input.title,
-      content: input.content,
-      tags: input.tags,
-      color: input.color ?? "gray",
-      updatedAt: nowIso,
-      pinned: false,
-    };
-    next = [newNote, ...existing];
-  }
-
-  writeNotesToStorage(next);
-  return next;
-}
+export type NoteItem = Note;
 
 const COLORS: ColorKey[] = [
   "gray",
@@ -167,6 +49,11 @@ const COLOR_ACCENT: Record<ColorKey, string> = {
 };
 
 const LONG_PRESS_MS = 450;
+const DOUBLE_TAP_MS = 250;
+
+// Keep consistent with the rest of the app
+const COUNTS_EVENT = "job-tracker:refresh-counts";
+const NOTES_EVENT = "job-tracker:refresh-notes";
 
 function getColorHex(c: ColorKey): string {
   switch (c) {
@@ -189,6 +76,15 @@ function getColorHex(c: ColorKey): string {
   }
 }
 
+function makeId(): string {
+  try {
+    if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+      return crypto.randomUUID();
+    }
+  } catch {}
+  return `note-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
 /** Turn comma-separated input into tags; always return at least one. */
 function parseTags(raw: string): string[] {
   const tags = raw
@@ -199,7 +95,7 @@ function parseTags(raw: string): string[] {
 }
 
 /**
- * ✅ Reusable dialog exported for Stats card use
+ * ✅ Reusable dialog (kept exported)
  */
 export function AddNoteDialog(props: {
   open: boolean;
@@ -227,7 +123,7 @@ export function AddNoteDialog(props: {
       setDialogTitle(initialNote.title ?? "");
       setDialogContent(initialNote.content ?? "");
       setDialogTags((initialNote.tags ?? []).join(", "));
-      setDialogColor(initialNote.color ?? "gray");
+      setDialogColor((initialNote.color ?? "gray") as ColorKey);
     } else {
       setDialogTitle("");
       setDialogContent("");
@@ -261,10 +157,8 @@ export function AddNoteDialog(props: {
       aria-modal="true"
       onClick={onClose}
     >
-      {/* Backdrop */}
       <div className="absolute inset-0 bg-emerald-950/40" aria-hidden="true" />
 
-      {/* Panel */}
       <div
         className="relative z-10 w-full max-w-xl"
         onClick={(e) => e.stopPropagation()}
@@ -281,7 +175,6 @@ export function AddNoteDialog(props: {
             "border-neutral-100/80",
           ].join(" ")}
         >
-          {/* Header – dot + title */}
           <div className="flex items-center gap-2">
             <span
               className={`inline-block h-2.5 w-2.5 rounded-full ${COLOR_STYLES[dialogColor].dot}`}
@@ -296,7 +189,6 @@ export function AddNoteDialog(props: {
             />
           </div>
 
-          {/* Content */}
           <div className="mt-3">
             <label htmlFor="overview-dialog-content" className="sr-only">
               Note content
@@ -311,7 +203,6 @@ export function AddNoteDialog(props: {
             />
           </div>
 
-          {/* Color picker */}
           <div className="mt-3">
             <div className="mb-1 inline-flex items-center gap-2 text-xs text-neutral-600">
               <Palette className="h-3.5 w-3.5" aria-hidden="true" />
@@ -343,7 +234,6 @@ export function AddNoteDialog(props: {
             </div>
           </div>
 
-          {/* Tags */}
           <div className="mt-3">
             <label
               htmlFor="overview-dialog-tags"
@@ -360,7 +250,6 @@ export function AddNoteDialog(props: {
             />
           </div>
 
-          {/* Footer */}
           <div className="mt-4 flex items-center justify-end gap-2">
             <button
               type="button"
@@ -393,11 +282,9 @@ export function AddNoteDialog(props: {
 }
 
 export default function NotesOverviewCard() {
-  const [notes, setNotes] = useState<NoteItem[]>(() => {
-    if (typeof window === "undefined") return INITIAL_OVERVIEW_NOTES;
-    const stored = readNotesFromStorage();
-    return stored.length ? stored : INITIAL_OVERVIEW_NOTES;
-  });
+  const [mode, setMode] = useState<NotesStorageMode>("guest");
+  const [notes, setNotes] = useState<NoteItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [isNoteDialogOpen, setIsNoteDialogOpen] = useState(false);
   const [editingNote, setEditingNote] = useState<NoteItem | null>(null);
@@ -406,28 +293,47 @@ export default function NotesOverviewCard() {
     null
   );
 
-  // Seed storage one-time if empty
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const existing = readNotesFromStorage();
-    if (!existing.length) {
-      writeNotesToStorage(INITIAL_OVERVIEW_NOTES);
-    }
-  }, []);
+  // for mobile double-tap
+  const lastTapRef = useRef<number>(0);
 
-  // Keep local state synced if something else writes notes
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+  const refreshNotes = async () => {
+    const res = await loadNotes();
+    setMode(res.mode);
+    setNotes(res.items);
+  };
 
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === NOTES_STORAGE_KEY) {
-        const next = readNotesFromStorage();
-        setNotes(next.length ? next : INITIAL_OVERVIEW_NOTES);
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      try {
+        await migrateGuestNotesToUser().catch(() => {});
+        if (!alive) return;
+        await refreshNotes();
+      } finally {
+        if (alive) setLoading(false);
       }
+    })();
+
+    const handler = () => void refreshNotes();
+    const onFocus = () => void refreshNotes();
+    const onVis = () => {
+      if (!document.hidden) refreshNotes();
     };
 
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    window.addEventListener(COUNTS_EVENT, handler);
+    window.addEventListener(NOTES_EVENT, handler);
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVis);
+
+    return () => {
+      alive = false;
+      window.removeEventListener(COUNTS_EVENT, handler);
+      window.removeEventListener(NOTES_EVENT, handler);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const overviewNotes = useMemo(() => {
@@ -435,7 +341,10 @@ export default function NotesOverviewCard() {
       const ap = a.pinned ? 1 : 0;
       const bp = b.pinned ? 1 : 0;
       if (ap !== bp) return bp - ap;
-      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      return (
+        new Date(b.updatedAt ?? 0).getTime() -
+        new Date(a.updatedAt ?? 0).getTime()
+      );
     });
     return sorted.slice(0, 3);
   }, [notes]);
@@ -455,15 +364,57 @@ export default function NotesOverviewCard() {
     setEditingNote(null);
   };
 
-  const handleSaveNote = (payload: {
+  const notifyNotesChanged = () => {
+    window.dispatchEvent(new Event(NOTES_EVENT));
+    window.dispatchEvent(new Event(COUNTS_EVENT));
+  };
+
+  const handleSaveNote = async (payload: {
     id?: string;
     title: string;
     content: string;
     tags: string[];
     color: ColorKey;
   }) => {
-    const next = upsertNoteToStorage(payload);
-    setNotes(next);
+    const nowIso = new Date().toISOString();
+
+    if (!payload.id) {
+      const newNote: Note = {
+        id: makeId(),
+        title: payload.title,
+        content: payload.content,
+        tags: payload.tags,
+        color: payload.color,
+        updatedAt: nowIso,
+        pinned: false,
+      };
+
+      setNotes((prev) => [newNote, ...prev]);
+      const saved = await upsertNote(newNote, mode);
+
+      if (saved.id !== newNote.id) {
+        setNotes((prev) =>
+          prev.map((n) => (n.id === newNote.id ? { ...saved } : n))
+        );
+      }
+
+      notifyNotesChanged();
+      return;
+    }
+
+    const base = notes.find((n) => n.id === payload.id) ?? { id: payload.id };
+    const updated: Note = {
+      ...(base as Note),
+      title: payload.title,
+      content: payload.content,
+      tags: payload.tags,
+      color: payload.color,
+      updatedAt: nowIso,
+    };
+
+    setNotes((prev) => prev.map((n) => (n.id === payload.id ? updated : n)));
+    await upsertNote(updated, mode);
+    notifyNotesChanged();
   };
 
   const startLongPress = (note: NoteItem) => {
@@ -478,6 +429,23 @@ export default function NotesOverviewCard() {
       window.clearTimeout(longPressTimeoutId);
       setLongPressTimeoutId(null);
     }
+  };
+
+  // ✅ mobile: double-tap edits
+  const handleTouchEnd = (note: NoteItem) => {
+    const now = Date.now();
+    const delta = now - lastTapRef.current;
+
+    // always cancel pending long-press on touch end
+    cancelLongPress();
+
+    if (delta > 0 && delta < DOUBLE_TAP_MS) {
+      lastTapRef.current = 0;
+      openEditDialog(note);
+      return;
+    }
+
+    lastTapRef.current = now;
   };
 
   return (
@@ -507,7 +475,6 @@ export default function NotesOverviewCard() {
               </p>
             </div>
 
-            {/* Same pill style as your other quick buttons */}
             <button
               type="button"
               onClick={openAddDialog}
@@ -523,57 +490,73 @@ export default function NotesOverviewCard() {
           </div>
 
           <div className="mt-3 space-y-3">
-            {overviewNotes.map((note) => {
-              const color = note.color ?? "gray";
+            {loading && (
+              <div className="rounded-xl border border-neutral-200/80 bg-white/70 p-4 text-[11px] text-neutral-600">
+                Loading notes…
+              </div>
+            )}
 
-              return (
-                <article
-                  key={note.id}
-                  className={[
-                    "relative flex flex-col rounded-xl border p-3 text-sm shadow-sm transition-all",
-                    "bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90",
-                    "border-neutral-200/80 hover:-translate-y-0.5 hover:shadow-md",
-                    "before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl before:bg-gradient-to-b before:opacity-90",
-                    "cursor-pointer",
-                    COLOR_ACCENT[color],
-                  ].join(" ")}
-                  onMouseDown={() => startLongPress(note)}
-                  onMouseUp={cancelLongPress}
-                  onMouseLeave={cancelLongPress}
-                  onTouchStart={() => startLongPress(note)}
-                  onTouchEnd={cancelLongPress}
-                  onTouchCancel={cancelLongPress}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-[13px] font-semibold text-neutral-900">
-                      {note.title}
+            {!loading &&
+              overviewNotes.map((note) => {
+                const color = (note.color ?? "gray") as ColorKey;
+
+                return (
+                  <article
+                    key={note.id}
+                    className={[
+                      "relative flex flex-col rounded-xl border p-3 text-sm shadow-sm transition-all",
+                      "bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90",
+                      "border-neutral-200/80 hover:-translate-y-0.5 hover:shadow-md",
+                      "before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl before:bg-gradient-to-b before:opacity-90",
+                      "cursor-pointer",
+                      COLOR_ACCENT[color],
+                    ].join(" ")}
+                    // ✅ hold-press edits (mouse + touch)
+                    onMouseDown={() => startLongPress(note)}
+                    onMouseUp={cancelLongPress}
+                    onMouseLeave={cancelLongPress}
+                    onTouchStart={() => startLongPress(note)}
+                    onTouchEnd={() => handleTouchEnd(note)}
+                    onTouchCancel={cancelLongPress}
+                    // ✅ 2 clicks edits (desktop)
+                    onDoubleClick={() => {
+                      cancelLongPress();
+                      openEditDialog(note);
+                    }}
+                    title="Hold to edit (or double-click)"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[13px] font-semibold text-neutral-900">
+                        {note.title ?? "Untitled note"}
+                      </p>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-neutral-50 px-2 py-0.5 text-[10px] font-medium text-neutral-600">
+                        <Tag className="h-3 w-3" />
+                        <span>
+                          {(note.tags ?? ["Note"]).slice(0, 3).join(" · ")}
+                        </span>
+                      </span>
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-[12px] text-neutral-600 whitespace-pre-line">
+                      {note.content ?? ""}
                     </p>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-neutral-50 px-2 py-0.5 text-[10px] font-medium text-neutral-600">
-                      <Tag className="h-3 w-3" />
-                      <span>{note.tags.slice(0, 3).join(" · ")}</span>
-                    </span>
-                  </div>
-                  <p className="mt-1 line-clamp-2 text-[12px] text-neutral-600 whitespace-pre-line">
-                    {note.content}
-                  </p>
-                </article>
-              );
-            })}
+                  </article>
+                );
+              })}
 
-            {overviewNotes.length === 0 && (
+            {!loading && overviewNotes.length === 0 && (
               <div className="rounded-xl border border-dashed border-neutral-300 bg-white/70 p-4 text-center text-[11px] text-neutral-600">
-                No notes yet.
+                No notes yet. Click <span className="font-medium">Add note</span>{" "}
+                to create your first one.
               </div>
             )}
           </div>
         </div>
       </section>
 
-      {/* ✅ Reused exported dialog */}
       <AddNoteDialog
         open={isNoteDialogOpen}
         onClose={closeNoteDialog}
-        onSave={handleSaveNote}
+        onSave={(payload) => void handleSaveNote(payload)}
         initialNote={editingNote}
       />
     </>

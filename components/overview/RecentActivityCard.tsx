@@ -1,51 +1,29 @@
-"use client";
-
 // app/components/RecentActivityCard.tsx
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { Clock, ListTodo } from "lucide-react";
-import type { ActivityItem } from "@/components/ActivityLogSidebar";
 
-// Activity logs written by your pages.
-// Note: AppliedPage currently does NOT persist its own activity log.
-// This key is here to support it if/when you add persistence later.
-const APPLIED_ACTIVITY_STORAGE_KEY = "job-tracker:applied-activity";
-const INTERVIEWS_ACTIVITY_STORAGE_KEY = "job-tracker:interviews-activity";
-const REJECTIONS_ACTIVITY_STORAGE_KEY = "job-tracker:rejected-activity";
-const WITHDRAWN_ACTIVITY_STORAGE_KEY = "job-tracker:withdrawn-activity";
-
-// Optional/forward-compatible offers activity key(s)
-// (won't break if they don't exist)
-const OFFERS_ACTIVITY_STORAGE_KEYS = [
-  "job-tracker:offers-received-activity",
-  "job-tracker:offers-activity",
-];
+import { getSupabaseClient } from "@/lib/supabase/client";
+import {
+  loadActivity,
+  type ActivityItem,
+  type ActivityVariant,
+} from "@/lib/storage/activity";
 
 const MS_MIN = 60_000;
 const MS_HOUR = 60 * MS_MIN;
 const MS_DAY = 24 * MS_HOUR;
+
 const LAST_DAYS = 7;
 const MAX_FEEDS = 5;
 
+// listen to these if your app emits them (safe even if it doesn't)
+const COUNTS_EVENT = "job-tracker:refresh-counts";
+const ACTIVITY_EVENT = "job-tracker:refresh-activity";
+
 type SourceBucket = "applied" | "interview" | "rejected" | "withdrawn" | "offer";
 type InternalActivityItem = ActivityItem & { __source?: SourceBucket };
-
-function safeReadArray(key: string): ActivityItem[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function readWithSource(key: string, source: SourceBucket): InternalActivityItem[] {
-  const list = safeReadArray(key);
-  return list.map((i) => ({ ...i, __source: source }));
-}
 
 function toMs(ts?: string) {
   if (!ts) return 0;
@@ -74,7 +52,6 @@ function timeAgoLabel(timestampIso: string, nowMs: number) {
 }
 
 function inferCategory(item: InternalActivityItem): SourceBucket {
-  // Prefer explicit source when we know it
   if (item.__source) return item.__source;
 
   const from = (item.fromStatus ?? "").toLowerCase();
@@ -84,7 +61,8 @@ function inferCategory(item: InternalActivityItem): SourceBucket {
 
   if (to.includes("rejected") || type.includes("rejected")) return "rejected";
   if (to.includes("withdrawn") || type.includes("withdrawn")) return "withdrawn";
-  if (to.includes("accepted") || note.includes("offer")) return "offer";
+  if (to.includes("accepted") || note.includes("offer") || type.includes("offer"))
+    return "offer";
 
   if (
     to.includes("interview") ||
@@ -143,7 +121,6 @@ function prefixForDeleted(source: SourceBucket) {
   }
 }
 
-// Build a label that ALWAYS mentions role + company when available.
 function buildLabel(item: InternalActivityItem) {
   const company = item.company?.trim() || "Unknown company";
   const role = item.role?.trim() || "Unknown role";
@@ -163,10 +140,8 @@ function buildLabel(item: InternalActivityItem) {
       return withNote(prefixForAdded(source));
 
     case "edited":
-      // If a move-to-accepted was logged as edited somewhere
-      if (to?.toLowerCase().includes("accepted")) {
-        return withNote("Offer accepted");
-      }
+      if (to?.toLowerCase().includes("accepted")) return withNote("Offer accepted");
+      if (to?.toLowerCase().includes("declined")) return withNote("Offer declined");
       return withNote(prefixForEdited(source));
 
     case "deleted":
@@ -191,6 +166,12 @@ function buildLabel(item: InternalActivityItem) {
   }
 }
 
+function mapVariantToSource(v: ActivityVariant): SourceBucket {
+  if (v === "offers") return "offer";
+  if (v === "interviews") return "interview";
+  return v;
+}
+
 export default function RecentActivityCard() {
   const [allItems, setAllItems] = useState<InternalActivityItem[]>([]);
   const [now, setNow] = useState(() => Date.now());
@@ -198,47 +179,78 @@ export default function RecentActivityCard() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const read = () => {
-      const applied = readWithSource(APPLIED_ACTIVITY_STORAGE_KEY, "applied");
-      const interviews = readWithSource(
-        INTERVIEWS_ACTIVITY_STORAGE_KEY,
-        "interview"
-      );
-      const rejected = readWithSource(
-        REJECTIONS_ACTIVITY_STORAGE_KEY,
-        "rejected"
-      );
-      const withdrawn = readWithSource(
-        WITHDRAWN_ACTIVITY_STORAGE_KEY,
-        "withdrawn"
-      );
+    let alive = true;
+    const supabase = getSupabaseClient();
 
-      const offers = OFFERS_ACTIVITY_STORAGE_KEYS.flatMap((k) =>
-        readWithSource(k, "offer")
-      );
+    const refresh = async () => {
+      try {
+        const variants: ActivityVariant[] = [
+          "applied",
+          "interviews",
+          "rejected",
+          "withdrawn",
+          "offers",
+        ];
 
-      const merged = [...applied, ...interviews, ...rejected, ...withdrawn, ...offers];
+        const results = await Promise.all(
+          variants.map(async (v) => {
+            const { items } = await loadActivity(v);
+            const source = mapVariantToSource(v);
+            return (items as InternalActivityItem[]).map((it) => ({
+              ...it,
+              __source: source,
+            }));
+          })
+        );
 
-      // Deduplicate by id if the same entry appears twice
-      const map = new Map<string, InternalActivityItem>();
-      for (const it of merged) {
-        if (it?.id) map.set(it.id, it);
+        if (!alive) return;
+
+        const merged = results.flat();
+
+        // Deduplicate by id
+        const map = new Map<string, InternalActivityItem>();
+        for (const it of merged) {
+          if (it?.id) map.set(it.id, it);
+        }
+
+        const unique = Array.from(map.values());
+        unique.sort((a, b) => toMs(b.timestamp) - toMs(a.timestamp));
+        setAllItems(unique);
+      } catch (e) {
+        console.error("RecentActivityCard: failed to load activity", e);
+        if (alive) setAllItems([]);
       }
-
-      const unique = Array.from(map.values());
-      unique.sort((a, b) => toMs(b.timestamp) - toMs(a.timestamp));
-      setAllItems(unique);
     };
 
-    read();
+    // subscribe first, then hydrate session
+    const { data: sub } = supabase.auth.onAuthStateChange(() => {
+      void refresh();
+    });
+    supabase.auth.getSession().finally(() => void refresh());
 
-    // Keep "time ago" labels fresh + pick up new logs from other pages
-    const id = window.setInterval(() => {
-      setNow(Date.now());
-      read();
-    }, 60_000);
+    const onFocus = () => void refresh();
+    const onVis = () => {
+      if (!document.hidden) refresh();
+    };
+    const onEvent = () => void refresh();
 
-    return () => window.clearInterval(id);
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener(COUNTS_EVENT, onEvent);
+    window.addEventListener(ACTIVITY_EVENT, onEvent);
+
+    // keep “time ago” fresh
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
+
+    return () => {
+      alive = false;
+      sub?.subscription?.unsubscribe();
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener(COUNTS_EVENT, onEvent);
+      window.removeEventListener(ACTIVITY_EVENT, onEvent);
+      window.clearInterval(timer);
+    };
   }, []);
 
   const recent = useMemo(() => {
@@ -264,14 +276,11 @@ export default function RecentActivityCard() {
     <section
       className={[
         "relative overflow-hidden rounded-2xl border border-neutral-200/70",
-        // was: from-white via-slate-50 to-sky-50
         "bg-gradient-to-br from-slate-50 via-white to-indigo-50",
         "p-5 shadow-md",
       ].join(" ")}
     >
-      {/* was sky blob */}
       <div className="pointer-events-none absolute -bottom-20 -right-16 h-56 w-56 rounded-full bg-indigo-400/15 blur-3xl" />
-
 
       <div className="relative z-10">
         <div className="flex items-center justify-between gap-2">
@@ -313,12 +322,12 @@ export default function RecentActivityCard() {
                 item.category === "applied"
                   ? "bg-sky-500"
                   : item.category === "interview"
-                    ? "bg-emerald-500"
-                    : item.category === "rejected"
-                      ? "bg-rose-500"
-                      : item.category === "withdrawn"
-                        ? "bg-amber-500"
-                        : "bg-lime-500"; // offer
+                  ? "bg-emerald-500"
+                  : item.category === "rejected"
+                  ? "bg-rose-500"
+                  : item.category === "withdrawn"
+                  ? "bg-amber-500"
+                  : "bg-lime-500"; // offer
 
               return (
                 <li

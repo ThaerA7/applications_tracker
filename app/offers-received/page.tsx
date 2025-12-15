@@ -11,6 +11,7 @@ import {
   Plus,
   History,
 } from "lucide-react";
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 
 import MoveToAcceptedDialog, {
   type AcceptedDetails,
@@ -184,7 +185,8 @@ export default function OffersReceivedPage() {
 
     void loadAll();
 
-    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange(
+  (event: AuthChangeEvent, session: Session | null) => {
       if (!alive) return;
 
       if (event === "SIGNED_IN" && session?.user) {

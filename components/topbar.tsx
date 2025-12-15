@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { LogOut, Menu, UserRound } from "lucide-react";
-import type { User } from "@supabase/supabase-js";
+import type { User, Session, AuthChangeEvent } from "@supabase/supabase-js";
+
 import { getSupabaseClient } from "@/lib/supabase/client";
 
 const ROUTES: Record<string, { title: string }> = {
@@ -252,24 +253,30 @@ export default function TopBar({ collapsed, onToggleSidebar }: TopBarProps) {
   const [loggingOut, setLoggingOut] = useState(false);
 
   // Load session + subscribe
-  useEffect(() => {
-    const supabase = getSupabaseClient();
-    let active = true;
+  // Load session + subscribe
+useEffect(() => {
+  const supabase = getSupabaseClient();
+  let active = true;
 
-    supabase.auth.getSession().then(({ data }) => {
+  supabase.auth
+    .getSession()
+    .then(({ data }: { data: { session: Session | null } }) => {
       if (!active) return;
       setUser(data.session?.user ?? null);
     });
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+  const { data: sub } = supabase.auth.onAuthStateChange(
+    (_event: AuthChangeEvent, session: Session | null) => {
       setUser(session?.user ?? null);
-    });
+    }
+  );
 
-    return () => {
-      active = false;
-      sub.subscription.unsubscribe();
-    };
-  }, []);
+  return () => {
+    active = false;
+    sub.subscription.unsubscribe();
+  };
+}, []);
+
 
   const avatarLabel = useMemo(() => {
     if (!user) return "Guest";

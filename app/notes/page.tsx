@@ -28,6 +28,13 @@ import {
   type NotesStorageMode,
 } from "@/lib/storage/notes";
 
+const COUNTS_EVENT = "job-tracker:refresh-counts";
+const NOTES_EVENT = "job-tracker:refresh-notes";
+function notifyNotesChanged() {
+  window.dispatchEvent(new Event(NOTES_EVENT));
+  window.dispatchEvent(new Event(COUNTS_EVENT));
+}
+
 const COLORS: ColorKey[] = [
   "gray",
   "blue",
@@ -145,7 +152,6 @@ export default function NotesPage() {
 
     (async () => {
       try {
-        // If user is signed in, this moves guest notes into Supabase once.
         await migrateGuestNotesToUser().catch(() => {});
         const res = await loadNotes();
         if (!alive) return;
@@ -181,7 +187,8 @@ export default function NotesPage() {
         content.includes(q) ||
         tags.some((t: string) => t.includes(q));
 
-      const matchesTag = activeTag === "All" || (n.tags ?? []).includes(activeTag);
+      const matchesTag =
+        activeTag === "All" || (n.tags ?? []).includes(activeTag);
 
       const noteColor: ColorKey = (n.color ?? "gray") as ColorKey;
       const matchesColor = activeColor === "all" || noteColor === activeColor;
@@ -193,7 +200,10 @@ export default function NotesPage() {
       const ap = !!a.pinned;
       const bp = !!b.pinned;
       if (bp === ap) {
-        return new Date(b.updatedAt ?? 0).getTime() - new Date(a.updatedAt ?? 0).getTime();
+        return (
+          new Date(b.updatedAt ?? 0).getTime() -
+          new Date(a.updatedAt ?? 0).getTime()
+        );
       }
       return (bp ? 1 : 0) - (ap ? 1 : 0);
     });
@@ -238,13 +248,10 @@ export default function NotesPage() {
         pinned: false,
       };
 
-      // optimistic add
       setNotes((prev) => [newNote, ...prev]);
 
-      // persist (mode optional, but we pass it so it doesn't re-check session)
       const saved = await upsertNote(newNote, mode);
 
-      // if storage replaced id (uuid fix), reconcile
       if (saved.id !== newNote.id) {
         setNotes((prev) =>
           prev.map((n) => (n.id === newNote.id ? { ...saved } : n))
@@ -253,10 +260,10 @@ export default function NotesPage() {
 
       setEditingId(null);
       setIsDialogOpen(false);
+      notifyNotesChanged();
       return;
     }
 
-    // editing existing
     const updated: Note = {
       ...(notes.find((n) => n.id === editingId) ?? { id: editingId }),
       title: draftTitle || "Untitled note",
@@ -271,6 +278,7 @@ export default function NotesPage() {
 
     setEditingId(null);
     setIsDialogOpen(false);
+    notifyNotesChanged();
   }
 
   function closeDialog() {
@@ -287,6 +295,7 @@ export default function NotesPage() {
     if (!target) return;
 
     await upsertNote({ ...target, pinned: !target.pinned }, mode);
+    notifyNotesChanged();
   }
 
   function requestDelete(note: Note) {
@@ -301,6 +310,7 @@ export default function NotesPage() {
     await deleteNote(id, mode);
 
     setDeleteTarget(null);
+    notifyNotesChanged();
   }
 
   function cancelDelete() {
@@ -321,7 +331,6 @@ export default function NotesPage() {
           "p-8 shadow-md overflow-hidden",
         ].join(" ")}
       >
-        {/* soft fuchsia/violet blobs */}
         <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-fuchsia-400/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-violet-400/20 blur-3xl" />
 
@@ -620,7 +629,9 @@ export default function NotesPage() {
                 Delete this note?
               </p>
               <p className="mt-1 text-sm text-neutral-700">
-                <span className="font-medium">{deleteTarget.title ?? "Untitled"}</span>{" "}
+                <span className="font-medium">
+                  {deleteTarget.title ?? "Untitled"}
+                </span>{" "}
                 will be permanently removed.
               </p>
               <p className="mt-1 text-xs text-neutral-500">

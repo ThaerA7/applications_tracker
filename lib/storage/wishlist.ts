@@ -146,7 +146,7 @@ async function loadUserWishlist(): Promise<WishlistItem[]> {
     id: row.id,
   }));
 
-  const parsed = safeParseList(mapped.map((m) => ({ ...m, id: String(m.id) })));
+  const parsed = safeParseList(mapped.map((m: any) => ({ ...m, id: String(m.id) })));
   return parsed;
 }
 

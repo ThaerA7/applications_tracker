@@ -63,6 +63,7 @@ import {
   type ActivityStorageMode,
 } from "@/lib/storage/activity";
 import { OfferReceivedJob } from "../offers-received/OffersReceivedCards";
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 
 
 
@@ -317,7 +318,8 @@ export default function InterviewsPage() {
 
     void loadAll();
 
-    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange(
+  (event: AuthChangeEvent, session: Session | null) => {
       if (!alive) return;
 
       if (event === "SIGNED_IN" && session?.user) {

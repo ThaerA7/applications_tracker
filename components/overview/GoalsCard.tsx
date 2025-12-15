@@ -14,6 +14,7 @@ import GoalSettingsDialog, {
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { loadInterviews } from "@/lib/storage/interviews";
 import { loadOffers } from "@/lib/storage/offers";
+import { idbGet, idbSet } from "@/lib/storage/indexedDb";
 
 /**
  * Global refresh event emitted by storage modules
@@ -72,50 +73,37 @@ function isWithinLastDays(
 
 // --- local settings helpers ---
 
-function loadSettings(): GoalsSettings {
-  if (typeof window === "undefined") return DEFAULT_SETTINGS;
-  try {
-    const raw = window.localStorage.getItem(GOALS_SETTINGS_KEY);
-    if (!raw) return DEFAULT_SETTINGS;
-    const parsed = JSON.parse(raw);
+const GOALS_SETTINGS_IDB_KEY = "goals-settings-v1";
 
-    const next: GoalsSettings = {
+async function loadSettings(): Promise<GoalsSettings> {
+  try {
+    const raw = await idbGet<any>(GOALS_SETTINGS_IDB_KEY);
+    if (!raw) return DEFAULT_SETTINGS;
+
+    return {
       interviews: {
-        target:
-          Number(parsed?.interviews?.target) || DEFAULT_SETTINGS.interviews.target,
-        periodDays:
-          Number(parsed?.interviews?.periodDays) ||
-          DEFAULT_SETTINGS.interviews.periodDays,
+        target: Number(raw?.interviews?.target) || DEFAULT_SETTINGS.interviews.target,
+        periodDays: Number(raw?.interviews?.periodDays) || DEFAULT_SETTINGS.interviews.periodDays,
       },
       offers: {
-        target: Number(parsed?.offers?.target) || DEFAULT_SETTINGS.offers.target,
-        periodDays:
-          Number(parsed?.offers?.periodDays) || DEFAULT_SETTINGS.offers.periodDays,
+        target: Number(raw?.offers?.target) || DEFAULT_SETTINGS.offers.target,
+        periodDays: Number(raw?.offers?.periodDays) || DEFAULT_SETTINGS.offers.periodDays,
       },
       overview: {
-        weeklyTarget:
-          Number(parsed?.overview?.weeklyTarget) ||
-          DEFAULT_SETTINGS.overview.weeklyTarget,
-        monthlyTarget:
-          Number(parsed?.overview?.monthlyTarget) ||
-          DEFAULT_SETTINGS.overview.monthlyTarget,
+        weeklyTarget: Number(raw?.overview?.weeklyTarget) || DEFAULT_SETTINGS.overview.weeklyTarget,
+        monthlyTarget: Number(raw?.overview?.monthlyTarget) || DEFAULT_SETTINGS.overview.monthlyTarget,
       },
     };
-
-    return next;
   } catch {
     return DEFAULT_SETTINGS;
   }
 }
 
 function persistSettings(next: GoalsSettings) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(GOALS_SETTINGS_KEY, JSON.stringify(next));
-  } catch (err) {
-    console.error("Failed to persist goals settings", err);
-  }
+  void idbSet(GOALS_SETTINGS_IDB_KEY, next);
 }
+
+
 
 // --- minimal shapes for counting ---
 
@@ -145,18 +133,18 @@ export default function GoalsCard() {
 
   // init clock + load settings
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    setNowMs(Date.now());
+  if (typeof window === "undefined") return;
+  setNowMs(Date.now());
 
-    const loaded = loadSettings();
+  (async () => {
+    const loaded = await loadSettings();
     setSettings(loaded);
+  })();
 
-    const id = window.setInterval(() => {
-      setNowMs(Date.now());
-    }, 60_000);
+  const id = window.setInterval(() => setNowMs(Date.now()), 60_000);
+  return () => window.clearInterval(id);
+}, []);
 
-    return () => window.clearInterval(id);
-  }, []);
 
  useEffect(() => {
   if (typeof window === "undefined") return;

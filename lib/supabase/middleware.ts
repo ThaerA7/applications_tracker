@@ -45,7 +45,7 @@ export async function updateSession(request: NextRequest) {
   });
 
   // Keep this pattern to avoid random logouts with SSR
-  await supabase.auth.getClaims();
+  await supabase.auth.getUser();
 
   // ✅ Make all pages accessible (UI gate only)
   return supabaseResponse;

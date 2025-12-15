@@ -11,6 +11,7 @@ import MoveToWithdrawnDialog, {
 } from "@/components/dialogs/MoveToWithdrawnDialog";
 import { animateCardExit } from "@/components/dialogs/cardExitAnimation";
 import ActivityLogSidebar, { type ActivityItem } from "@/components/ActivityLogSidebar";
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 
 import { getSupabaseClient } from "@/lib/supabase/client";
 import {
@@ -113,7 +114,8 @@ export default function WithdrawnPage() {
 
     void loadAll();
 
-    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange(
+  (event: AuthChangeEvent, session: Session | null) => {
       if (!alive) return;
 
       if (event === "SIGNED_IN" && session?.user) {

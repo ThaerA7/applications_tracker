@@ -1,4 +1,4 @@
-// app/components/StatsCard.tsx
+// components/overview/StatsCard.tsx
 
 "use client";
 
@@ -16,7 +16,7 @@ import {
 } from "recharts";
 import { CalendarDays, Clock, ListChecks, Plus, TrendingUp } from "lucide-react";
 
-import { AddNoteDialog, upsertNoteToStorage } from "@/components/overview/NotesCard";
+import { AddNoteDialog } from "@/components/overview/NotesCard";
 
 // ✅ Dialogs
 import AddApplicationDialog, {
@@ -72,10 +72,24 @@ import {
   type OffersStorageMode,
 } from "@/lib/storage/offers";
 
+import {
+  upsertNote,
+  type Note,
+  type ColorKey,
+  type NotesStorageMode,
+} from "@/lib/storage/notes";
+
 /**
  * Global refresh event emitted by storage modules
  */
 const COUNTS_EVENT = "job-tracker:refresh-counts";
+const NOTES_EVENT = "job-tracker:refresh-notes";
+
+function notifyNotesChanged() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(NOTES_EVENT));
+  window.dispatchEvent(new Event(COUNTS_EVENT));
+}
 
 /**
  * Lightweight shapes for analytics
@@ -382,66 +396,63 @@ export default function StatsCard() {
   // ✅ one mode is enough (derived from auth)
   const [mode, setMode] = useState<"guest" | "user">("guest");
 
-  useEffect(() => {
-  if (typeof window === "undefined") return;
-
-  let alive = true;
-  const supabase = getSupabaseClient();
-
-  const loadAll = async () => {
-    try {
-      const [a, i, r, w, o] = await Promise.all([
-        loadApplied(),
-        loadInterviews(),
-        loadRejected(),
-        loadWithdrawn(),
-        loadOffers(),
-      ]);
-
-      if (!alive) return;
-
-      setMode(a.mode);
-      setApplied(a.items as AnyRecord[]);
-      setInterviews(i.items as AnyRecord[]);
-      setRejected(r.items as AnyRecord[]);
-      setWithdrawn(w.items as AnyRecord[]);
-
-      // ✅ keep it, but also normalize if your stored shape varies
-      setOffers(normalizeOffers((o.items as OfferReceivedJobLike[]) ?? []));
-
-      setNow(new Date());
-    } catch (err) {
-      console.error("StatsCard: failed to load data:", err);
-    }
-  };
-
-  const refresh = () => void loadAll();
-
-  // ✅ subscribe first
-  const { data: sub } = supabase.auth.onAuthStateChange(() => refresh());
-
-  // ✅ then force session hydration, then load once
-  supabase.auth.getSession().finally(() => refresh());
-
-  window.addEventListener(COUNTS_EVENT, refresh);
-  window.addEventListener("focus", refresh);
-
-  const onVis = () => {
-    if (!document.hidden) refresh();
-  };
-  document.addEventListener("visibilitychange", onVis);
-
-  return () => {
-    alive = false;
-    window.removeEventListener(COUNTS_EVENT, refresh);
-    window.removeEventListener("focus", refresh);
-    document.removeEventListener("visibilitychange", onVis);
-    sub?.subscription?.unsubscribe();
-  };
-}, []);
-
-
   const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    let alive = true;
+    const supabase = getSupabaseClient();
+
+    const loadAll = async () => {
+      try {
+        const [a, i, r, w, o] = await Promise.all([
+          loadApplied(),
+          loadInterviews(),
+          loadRejected(),
+          loadWithdrawn(),
+          loadOffers(),
+        ]);
+
+        if (!alive) return;
+
+        setMode(a.mode);
+        setApplied(a.items as AnyRecord[]);
+        setInterviews(i.items as AnyRecord[]);
+        setRejected(r.items as AnyRecord[]);
+        setWithdrawn(w.items as AnyRecord[]);
+        setOffers(normalizeOffers((o.items as OfferReceivedJobLike[]) ?? []));
+
+        setNow(new Date());
+      } catch (err) {
+        console.error("StatsCard: failed to load data:", err);
+      }
+    };
+
+    const refresh = () => void loadAll();
+
+    // ✅ subscribe first
+    const { data: sub } = supabase.auth.onAuthStateChange(() => refresh());
+
+    // ✅ then force session hydration, then load once
+    supabase.auth.getSession().finally(() => refresh());
+
+    window.addEventListener(COUNTS_EVENT, refresh);
+    window.addEventListener("focus", refresh);
+
+    const onVis = () => {
+      if (!document.hidden) refresh();
+    };
+    document.addEventListener("visibilitychange", onVis);
+
+    return () => {
+      alive = false;
+      window.removeEventListener(COUNTS_EVENT, refresh);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", onVis);
+      sub?.subscription?.unsubscribe();
+    };
+  }, []);
 
   const weeklyActivity = useMemo(
     () =>
@@ -556,14 +567,20 @@ export default function StatsCard() {
   };
 
   const handleQuickSaveRejected = async (details: RejectionDetails) => {
-    const item: RejectedApplication = { id: makeUuidV4(), ...(details as any) } as any;
+    const item: RejectedApplication = {
+      id: makeUuidV4(),
+      ...(details as any),
+    } as any;
     setRejected((prev) => [item as AnyRecord, ...prev]);
     await upsertRejected(item, mode as RejectedStorageMode);
     setOpenAddRejected(false);
   };
 
   const handleQuickSaveWithdrawn = async (details: WithdrawnDetails) => {
-    const item: WithdrawnApplication = { id: makeUuidV4(), ...(details as any) } as any;
+    const item: WithdrawnApplication = {
+      id: makeUuidV4(),
+      ...(details as any),
+    } as any;
     setWithdrawn((prev) => [item as AnyRecord, ...prev]);
     await upsertWithdrawn(item, mode as WithdrawnStorageMode);
     setOpenAddWithdrawn(false);
@@ -598,6 +615,30 @@ export default function StatsCard() {
     setOffers((prev) => [item, ...prev]);
     await upsertOffer(item as any, mode as OffersStorageMode);
     setOpenAddOffer(false);
+  };
+
+  const handleQuickSaveNote = async (payload: {
+    id?: string;
+    title: string;
+    content: string;
+    tags: string[];
+    color: ColorKey;
+  }) => {
+    const nowIso = new Date().toISOString();
+
+    const note: Note = {
+      id: payload.id ?? makeUuidV4(),
+      title: payload.title,
+      content: payload.content,
+      tags: payload.tags,
+      color: payload.color,
+      updatedAt: nowIso,
+      pinned: false,
+    };
+
+    await upsertNote(note, mode as NotesStorageMode);
+    notifyNotesChanged();
+    setOpenAddNote(false);
   };
 
   const quickActions = [
@@ -912,10 +953,7 @@ export default function StatsCard() {
         open={openAddNote}
         onClose={() => setOpenAddNote(false)}
         initialNote={null}
-        onSave={(payload) => {
-          upsertNoteToStorage(payload);
-          setOpenAddNote(false);
-        }}
+        onSave={(payload) => void handleQuickSaveNote(payload)}
       />
     </>
   );

@@ -13,6 +13,7 @@ import { loadRejected } from "@/lib/storage/rejected";
 import { loadOffers } from "@/lib/storage/offers";
 import { loadWishlist } from "@/lib/storage/wishlist";
 import { loadNotes } from "@/lib/storage/notes";
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 
 type Item = {
   href: string;
@@ -112,9 +113,11 @@ export default function Sidebar({ collapsed }: SidebarProps) {
   };
 
   // ✅ Subscribe FIRST so we catch INITIAL_SESSION on hard refresh
-  const { data: sub } = supabase.auth.onAuthStateChange((_event) => {
+  const { data: sub } = supabase.auth.onAuthStateChange(
+  (_event: AuthChangeEvent, _session: Session | null) => {
     void refreshCounts();
-  });
+  }
+);
 
   // ✅ Kick session hydration and then refresh once
   supabase.auth.getSession().finally(() => {
