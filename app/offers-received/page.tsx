@@ -71,54 +71,6 @@ const VIEW_FILTERS: {
   icon: ComponentType<any>;
 }[];
 
-// Demo data for guests (not persisted to Supabase)
-const DEMO_OFFERS_RECEIVED: OfferReceivedJob[] = [
-  {
-    id: "r1",
-    company: "Acme Corp",
-    role: "Frontend Engineer",
-    location: "Berlin",
-    appliedOn: "2025-10-10",
-    employmentType: "Full-time",
-    offerReceivedDate: "2025-11-01",
-    offerAcceptedDate: "2025-11-03",
-    startDate: "2026-01-12",
-    salary: "€65,000 / year",
-    url: "https://jobs.example/acme/frontend",
-    logoUrl: "/logos/acme.svg",
-    notes: "You did it! First big frontend role. 🎉",
-    taken: true,
-  },
-  {
-    id: "r2",
-    company: "Globex",
-    role: "Mobile Developer (Flutter)",
-    location: "Remote",
-    appliedOn: "2025-09-25",
-    employmentType: "Ausbildung",
-    offerReceivedDate: "2025-10-15",
-    startDate: "2026-03-01",
-    salary: "€60,000 / year",
-    logoUrl: "/logos/globex.png",
-    notes: "Remote-friendly team, strong learning potential.",
-    taken: false,
-  },
-  {
-    id: "r3",
-    company: "Initech",
-    role: "Junior Fullstack Developer",
-    location: "Hamburg",
-    appliedOn: "2025-09-02",
-    employmentType: "Full-time",
-    offerReceivedDate: "2025-10-02",
-    offerDeclinedDate: "2025-10-05",
-    salary: "€54,000 / year",
-    logoUrl: "/logos/initech.svg",
-    notes: "Good offer, but you chose a better-fit path.",
-    taken: false,
-  },
-];
-
 const normalizeOffers = (list: OfferReceivedJob[]) => {
   return list.map((j) => {
     const offerReceivedDate = j.offerReceivedDate ?? j.decisionDate ?? undefined;
@@ -218,19 +170,13 @@ export default function OffersReceivedPage() {
         setActivityMode(act.mode);
         setActivityItems(act.items);
 
-        if (items.length === 0 && mode === "guest") {
-          // Seed demo only for guests with empty storage
-          const normalizedDemo = normalizeOffers(DEMO_OFFERS_RECEIVED);
-          setItems(normalizedDemo);
-
-          
-        } else {
-          setItems(normalizeOffers(items));
-        }
+        // 👇 No more demo seeding – just use real stored items
+        setItems(normalizeOffers(items));
       } catch (err) {
         console.error("Failed to load offers/activity:", err);
         if (!alive) return;
-        setItems(normalizeOffers(DEMO_OFFERS_RECEIVED));
+        // If something explodes, just show nothing instead of demo
+        setItems([]);
       } finally {
         if (alive) setHydrated(true);
       }
@@ -244,7 +190,7 @@ export default function OffersReceivedPage() {
       if (event === "SIGNED_IN" && session?.user) {
         setTimeout(async () => {
           if (!alive) return;
-          await migrateGuestOffersToUser(); 
+          await migrateGuestOffersToUser();
           await migrateGuestActivityToUser(); // ✅ migrate all variants (including offers)
           await loadAll();
         }, 0);

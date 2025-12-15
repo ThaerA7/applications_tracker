@@ -31,7 +31,7 @@ export type Note = StoredNote;
 
 export type NotesStorageMode = "guest" | "user";
 
-const GUEST_LOCAL_KEY = "job-tracker:notes";
+// ✅ IndexedDB-only guest key
 const GUEST_IDB_KEY = "notes";
 
 const TABLE = "applications";
@@ -55,72 +55,62 @@ function safeParseList(raw: any): StoredNote[] {
 }
 
 function isUuid(v: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    v
+  );
 }
 
-function makeUuid(): string | null {
+function makeUuid(): string {
+  // Prefer crypto if available
   try {
     if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
       return crypto.randomUUID();
     }
   } catch {}
-  return null;
+
+  // Fallback: UUID v4-ish generator (good enough for client IDs)
+  const template = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx";
+  return template.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
 }
 
 /**
  * Ensures we never try to upsert a non-UUID into applications.id (uuid).
- * If we can't generate a uuid (very old browser), we keep the original id
- * and Supabase will reject it — but modern browsers will be fine.
  */
 function ensureUuidId(note: StoredNote): StoredNote {
   if (typeof note.id === "string" && isUuid(note.id)) return note;
-
-  const uuid = makeUuid();
-  if (!uuid) return note;
-
-  return { ...note, id: uuid };
+  return { ...note, id: makeUuid() };
 }
 
-// ---------- guest storage ----------
+// ---------- guest storage (IndexedDB ONLY) ----------
 
 async function loadGuestNotes(): Promise<StoredNote[]> {
-  // Prefer IDB
   try {
     const idb = await idbGet<StoredNote[]>(GUEST_IDB_KEY);
-    if (idb) return safeParseList(idb);
-  } catch {}
-
-  // Fallback localStorage
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(GUEST_LOCAL_KEY);
-    return safeParseList(raw ? JSON.parse(raw) : []);
+    return safeParseList(idb ?? []);
   } catch {
+    // no fallback storage (localStorage removed)
     return [];
   }
 }
 
 async function saveGuestNotes(list: StoredNote[]) {
-  // Try IDB
   try {
     await idbSet(GUEST_IDB_KEY, list);
-  } catch {}
-
-  // Mirror to localStorage as cheap backup
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(GUEST_LOCAL_KEY, JSON.stringify(list));
-  } catch {}
+  } catch {
+    // no fallback storage (localStorage removed)
+  }
 }
 
 async function clearGuestNotes() {
   try {
     await idbDel(GUEST_IDB_KEY);
-  } catch {}
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.removeItem(GUEST_LOCAL_KEY);
-  } catch {}
+  } catch {
+    // no fallback storage (localStorage removed)
+  }
 }
 
 // ---------- user storage (Supabase) ----------
@@ -169,14 +159,6 @@ async function upsertUserNote(note: StoredNote): Promise<StoredNote> {
   const supabase = getSupabaseClient();
 
   const fixed = ensureUuidId(note);
-
-  // If still not uuid, upsert will fail (old browser) -> log and return
-  if (!isUuid(fixed.id)) {
-    console.error(
-      `Notes upsert blocked: applications.id is uuid but note.id is not a uuid (${fixed.id}).`
-    );
-    return fixed;
-  }
 
   const { error } = await supabase.from(TABLE).upsert(
     {
@@ -265,7 +247,6 @@ export async function deleteNote(id: string, mode?: NotesStorageMode) {
   notifyCountsChanged();
 }
 
-
 /**
  * When a user signs in, move guest Notes data into Supabase.
  * We also convert any old non-UUID ids into UUIDs to prevent insert failures.
@@ -278,14 +259,7 @@ export async function migrateGuestNotesToUser() {
   const guest = await loadGuestNotes();
   if (guest.length === 0) return;
 
-  const fixedGuest = guest.map((n) => ensureUuidId(n)).filter((n) => isUuid(n.id));
-
-  if (fixedGuest.length === 0) {
-    // nothing we can safely insert into a uuid table
-    await clearGuestNotes();
-    notifyCountsChanged();
-    return;
-  }
+  const fixedGuest = guest.map((n) => ensureUuidId(n));
 
   const payload = fixedGuest.map((note) => ({
     id: note.id,

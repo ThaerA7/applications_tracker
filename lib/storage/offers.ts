@@ -49,32 +49,32 @@ function ensureUuid(id: string): string {
   });
 }
 
-// ---------- guest storage ----------
+// ---------- guest storage (IndexedDB ONLY) ----------
 
 async function loadGuestOffers(): Promise<OfferReceivedJob[]> {
   try {
     const idb = await idbGet<OfferReceivedJob[]>(GUEST_IDB_KEY);
     return safeParseList(idb ?? []);
-  } catch {}
-
-  
+  } catch {
+    // no fallback storage
     return [];
-  
+  }
 }
 
 async function saveGuestOffers(list: OfferReceivedJob[]) {
   try {
     await idbSet(GUEST_IDB_KEY, list);
-  } catch {}
-
-  
+  } catch {
+    // no fallback storage
+  }
 }
 
 async function clearGuestOffers() {
   try {
     await idbDel(GUEST_IDB_KEY);
-  } catch {}
-  
+  } catch {
+    // no fallback storage
+  }
 }
 
 // ---------- user storage (Supabase) ----------
