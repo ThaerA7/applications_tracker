@@ -35,7 +35,7 @@ import MoveToAcceptedDialog, {
   type AcceptedDetails,
 } from "@/components/dialogs/MoveToAcceptedDialog";
 
-// ✅ Storage (guest: IDB/local mirror, user: Supabase)
+// ✅ Storage
 import { getSupabaseClient } from "@/lib/supabase/client";
 
 import {
@@ -79,15 +79,32 @@ import {
   type NotesStorageMode,
 } from "@/lib/storage/notes";
 
+// ✅ Activity (this is what RecentActivityCard reads)
+import {
+  loadActivity,
+  appendActivity,
+  type ActivityItem,
+  type ActivityVariant,
+  type ActivityType,
+  type ActivityStorageMode,
+} from "@/lib/storage/activity";
+
 /**
  * Global refresh event emitted by storage modules
  */
 const COUNTS_EVENT = "job-tracker:refresh-counts";
 const NOTES_EVENT = "job-tracker:refresh-notes";
+const ACTIVITY_EVENT = "job-tracker:refresh-activity";
 
 function notifyNotesChanged() {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new Event(NOTES_EVENT));
+  window.dispatchEvent(new Event(COUNTS_EVENT));
+}
+
+function notifyActivityChanged() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(ACTIVITY_EVENT));
   window.dispatchEvent(new Event(COUNTS_EVENT));
 }
 
@@ -393,8 +410,8 @@ export default function StatsCard() {
   const [openAddOffer, setOpenAddOffer] = useState(false);
   const [openAddNote, setOpenAddNote] = useState(false);
 
-  // ✅ one mode is enough (derived from auth)
   const [mode, setMode] = useState<"guest" | "user">("guest");
+  const [activityMode, setActivityMode] = useState<ActivityStorageMode>("guest");
 
   const [now, setNow] = useState(() => new Date());
 
@@ -406,17 +423,20 @@ export default function StatsCard() {
 
     const loadAll = async () => {
       try {
-        const [a, i, r, w, o] = await Promise.all([
+        const [a, i, r, w, o, act] = await Promise.all([
           loadApplied(),
           loadInterviews(),
           loadRejected(),
           loadWithdrawn(),
           loadOffers(),
+          loadActivity("applied"),
         ]);
 
         if (!alive) return;
 
         setMode(a.mode);
+        setActivityMode(act.mode);
+
         setApplied(a.items as AnyRecord[]);
         setInterviews(i.items as AnyRecord[]);
         setRejected(r.items as AnyRecord[]);
@@ -431,10 +451,7 @@ export default function StatsCard() {
 
     const refresh = () => void loadAll();
 
-    // ✅ subscribe first
     const { data: sub } = supabase.auth.onAuthStateChange(() => refresh());
-
-    // ✅ then force session hydration, then load once
     supabase.auth.getSession().finally(() => refresh());
 
     window.addEventListener(COUNTS_EVENT, refresh);
@@ -453,6 +470,34 @@ export default function StatsCard() {
       sub?.subscription?.unsubscribe();
     };
   }, []);
+
+  const logActivity = async (
+    variant: ActivityVariant,
+    type: ActivityType,
+    base: {
+      id: string;
+      company?: string;
+      role?: string;
+      location?: string;
+      appliedOn?: string;
+    },
+    extras?: Partial<ActivityItem>
+  ) => {
+    const entry: ActivityItem = {
+      id: makeUuidV4(),
+      appId: base.id,
+      type,
+      timestamp: new Date().toISOString(),
+      company: base.company?.trim() || "Unknown company",
+      role: base.role,
+      location: base.location,
+      appliedOn: base.appliedOn,
+      ...extras,
+    };
+
+    await appendActivity(variant, entry, activityMode);
+    notifyActivityChanged();
+  };
 
   const weeklyActivity = useMemo(
     () =>
@@ -549,46 +594,102 @@ export default function StatsCard() {
   }, [now, applied, interviews, rejected, withdrawn, offers]);
 
   // =========================
-  // ✅ QUICK ADD (persist via storage layer)
+  // ✅ QUICK ADD (persist + activity log)
   // =========================
 
   const handleQuickSaveApplication = async (data: NewApplicationForm) => {
     const item: AppliedApplication = { id: makeUuidV4(), ...data };
     setApplied((prev) => [item as AnyRecord, ...prev]);
     await upsertApplied(item, mode as AppliedStorageMode);
+
+    await logActivity(
+      "applied",
+      "added",
+      {
+        id: item.id,
+        company: (item as any).company,
+        role: (item as any).role,
+        location: (item as any).location,
+        appliedOn: (item as any).appliedOn,
+      },
+      { toStatus: (item as any).status ?? "Applied" }
+    );
+
     setOpenAddApp(false);
   };
 
   const handleQuickSaveInterview = async (created: Interview) => {
-    const item: StoredInterview = created as any;
+    const interviewId = (created as any).id ?? makeUuidV4();
+    const item: StoredInterview = { ...(created as any), id: interviewId } as any;
+
     setInterviews((prev) => [item as AnyRecord, ...prev]);
     await upsertInterview(item, mode as InterviewsStorageMode);
+
+    const c = created as any;
+    await logActivity(
+      "interviews",
+      "added",
+      {
+        id: interviewId,
+        company: c.company ?? c.application?.company,
+        role: c.role ?? c.application?.role ?? "Interview",
+        location: c.location ?? c.application?.location,
+        appliedOn: c.appliedOn ?? c.application?.appliedOn,
+      },
+      { toStatus: "Interviews" }
+    );
+
     setOpenAddInterview(false);
   };
 
   const handleQuickSaveRejected = async (details: RejectionDetails) => {
-    const item: RejectedApplication = {
-      id: makeUuidV4(),
-      ...(details as any),
-    } as any;
+    const item: RejectedApplication = { id: makeUuidV4(), ...(details as any) } as any;
+
     setRejected((prev) => [item as AnyRecord, ...prev]);
     await upsertRejected(item, mode as RejectedStorageMode);
+
+    const d = details as any;
+    await logActivity(
+      "rejected",
+      "added",
+      {
+        id: item.id,
+        company: d.company,
+        role: d.role,
+        location: d.location,
+        appliedOn: d.appliedDate,
+      },
+      { toStatus: "Rejected", note: d.notes }
+    );
+
     setOpenAddRejected(false);
   };
 
   const handleQuickSaveWithdrawn = async (details: WithdrawnDetails) => {
-    const item: WithdrawnApplication = {
-      id: makeUuidV4(),
-      ...(details as any),
-    } as any;
+    const item: WithdrawnApplication = { id: makeUuidV4(), ...(details as any) } as any;
+
     setWithdrawn((prev) => [item as AnyRecord, ...prev]);
     await upsertWithdrawn(item, mode as WithdrawnStorageMode);
+
+    const d = details as any;
+    await logActivity(
+      "withdrawn",
+      "added",
+      {
+        id: item.id,
+        company: d.company,
+        role: d.role,
+        location: d.location,
+        appliedOn: d.appliedDate,
+      },
+      { toStatus: "Withdrawn", note: d.notes ?? d.reason }
+    );
+
     setOpenAddWithdrawn(false);
   };
 
   const handleQuickSaveOffer = async (details: AcceptedDetails) => {
     const id = makeUuidV4();
-
     const offerReceivedDate = details.offerReceivedDate ?? details.decisionDate;
 
     const item = normalizeOffers([
@@ -614,6 +715,26 @@ export default function StatsCard() {
 
     setOffers((prev) => [item, ...prev]);
     await upsertOffer(item as any, mode as OffersStorageMode);
+
+    await logActivity(
+      "offers",
+      "added",
+      {
+        id: item.id,
+        company: item.company,
+        role: item.role,
+        location: item.location,
+        appliedOn: item.appliedOn,
+      },
+      {
+        toStatus: item.offerAcceptedDate ? "accepted" : "received",
+        note: item.notes,
+        offerReceivedDate: item.offerReceivedDate,
+        offerAcceptedDate: item.offerAcceptedDate,
+        offerDeclinedDate: item.offerDeclinedDate,
+      }
+    );
+
     setOpenAddOffer(false);
   };
 
@@ -663,7 +784,6 @@ export default function StatsCard() {
         <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-emerald-400/15 blur-3xl" />
 
         <div className="relative z-10 space-y-5">
-          {/* Header row: title + quick actions aligned */}
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-sky-100 bg-white/80 px-3 py-1 text-xs font-medium text-sky-700 shadow-sm">
@@ -679,7 +799,6 @@ export default function StatsCard() {
               </p>
             </div>
 
-            {/* Quick actions – styled like Notes/Upcoming pills */}
             <div className="flex flex-wrap items-center gap-2">
               {quickActions.map((a) => (
                 <button
@@ -703,7 +822,6 @@ export default function StatsCard() {
 
           {/* KPIs */}
           <div className="grid gap-3 md:grid-cols-3">
-            {/* Total applications */}
             <div className="rounded-xl border border-neutral-200 bg-white/90 p-4 shadow-sm backdrop-blur">
               <div className="flex items-center justify-between gap-2">
                 <div>
@@ -731,7 +849,6 @@ export default function StatsCard() {
               </div>
             </div>
 
-            {/* Interviews */}
             <div className="rounded-xl border border-emerald-100 bg-white/90 p-4 shadow-sm backdrop-blur">
               <div className="flex items-center justify-between gap-2">
                 <div>
@@ -759,7 +876,6 @@ export default function StatsCard() {
               </div>
             </div>
 
-            {/* Decisions */}
             <div className="rounded-xl border border-rose-100 bg-white/90 p-4 shadow-sm backdrop-blur">
               <div className="flex items-center justify-between gap-2">
                 <div>
@@ -792,7 +908,6 @@ export default function StatsCard() {
           </div>
 
           <div className="grid grid-cols-1 divide-y divide-neutral-100 lg:grid-cols-2 lg:divide-y-0 lg:divide-x">
-            {/* Weekly bar chart */}
             <div className="pb-4 lg:pb-0 lg:pr-4">
               <div className="flex items-center justify-between gap-2">
                 <div>
@@ -829,22 +944,13 @@ export default function StatsCard() {
                       allowDecimals={false}
                     />
                     <Tooltip contentStyle={tooltipStyle} />
-                    <Bar
-                      dataKey="applications"
-                      radius={[6, 6, 0, 0]}
-                      fill="#0ea5e9"
-                    />
-                    <Bar
-                      dataKey="interviews"
-                      radius={[6, 6, 0, 0]}
-                      fill="#22c55e"
-                    />
+                    <Bar dataKey="applications" radius={[6, 6, 0, 0]} fill="#0ea5e9" />
+                    <Bar dataKey="interviews" radius={[6, 6, 0, 0]} fill="#22c55e" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
-            {/* Conversion line chart */}
             <div className="pt-4 lg:pt-0 lg:pl-4">
               <div className="flex items-center justify-between gap-2">
                 <div>
@@ -873,30 +979,9 @@ export default function StatsCard() {
                     />
                     <YAxis hide />
                     <Tooltip contentStyle={tooltipStyle} />
-                    <Line
-                      type="monotone"
-                      dataKey="applications"
-                      stroke="#0ea5e9"
-                      strokeWidth={2}
-                      dot={false}
-                      activeDot={{ r: 4 }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="interviews"
-                      stroke="#22c55e"
-                      strokeWidth={2}
-                      dot={false}
-                      activeDot={{ r: 4 }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="offers"
-                      stroke="#f97316"
-                      strokeWidth={2}
-                      dot={{ r: 3 }}
-                      activeDot={{ r: 4 }}
-                    />
+                    <Line type="monotone" dataKey="applications" stroke="#0ea5e9" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                    <Line type="monotone" dataKey="interviews" stroke="#22c55e" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                    <Line type="monotone" dataKey="offers" stroke="#f97316" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 4 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -905,10 +990,7 @@ export default function StatsCard() {
         </div>
       </section>
 
-      {/* ========================= */}
       {/* ✅ QUICK ADD DIALOGS */}
-      {/* ========================= */}
-
       <AddApplicationDialog
         open={openAddApp}
         onClose={() => setOpenAddApp(false)}
@@ -948,7 +1030,6 @@ export default function StatsCard() {
         onAcceptedCreated={handleQuickSaveOffer}
       />
 
-      {/* ✅ Add note WITHOUT navigating to Notes page */}
       <AddNoteDialog
         open={openAddNote}
         onClose={() => setOpenAddNote(false)}
