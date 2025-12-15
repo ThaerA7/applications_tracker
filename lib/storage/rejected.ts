@@ -7,7 +7,6 @@ import type { Rejection } from "@/app/rejected/RejectedCard";
 export type RejectedApplication = Rejection;
 export type RejectedStorageMode = "guest" | "user";
 
-const GUEST_LOCAL_KEY = "job-tracker:rejected";
 const GUEST_IDB_KEY = "rejected";
 
 const TABLE = "applications";
