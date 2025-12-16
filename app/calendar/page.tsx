@@ -2,13 +2,14 @@
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight, PhoneCall, Sparkles } from "lucide-react";
 import CalendarDaySidebar, {
   type CalendarDayEvent,
 } from "./CalendarDaySidebar";
 import CalendarStatsSection from "./CalendarStatsSection";
+import { getSupabaseClient } from "@/lib/supabase/client";
 
 import {
   ActivityKind,
@@ -24,6 +25,13 @@ import {
   normalizeDate,
   toIsoDate,
 } from "./calendarUtils";
+import { loadApplied } from "@/lib/storage/applied";
+import { loadInterviews } from "@/lib/storage/interviews";
+import { loadRejected } from "@/lib/storage/rejected";
+import { loadWithdrawn } from "@/lib/storage/withdrawn";
+import { loadOffers } from "@/lib/storage/offers";
+
+const COUNTS_EVENT = "job-tracker:refresh-counts";
 
 export default function CalendarPage() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -47,134 +55,36 @@ export default function CalendarPage() {
     return () => window.clearInterval(id);
   }, []);
 
-  // Load all activity from localStorage
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+  const aliveRef = useRef(true);
+  const inFlightRef = useRef(false);
+  const queuedRef = useRef(false);
 
-    const collected: CalendarEvent[] = [];
+  const refreshEvents = useCallback(async () => {
+    if (inFlightRef.current) {
+      queuedRef.current = true;
+      return;
+    }
 
-    const parseArray = (key: string): any[] => {
-      try {
-        const raw = window.localStorage.getItem(key);
-        if (!raw) return [];
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed : [];
-      } catch {
-        return [];
-      }
-    };
+    inFlightRef.current = true;
 
-    const addEvent = (event: CalendarEvent | null | undefined) => {
-      if (!event || !event.date) return;
-      collected.push(event);
-    };
+    try {
+      const [appliedRes, interviewsRes, rejectedRes, withdrawnRes, offersRes] =
+        await Promise.all([
+          loadApplied(),
+          loadInterviews(),
+          loadRejected(),
+          loadWithdrawn(),
+          loadOffers(),
+        ]);
 
-    // --- Interviews ---
-    const interviews = parseArray("job-tracker:interviews");
-    interviews.forEach((item: any) => {
-      const dateOnly = normalizeDate(item.date);
-      if (!dateOnly) return;
-      const time = extractTime(item.date);
+      const collected: CalendarEvent[] = [];
+      const addEvent = (ev: CalendarEvent | null | undefined) => {
+        if (!ev?.date) return;
+        collected.push(ev);
+      };
 
-      addEvent({
-        id: `interview-${item.id ?? item.date ?? dateOnly}`,
-        date: dateOnly,
-        kind: "interview",
-        title: item.company || "Interview",
-        subtitle: item.role,
-        time: time || undefined,
-        dateTime: typeof item.date === "string" ? item.date : undefined,
-        location: item.location,
-        employmentType: item.employmentType,
-      });
-    });
-
-    // --- Rejected ---
-    const rejected = parseArray("job-tracker:rejected");
-    rejected.forEach((item: any) => {
-      const applied = normalizeDate(item.appliedDate);
-      if (applied) {
-        addEvent({
-          id: `applied-from-rejected-${item.id ?? applied}`,
-          date: applied,
-          kind: "applied",
-          title: item.company || "Applied",
-          subtitle: item.role,
-          location: item.location,
-          employmentType: item.employmentType,
-        });
-      }
-
-      const decision = normalizeDate(item.decisionDate);
-      if (decision) {
-        addEvent({
-          id: `rejected-${item.id ?? decision}`,
-          date: decision,
-          kind: "rejected",
-          title: item.company || "Rejected",
-          subtitle: item.role,
-          location: item.location,
-          employmentType: item.employmentType,
-        });
-      }
-    });
-
-    // --- Withdrawn ---
-    const withdrawn = parseArray("job-tracker:withdrawn");
-    withdrawn.forEach((item: any) => {
-      const applied =
-        normalizeDate(item.appliedOn) || normalizeDate(item.appliedDate);
-      if (applied) {
-        addEvent({
-          id: `applied-from-withdrawn-${item.id ?? applied}`,
-          date: applied,
-          kind: "applied",
-          title: item.company || "Applied",
-          subtitle: item.role,
-          location: item.location,
-          employmentType: item.employmentType,
-        });
-      }
-
-      const interviewDateOnly = normalizeDate(item.interviewDate);
-      if (interviewDateOnly) {
-        const time = extractTime(item.interviewDate);
-        addEvent({
-          id: `interview-from-withdrawn-${
-            item.id ?? item.interviewDate ?? interviewDateOnly
-          }`,
-          date: interviewDateOnly,
-          kind: "interview",
-          title: item.company || "Interview",
-          subtitle: item.role,
-          time: time || undefined,
-          dateTime:
-            typeof item.interviewDate === "string"
-              ? item.interviewDate
-              : undefined,
-          location: item.location,
-          employmentType: item.employmentType,
-        });
-      }
-
-      const withdrawnDate = normalizeDate(item.withdrawnDate);
-      if (withdrawnDate) {
-        addEvent({
-          id: `withdrawn-${item.id ?? withdrawnDate}`,
-          date: withdrawnDate,
-          kind: "withdrawn",
-          title: item.company || "Withdrawn",
-          subtitle: item.role,
-          location: item.location,
-          employmentType: item.employmentType,
-        });
-      }
-    });
-
-    // --- Applied-only lists (if you have them) ---
-    ["job-tracker:applied", "job-tracker:applications"].forEach((key) => {
-      const arr = parseArray(key);
-      arr.forEach((item: any) => {
+      // Applied
+      (appliedRes.items ?? []).forEach((item: any) => {
         const date =
           normalizeDate(item.appliedOn) ||
           normalizeDate(item.appliedDate) ||
@@ -182,7 +92,7 @@ export default function CalendarPage() {
           normalizeDate(item.createdAt);
         if (!date) return;
         addEvent({
-          id: `applied-${key}-${item.id ?? date}`,
+          id: `applied-${item.id ?? date}`,
           date,
           kind: "applied",
           title: item.company || "Applied",
@@ -191,86 +101,199 @@ export default function CalendarPage() {
           employmentType: item.employmentType,
         });
       });
-    });
 
-    // --- Offers (legacy/optional) ---
-    const offers = parseArray("job-tracker:offers");
-    offers.forEach((item: any) => {
-      const date =
-        normalizeDate(item.offerDate) ||
-        normalizeDate(item.acceptedDate) ||
-        normalizeDate(item.createdAt);
-      if (!date) return;
-      addEvent({
-        id: `offer-${item.id ?? date}`,
-        date,
-        kind: "offer",
-        title: item.company || "Offer",
-        subtitle: item.role,
-        location: item.location,
-        employmentType: item.employmentType,
+      // Interviews
+      (interviewsRes.items ?? []).forEach((item: any) => {
+        const dateOnly = normalizeDate(item.date);
+        if (!dateOnly) return;
+        const time = extractTime(item.date);
+        addEvent({
+          id: `interview-${item.id ?? item.date ?? dateOnly}`,
+          date: dateOnly,
+          kind: "interview",
+          title: item.company || "Interview",
+          subtitle: item.role,
+          time: time || undefined,
+          dateTime: typeof item.date === "string" ? item.date : undefined,
+          location: item.location,
+          employmentType: item.employmentType,
+        });
       });
-    });
 
-    // --- Offers received (NEW board) ---
-    const offersReceived = parseArray("job-tracker:offers-received");
+      // Rejected (applied + decision)
+      (rejectedRes.items ?? []).forEach((item: any) => {
+        const applied = normalizeDate(item.appliedDate);
+        if (applied) {
+          addEvent({
+            id: `applied-from-rejected-${item.id ?? applied}`,
+            date: applied,
+            kind: "applied",
+            title: item.company || "Applied",
+            subtitle: item.role,
+            location: item.location,
+            employmentType: item.employmentType,
+          });
+        }
 
-    offersReceived.forEach((item: any) => {
-      // Prefer the real "offer received" date,
-      // then legacy decisionDate,
-      // then fallback to accepted/declined so we still show something.
-      const date =
-        normalizeDate(item.offerReceivedDate) ||
-        normalizeDate(item.decisionDate) ||
-        normalizeDate(item.offerAcceptedDate) ||
-        normalizeDate(item.offerDeclinedDate);
-
-      if (!date) return;
-
-      const accepted = Boolean(item.offerAcceptedDate) || Boolean(item.taken);
-      const declined = Boolean(item.offerDeclinedDate);
-
-      // Add a small status hint so it’s visible in day logs
-      const statusSuffix = accepted
-        ? " · Accepted"
-        : declined
-        ? " · Declined"
-        : "";
-
-      const subtitleBase = item.role ?? "Offer";
-      const subtitle = `${subtitleBase}${statusSuffix}`;
-
-      addEvent({
-        id: `offer-received-${item.id ?? date}`,
-        date,
-        kind: "offer",
-        title: item.company || "Offer",
-        subtitle,
-        location: item.location,
-        employmentType: item.employmentType,
+        const decision = normalizeDate(item.decisionDate);
+        if (decision) {
+          addEvent({
+            id: `rejected-${item.id ?? decision}`,
+            date: decision,
+            kind: "rejected",
+            title: item.company || "Rejected",
+            subtitle: item.role,
+            location: item.location,
+            employmentType: item.employmentType,
+          });
+        }
       });
-    });
 
-    // Deduplicate by (kind, date, title, subtitle, time)
-    const map = new Map<string, CalendarEvent>();
-    for (const ev of collected) {
-      const key = `${ev.kind}-${ev.date}-${ev.title}-${ev.subtitle ?? ""}-${
-        ev.time ?? ""
-      }`;
-      if (!map.has(key)) {
-        map.set(key, ev);
+      // Withdrawn (applied + interview + withdrawn)
+      (withdrawnRes.items ?? []).forEach((item: any) => {
+        const applied =
+          normalizeDate(item.appliedOn) || normalizeDate(item.appliedDate);
+        if (applied) {
+          addEvent({
+            id: `applied-from-withdrawn-${item.id ?? applied}`,
+            date: applied,
+            kind: "applied",
+            title: item.company || "Applied",
+            subtitle: item.role,
+            location: item.location,
+            employmentType: item.employmentType,
+          });
+        }
+
+        const interviewDateOnly = normalizeDate(item.interviewDate);
+        if (interviewDateOnly) {
+          const time = extractTime(item.interviewDate);
+          addEvent({
+            id: `interview-from-withdrawn-${
+              item.id ?? item.interviewDate ?? interviewDateOnly
+            }`,
+            date: interviewDateOnly,
+            kind: "interview",
+            title: item.company || "Interview",
+            subtitle: item.role,
+            time: time || undefined,
+            dateTime:
+              typeof item.interviewDate === "string"
+                ? item.interviewDate
+                : undefined,
+            location: item.location,
+            employmentType: item.employmentType,
+          });
+        }
+
+        const withdrawnDate = normalizeDate(item.withdrawnDate);
+        if (withdrawnDate) {
+          addEvent({
+            id: `withdrawn-${item.id ?? withdrawnDate}`,
+            date: withdrawnDate,
+            kind: "withdrawn",
+            title: item.company || "Withdrawn",
+            subtitle: item.role,
+            location: item.location,
+            employmentType: item.employmentType,
+          });
+        }
+      });
+
+      // Offers (legacy/accepted/declined)
+      (offersRes.items ?? []).forEach((item: any) => {
+        const date =
+          normalizeDate(item.offerReceivedDate) ||
+          normalizeDate(item.decisionDate) ||
+          normalizeDate(item.offerAcceptedDate) ||
+          normalizeDate(item.offerDeclinedDate) ||
+          normalizeDate(item.offerDate) ||
+          normalizeDate(item.createdAt);
+
+        if (!date) return;
+
+        const accepted = Boolean(item.offerAcceptedDate) || Boolean(item.taken);
+        const declined = Boolean(item.offerDeclinedDate);
+        const statusSuffix = accepted
+          ? " · Accepted"
+          : declined
+          ? " · Declined"
+          : "";
+
+        const subtitleBase = item.role ?? "Offer";
+        const subtitle = `${subtitleBase}${statusSuffix}`;
+
+        addEvent({
+          id: `offer-${item.id ?? date}`,
+          date,
+          kind: "offer",
+          title: item.company || "Offer",
+          subtitle,
+          location: item.location,
+          employmentType: item.employmentType,
+        });
+      });
+
+      // Deduplicate by (kind, date, title, subtitle, time)
+      const map = new Map<string, CalendarEvent>();
+      for (const ev of collected) {
+        const key = `${ev.kind}-${ev.date}-${ev.title}-${ev.subtitle ?? ""}-${
+          ev.time ?? ""
+        }`;
+        if (!map.has(key)) {
+          map.set(key, ev);
+        }
+      }
+
+      const unique = Array.from(map.values());
+      if (aliveRef.current) {
+        setEvents(unique);
+        setSelectedDate((prev) => {
+          if (prev) return prev;
+          return unique.some((ev) => ev.date === todayIso) ? todayIso : prev;
+        });
+      }
+    } catch (err) {
+      console.error("Calendar: failed to load events", err);
+      if (aliveRef.current) setEvents([]);
+    } finally {
+      inFlightRef.current = false;
+      if (queuedRef.current && aliveRef.current) {
+        queuedRef.current = false;
+        void refreshEvents();
       }
     }
-
-    const unique = Array.from(map.values());
-    setEvents(unique);
-
-    // Default selected date: today if it has activity, else none
-    const todayHasEvents = unique.some((ev) => ev.date === todayIso);
-    if (todayHasEvents) {
-      setSelectedDate(todayIso);
-    }
   }, [todayIso]);
+
+  useEffect(() => {
+    aliveRef.current = true;
+    void refreshEvents();
+
+    if (typeof window === "undefined") return;
+
+    const supabase = getSupabaseClient();
+
+    const refresh = () => void refreshEvents();
+
+    window.addEventListener(COUNTS_EVENT, refresh);
+    window.addEventListener("focus", refresh);
+
+    const onVis = () => {
+      if (!document.hidden) refresh();
+    };
+    document.addEventListener("visibilitychange", onVis);
+
+    const { data: sub } = supabase.auth.onAuthStateChange(() => refresh());
+    supabase.auth.getSession().finally(() => refresh());
+
+    return () => {
+      aliveRef.current = false;
+      window.removeEventListener(COUNTS_EVENT, refresh);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", onVis);
+      sub?.subscription?.unsubscribe();
+    };
+  }, [refreshEvents]);
 
   const eventsByDate = useMemo(() => {
     const grouped: Record<string, CalendarEvent[]> = {};
