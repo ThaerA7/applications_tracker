@@ -43,6 +43,27 @@ function GoogleIcon({ className = "h-4 w-4" }: { className?: string }) {
   );
 }
 
+function ThreeBounceLoader({ className = "" }: { className?: string }) {
+  return (
+    <span
+      className={["inline-flex items-center gap-[6px]", className].join(" ")}
+      role="status"
+      aria-live="polite"
+      aria-label="Signing in"
+    >
+      {[0, 1, 2].map((dot) => (
+        <span
+          key={dot}
+          className="h-2.5 w-2.5 rounded-full bg-white animate-bounce"
+          style={{ animationDelay: `${dot * 120}ms` }}
+          aria-hidden="true"
+        />
+      ))}
+      <span className="sr-only">Signing in</span>
+    </span>
+  );
+}
+
 export default function SignInGateDialog({
   defaultOpen = true,
   onContinueAsGuest,
@@ -52,6 +73,7 @@ export default function SignInGateDialog({
 
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   useEffect(() => setMounted(true), []);
 
@@ -113,18 +135,34 @@ export default function SignInGateDialog({
   }, [onContinueAsGuest, router]);
 
   const handleGoogle = useCallback(async () => {
-    if (onGoogleSignIn) return onGoogleSignIn();
+    if (googleLoading) return;
 
-    const supabase = getSupabaseClient();
-    const redirectTo = `${window.location.origin}/auth/callback?next=/`; // ✅ force Overview
+    setGoogleLoading(true);
 
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo },
-    });
+    try {
+      if (onGoogleSignIn) {
+        await onGoogleSignIn();
+        setGoogleLoading(false);
+        return;
+      }
 
-    if (error) console.error("Google sign-in failed:", error.message);
-  }, [onGoogleSignIn]);
+      const supabase = getSupabaseClient();
+      const redirectTo = `${window.location.origin}/auth/callback?next=/`; // ✅ force Overview
+
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo },
+      });
+
+      if (error) {
+        console.error("Google sign-in failed:", error.message);
+        setGoogleLoading(false);
+      }
+    } catch (err) {
+      console.error("Google sign-in failed:", err);
+      setGoogleLoading(false);
+    }
+  }, [onGoogleSignIn, googleLoading]);
 
   const content = useMemo(() => {
     if (!open) return null;
@@ -244,12 +282,35 @@ export default function SignInGateDialog({
                         "hover:bg-neutral-800",
                         "active:scale-[0.99] transition",
                         "shadow-sm",
-                        "inline-flex items-center justify-center",
+                        "relative inline-flex items-center justify-center gap-3",
                         "focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400",
+                        "disabled:opacity-100 disabled:bg-neutral-900 disabled:text-white disabled:cursor-not-allowed disabled:active:scale-100",
                       ].join(" ")}
+                      disabled={googleLoading}
+                      data-loading={googleLoading}
+                      aria-busy={googleLoading}
                     >
-                      <GoogleIcon className="mr-2 h-6 w-6" />
-                      Continue with Google
+                      <span
+                        className={[
+                          "flex items-center gap-3",
+                          googleLoading ? "opacity-0" : "",
+                        ].join(" ")}
+                      >
+                        <GoogleIcon className="h-6 w-6 flex-shrink-0" />
+                        <span className="text-base font-medium">
+                          Continue with Google
+                        </span>
+                      </span>
+
+                      {googleLoading && (
+                        <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                          <ThreeBounceLoader />
+                        </span>
+                      )}
+
+                      <span className="sr-only">
+                        {googleLoading ? "Signing in with Google" : "Continue with Google"}
+                      </span>
                     </button>
 
                     <button
@@ -318,7 +379,7 @@ export default function SignInGateDialog({
         </div>
       </div>
     );
-  }, [open, handleGoogle, handleGuest, handleGuest]);
+  }, [open, handleGoogle, handleGuest, googleLoading]);
 
   if (!mounted) return null;
   return createPortal(content, document.body);
