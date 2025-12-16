@@ -204,35 +204,30 @@ export default function SignInGateDialog({
               <div
                 className={[
                   "grid",
-                  "sm:grid-cols-[0.8fr_1.0fr]",
+                  "sm:grid-cols-[1.05fr_0.95fr]",
                   "min-h-[440px]",
                 ].join(" ")}
               >
-                <div className="relative overflow-hidden px-6 py-8 sm:px-10 sm:py-12">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-[11px] font-medium text-indigo-700">
-                    <Sparkles className="h-3.5 w-3.5" />
-                    New session, better tracking
-                  </div>
-
+                <div className="relative overflow-hidden px-6 pt-6 pb-8 sm:px-10 sm:pt-10 sm:pb-12">
                   <h2
                     id="signin-gate-title"
-                    className="mt-4 text-2xl sm:text-3xl font-semibold tracking-tight text-neutral-900"
+                    className="mt-2 text-2xl sm:text-3xl font-semibold tracking-tight text-neutral-900"
                   >
                     Welcome to Application Tracker
                   </h2>
 
                   <p
                     id="signin-gate-desc"
-                    className="mt-2 text-sm sm:text-base text-neutral-600 max-w-[32ch]"
+                    className="mt-3 text-sm sm:text-base text-neutral-600 max-w-[32ch]"
                   >
                     Sign in to sync your progress across devices, or continue as a
                     guest with local-only data.
                   </p>
 
-                  <div className="mt-6 space-y-3">
-                    <div className="flex items-start gap-3">
+                  <div className="mt-6 grid gap-4">
+                    <div className="grid grid-cols-[auto_1fr] items-start gap-3">
                       <CheckCircle2 className="mt-0.5 h-5 w-5 text-emerald-600" />
-                      <div>
+                      <div className="space-y-1 leading-[1.5]">
                         <div className="text-sm font-medium text-neutral-900">
                           Private by default
                         </div>
@@ -241,9 +236,9 @@ export default function SignInGateDialog({
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-start gap-3">
+                    <div className="grid grid-cols-[auto_1fr] items-start gap-3">
                       <Cloud className="mt-0.5 h-5 w-5 text-indigo-600" />
-                      <div>
+                      <div className="space-y-1 leading-[1.5]">
                         <div className="text-sm font-medium text-neutral-900">
                           Seamless sync
                         </div>
@@ -252,9 +247,9 @@ export default function SignInGateDialog({
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-start gap-3">
+                    <div className="grid grid-cols-[auto_1fr] items-start gap-3">
                       <UserRound className="mt-0.5 h-5 w-5 text-sky-600" />
-                      <div>
+                      <div className="space-y-1 leading-[1.5]">
                         <div className="text-sm font-medium text-neutral-900">
                           Instant guest mode
                         </div>
@@ -358,13 +353,6 @@ export default function SignInGateDialog({
                       <div className="flex items-center gap-2 text-xs font-medium text-neutral-800">
                         <CheckCircle2 className="h-4 w-4 text-sky-600" />
                         Safer progress recovery
-                      </div>
-                    </div>
-
-                    <div className="rounded-xl border border-neutral-200/70 bg-neutral-50 p-3">
-                      <div className="flex items-center gap-2 text-xs font-medium text-neutral-800">
-                        <Sparkles className="h-4 w-4 text-indigo-600" />
-                        One-tap setup
                       </div>
                     </div>
                   </div>
