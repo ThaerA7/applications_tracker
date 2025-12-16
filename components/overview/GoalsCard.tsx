@@ -10,8 +10,7 @@ import GoalSettingsDialog, {
   type OverviewGoalValues,
 } from "../dialogs/GoalSettingsDialog";
 
-// ✅ Storage (guest: IDB/local mirror, user: Supabase)
-import { getSupabaseClient } from "@/lib/supabase/client";
+// ✅ Storage (guest: IDB/local mirror, user: Supabase via storage modules)
 import { loadInterviews } from "@/lib/storage/interviews";
 import { loadOffers } from "@/lib/storage/offers";
 import { idbGet, idbSet } from "@/lib/storage/indexedDb";
@@ -21,9 +20,7 @@ import { idbGet, idbSet } from "@/lib/storage/indexedDb";
  */
 const COUNTS_EVENT = "job-tracker:refresh-counts";
 
-// settings for this card
-const GOALS_SETTINGS_KEY = "job-tracker:goals-settings";
-
+// --- settings for this card ---
 type SingleGoalKey = "interviews" | "offers";
 
 type GoalsSettings = {
@@ -39,7 +36,6 @@ const DEFAULT_SETTINGS: GoalsSettings = {
 };
 
 // --- date helpers (UTC midnight window) ---
-
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 function parseToUtcMidnight(dateLike?: string | null): number | null {
@@ -72,7 +68,6 @@ function isWithinLastDays(
 }
 
 // --- local settings helpers ---
-
 const GOALS_SETTINGS_IDB_KEY = "goals-settings-v1";
 
 async function loadSettings(): Promise<GoalsSettings> {
@@ -82,16 +77,24 @@ async function loadSettings(): Promise<GoalsSettings> {
 
     return {
       interviews: {
-        target: Number(raw?.interviews?.target) || DEFAULT_SETTINGS.interviews.target,
-        periodDays: Number(raw?.interviews?.periodDays) || DEFAULT_SETTINGS.interviews.periodDays,
+        target:
+          Number(raw?.interviews?.target) || DEFAULT_SETTINGS.interviews.target,
+        periodDays:
+          Number(raw?.interviews?.periodDays) ||
+          DEFAULT_SETTINGS.interviews.periodDays,
       },
       offers: {
         target: Number(raw?.offers?.target) || DEFAULT_SETTINGS.offers.target,
-        periodDays: Number(raw?.offers?.periodDays) || DEFAULT_SETTINGS.offers.periodDays,
+        periodDays:
+          Number(raw?.offers?.periodDays) || DEFAULT_SETTINGS.offers.periodDays,
       },
       overview: {
-        weeklyTarget: Number(raw?.overview?.weeklyTarget) || DEFAULT_SETTINGS.overview.weeklyTarget,
-        monthlyTarget: Number(raw?.overview?.monthlyTarget) || DEFAULT_SETTINGS.overview.monthlyTarget,
+        weeklyTarget:
+          Number(raw?.overview?.weeklyTarget) ||
+          DEFAULT_SETTINGS.overview.weeklyTarget,
+        monthlyTarget:
+          Number(raw?.overview?.monthlyTarget) ||
+          DEFAULT_SETTINGS.overview.monthlyTarget,
       },
     };
   } catch {
@@ -103,10 +106,7 @@ function persistSettings(next: GoalsSettings) {
   void idbSet(GOALS_SETTINGS_IDB_KEY, next);
 }
 
-
-
 // --- minimal shapes for counting ---
-
 type InterviewLike = { date?: string };
 type OfferLike = { offerReceivedDate?: string; decisionDate?: string };
 
@@ -126,72 +126,68 @@ export default function GoalsCard() {
 
   // settings dialog state
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsMode, setSettingsMode] =
-    useState<GoalSettingsMode>("single");
+  const [settingsMode, setSettingsMode] = useState<GoalSettingsMode>("single");
   const [settingsKey, setSettingsKey] =
     useState<SingleGoalKey | "overview" | null>(null);
 
   // init clock + load settings
   useEffect(() => {
-  if (typeof window === "undefined") return;
-  setNowMs(Date.now());
+    if (typeof window === "undefined") return;
 
-  (async () => {
-    const loaded = await loadSettings();
-    setSettings(loaded);
-  })();
+    setNowMs(Date.now());
 
-  const id = window.setInterval(() => setNowMs(Date.now()), 60_000);
-  return () => window.clearInterval(id);
-}, []);
+    (async () => {
+      const loaded = await loadSettings();
+      setSettings(loaded);
+    })();
 
+    const id = window.setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
 
- useEffect(() => {
-  if (typeof window === "undefined") return;
+  // load storage data (NO per-component supabase session/listeners)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
 
-  let alive = true;
-  const supabase = getSupabaseClient();
+    let alive = true;
+    let inFlight = false;
 
-  const loadAll = async () => {
-    try {
-      const [i, o] = await Promise.all([loadInterviews(), loadOffers()]);
-      if (!alive) return;
+    const loadAll = async () => {
+      if (inFlight) return;
+      inFlight = true;
 
-      setInterviews((i.items as any[]) ?? []);
-      setOffers((o.items as any[]) ?? []);
-    } catch (err) {
-      console.error("GoalsCard: failed to load data:", err);
-    }
-  };
+      try {
+        const [i, o] = await Promise.all([loadInterviews(), loadOffers()]);
+        if (!alive) return;
 
-  const refresh = () => void loadAll();
+        setInterviews((i.items as any[]) ?? []);
+        setOffers((o.items as any[]) ?? []);
+      } catch (err) {
+        console.error("GoalsCard: failed to load data:", err);
+      } finally {
+        inFlight = false;
+      }
+    };
 
-  // ✅ IMPORTANT: hydrate auth/session first (prevents signed-in refresh showing empty)
-  (async () => {
-    await supabase.auth.getSession();
-    if (!alive) return;
-    refresh();
-  })();
+    const refresh = () => void loadAll();
 
-  window.addEventListener(COUNTS_EVENT, refresh);
-  window.addEventListener("focus", refresh);
+    void loadAll();
 
-  const onVis = () => {
-    if (!document.hidden) refresh();
-  };
-  document.addEventListener("visibilitychange", onVis);
+    window.addEventListener(COUNTS_EVENT, refresh);
+    window.addEventListener("focus", refresh);
 
-  const { data: sub } = supabase.auth.onAuthStateChange(() => refresh());
+    const onVis = () => {
+      if (!document.hidden) refresh();
+    };
+    document.addEventListener("visibilitychange", onVis);
 
-  return () => {
-    alive = false;
-    window.removeEventListener(COUNTS_EVENT, refresh);
-    window.removeEventListener("focus", refresh);
-    document.removeEventListener("visibilitychange", onVis);
-    sub?.subscription?.unsubscribe();
-  };
-}, []);
-
+    return () => {
+      alive = false;
+      window.removeEventListener(COUNTS_EVENT, refresh);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, []);
 
   // recompute counts when time, settings, or storage lists change
   useEffect(() => {
@@ -202,11 +198,18 @@ export default function GoalsCard() {
     ).length;
 
     const oCount = offers.filter((o) =>
-      isWithinLastDays(o.offerReceivedDate ?? o.decisionDate, nowMs, settings.offers.periodDays)
+      isWithinLastDays(
+        o.offerReceivedDate ?? o.decisionDate,
+        nowMs,
+        settings.offers.periodDays
+      )
     ).length;
 
-    const wCount = interviews.filter((i) => isWithinLastDays(i.date, nowMs, 7)).length;
-    const mCount = interviews.filter((i) => isWithinLastDays(i.date, nowMs, 30)).length;
+    const wCount = interviews.filter((i) => isWithinLastDays(i.date, nowMs, 7))
+      .length;
+    const mCount = interviews.filter((i) =>
+      isWithinLastDays(i.date, nowMs, 30)
+    ).length;
 
     setInterviewsCount(iCount);
     setOffersCount(oCount);
@@ -373,7 +376,9 @@ export default function GoalsCard() {
                   <Flame className="h-3.5 w-3.5" />
                 </span>
                 <div className="space-y-0.5">
-                  <p className="font-semibold text-neutral-900">Weekly momentum</p>
+                  <p className="font-semibold text-neutral-900">
+                    Weekly momentum
+                  </p>
                   <p className="text-[11px] text-neutral-600">{streakBadge}</p>
                 </div>
               </div>
@@ -384,7 +389,10 @@ export default function GoalsCard() {
           <div className="space-y-4">
             <div className="grid gap-3 md:grid-cols-2">
               {topGoals.map((goal) => {
-                const ratio = Math.min(goal.current / Math.max(goal.target, 1), 1);
+                const ratio = Math.min(
+                  goal.current / Math.max(goal.target, 1),
+                  1
+                );
                 const pct = Math.round(
                   (goal.current / Math.max(goal.target, 1)) * 100
                 );
@@ -448,8 +456,8 @@ export default function GoalsCard() {
                     Goals overview
                   </p>
                   <p className="mt-1 text-sm font-semibold text-neutral-900">
-                    Weekly: {weeklyCount}/{settings.overview.weeklyTarget} · Monthly:{" "}
-                    {monthlyCount}/{settings.overview.monthlyTarget}
+                    Weekly: {weeklyCount}/{settings.overview.weeklyTarget} ·
+                    Monthly: {monthlyCount}/{settings.overview.monthlyTarget}
                   </p>
                 </div>
 

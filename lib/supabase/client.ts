@@ -1,10 +1,8 @@
 // lib/supabase/client.ts
-'use client';
+"use client";
 
-import { createBrowserClient } from '@supabase/ssr';
-import type { SupabaseClient } from '@supabase/supabase-js';
-
-let client: SupabaseClient | null = null;
+import { createBrowserClient } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 function getPublicSupabaseEnv() {
   const url =
@@ -19,18 +17,18 @@ function getPublicSupabaseEnv() {
   return { url, key };
 }
 
-let browserClient: ReturnType<typeof createBrowserClient> | null = null;
+export function getSupabaseClient(): SupabaseClient {
+  const g = globalThis as any;
 
-export function getSupabaseClient() {
-  if (browserClient) return browserClient;
+  if (g.__supabaseBrowserClient) return g.__supabaseBrowserClient;
 
   const { url, key } = getPublicSupabaseEnv();
   if (!url || !key) {
     throw new Error(
-      "Missing Supabase env vars. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY (or PUBLISHABLE_KEY)."
+      "Missing Supabase env vars. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY."
     );
   }
 
-  browserClient = createBrowserClient(url, key);
-  return browserClient;
+  g.__supabaseBrowserClient = createBrowserClient(url, key);
+  return g.__supabaseBrowserClient;
 }

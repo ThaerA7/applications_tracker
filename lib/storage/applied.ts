@@ -4,6 +4,7 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { idbGet, idbSet, idbDel } from "./indexedDb";
 import type { NewApplicationForm } from "@/components/dialogs/AddApplicationDialog";
+import { getModeCached } from "../supabase/sessionCache";
 
 export type AppliedApplication = {
   id: string;
@@ -116,9 +117,7 @@ async function deleteUserApplied(id: string) {
 // ---------- mode detection ----------
 
 export async function detectAppliedMode(): Promise<AppliedStorageMode> {
-  const supabase = getSupabaseClient();
-  const { data } = await supabase.auth.getSession();
-  return data.session?.user ? "user" : "guest";
+  return getModeCached();
 }
 
 // ---------- public API ----------

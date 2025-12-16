@@ -3,6 +3,7 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { idbGet, idbSet, idbDel } from "./indexedDb";
 import type { WithdrawnRecord } from "@/app/withdrawn/WithdrawnCard";
+import { getModeCached } from "../supabase/sessionCache";
 
 export type WithdrawnApplication = WithdrawnRecord;
 export type WithdrawnStorageMode = "guest" | "user";
@@ -108,9 +109,7 @@ async function deleteUserWithdrawn(id: string) {
 // ---------- mode detection ----------
 
 export async function detectWithdrawnMode(): Promise<WithdrawnStorageMode> {
-  const supabase = getSupabaseClient();
-  const { data } = await supabase.auth.getSession();
-  return data.session?.user ? "user" : "guest";
+  return getModeCached();
 }
 
 // ---------- public API ----------

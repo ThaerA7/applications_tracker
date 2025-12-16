@@ -3,6 +3,7 @@
 
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { idbGet, idbSet, idbDel } from "./indexedDb";
+import { getModeCached } from "../supabase/sessionCache";
 
 export type WishlistItem = {
   id: string; // ✅ UUID for Supabase
@@ -89,9 +90,7 @@ function normalizeWishlist(list: WishlistItem[]) {
 }
 
 export async function detectWishlistMode(): Promise<WishlistStorageMode> {
-  const supabase = getSupabaseClient();
-  const { data } = await supabase.auth.getSession();
-  return data.session?.user ? "user" : "guest";
+  return getModeCached();
 }
 
 /* ---------------- guest (IndexedDB ONLY) ---------------- */

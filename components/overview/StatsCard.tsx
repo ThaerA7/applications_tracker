@@ -1,8 +1,7 @@
 // components/overview/StatsCard.tsx
-
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -415,40 +414,59 @@ export default function StatsCard() {
 
   const [now, setNow] = useState(() => new Date());
 
+  // ✅ avoid setState after unmount + coalesce refresh storms
+  const aliveRef = useRef(true);
+  const inFlightRef = useRef(false);
+  const queuedRef = useRef(false);
+
+  const loadAll = useCallback(async () => {
+    if (inFlightRef.current) {
+      queuedRef.current = true;
+      return;
+    }
+
+    inFlightRef.current = true;
+    try {
+      const [a, i, r, w, o, act] = await Promise.all([
+        loadApplied(),
+        loadInterviews(),
+        loadRejected(),
+        loadWithdrawn(),
+        loadOffers(),
+        loadActivity("applied"),
+      ]);
+
+      if (!aliveRef.current) return;
+
+      setMode(a.mode);
+      setActivityMode(act.mode);
+
+      setApplied(a.items as AnyRecord[]);
+      setInterviews(i.items as AnyRecord[]);
+      setRejected(r.items as AnyRecord[]);
+      setWithdrawn(w.items as AnyRecord[]);
+      setOffers(normalizeOffers((o.items as OfferReceivedJobLike[]) ?? []));
+
+      setNow(new Date());
+    } catch (err) {
+      // keep console error as before
+      console.error("StatsCard: failed to load data:", err);
+    } finally {
+      inFlightRef.current = false;
+
+      if (queuedRef.current && aliveRef.current) {
+        queuedRef.current = false;
+        void loadAll();
+      }
+    }
+  }, []);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    let alive = true;
+    aliveRef.current = true;
+
     const supabase = getSupabaseClient();
-
-    const loadAll = async () => {
-      try {
-        const [a, i, r, w, o, act] = await Promise.all([
-          loadApplied(),
-          loadInterviews(),
-          loadRejected(),
-          loadWithdrawn(),
-          loadOffers(),
-          loadActivity("applied"),
-        ]);
-
-        if (!alive) return;
-
-        setMode(a.mode);
-        setActivityMode(act.mode);
-
-        setApplied(a.items as AnyRecord[]);
-        setInterviews(i.items as AnyRecord[]);
-        setRejected(r.items as AnyRecord[]);
-        setWithdrawn(w.items as AnyRecord[]);
-        setOffers(normalizeOffers((o.items as OfferReceivedJobLike[]) ?? []));
-
-        setNow(new Date());
-      } catch (err) {
-        console.error("StatsCard: failed to load data:", err);
-      }
-    };
-
     const refresh = () => void loadAll();
 
     const { data: sub } = supabase.auth.onAuthStateChange(() => refresh());
@@ -463,41 +481,45 @@ export default function StatsCard() {
     document.addEventListener("visibilitychange", onVis);
 
     return () => {
-      alive = false;
+      aliveRef.current = false;
       window.removeEventListener(COUNTS_EVENT, refresh);
       window.removeEventListener("focus", refresh);
       document.removeEventListener("visibilitychange", onVis);
       sub?.subscription?.unsubscribe();
     };
-  }, []);
+  }, [loadAll]);
 
-  const logActivity = async (
-    variant: ActivityVariant,
-    type: ActivityType,
-    base: {
-      id: string;
-      company?: string;
-      role?: string;
-      location?: string;
-      appliedOn?: string;
+  const logActivity = useCallback(
+    async (
+      variant: ActivityVariant,
+      type: ActivityType,
+      base: {
+        id: string;
+        company?: string;
+        role?: string;
+        location?: string;
+        appliedOn?: string;
+      },
+      extras?: Partial<ActivityItem>
+    ) => {
+      const entry: ActivityItem = {
+        id: makeUuidV4(),
+        appId: base.id,
+        type,
+        timestamp: new Date().toISOString(),
+        company: base.company?.trim() || "Unknown company",
+        role: base.role,
+        location: base.location,
+        appliedOn: base.appliedOn,
+        ...extras,
+      };
+
+      await appendActivity(variant, entry, activityMode);
+      if (!aliveRef.current) return;
+      notifyActivityChanged();
     },
-    extras?: Partial<ActivityItem>
-  ) => {
-    const entry: ActivityItem = {
-      id: makeUuidV4(),
-      appId: base.id,
-      type,
-      timestamp: new Date().toISOString(),
-      company: base.company?.trim() || "Unknown company",
-      role: base.role,
-      location: base.location,
-      appliedOn: base.appliedOn,
-      ...extras,
-    };
-
-    await appendActivity(variant, entry, activityMode);
-    notifyActivityChanged();
-  };
+    [activityMode]
+  );
 
   const weeklyActivity = useMemo(
     () =>
@@ -598,8 +620,12 @@ export default function StatsCard() {
   // =========================
 
   const handleQuickSaveApplication = async (data: NewApplicationForm) => {
+    // close fast for snappy UI
+    setOpenAddApp(false);
+
     const item: AppliedApplication = { id: makeUuidV4(), ...data };
     setApplied((prev) => [item as AnyRecord, ...prev]);
+
     await upsertApplied(item, mode as AppliedStorageMode);
 
     await logActivity(
@@ -615,10 +641,13 @@ export default function StatsCard() {
       { toStatus: (item as any).status ?? "Applied" }
     );
 
-    setOpenAddApp(false);
+    if (!aliveRef.current) return;
+    window.dispatchEvent(new Event(COUNTS_EVENT));
   };
 
   const handleQuickSaveInterview = async (created: Interview) => {
+    setOpenAddInterview(false);
+
     const interviewId = (created as any).id ?? makeUuidV4();
     const item: StoredInterview = { ...(created as any), id: interviewId } as any;
 
@@ -639,11 +668,17 @@ export default function StatsCard() {
       { toStatus: "Interviews" }
     );
 
-    setOpenAddInterview(false);
+    if (!aliveRef.current) return;
+    window.dispatchEvent(new Event(COUNTS_EVENT));
   };
 
   const handleQuickSaveRejected = async (details: RejectionDetails) => {
-    const item: RejectedApplication = { id: makeUuidV4(), ...(details as any) } as any;
+    setOpenAddRejected(false);
+
+    const item: RejectedApplication = {
+      id: makeUuidV4(),
+      ...(details as any),
+    } as any;
 
     setRejected((prev) => [item as AnyRecord, ...prev]);
     await upsertRejected(item, mode as RejectedStorageMode);
@@ -662,11 +697,17 @@ export default function StatsCard() {
       { toStatus: "Rejected", note: d.notes }
     );
 
-    setOpenAddRejected(false);
+    if (!aliveRef.current) return;
+    window.dispatchEvent(new Event(COUNTS_EVENT));
   };
 
   const handleQuickSaveWithdrawn = async (details: WithdrawnDetails) => {
-    const item: WithdrawnApplication = { id: makeUuidV4(), ...(details as any) } as any;
+    setOpenAddWithdrawn(false);
+
+    const item: WithdrawnApplication = {
+      id: makeUuidV4(),
+      ...(details as any),
+    } as any;
 
     setWithdrawn((prev) => [item as AnyRecord, ...prev]);
     await upsertWithdrawn(item, mode as WithdrawnStorageMode);
@@ -685,10 +726,13 @@ export default function StatsCard() {
       { toStatus: "Withdrawn", note: d.notes ?? d.reason }
     );
 
-    setOpenAddWithdrawn(false);
+    if (!aliveRef.current) return;
+    window.dispatchEvent(new Event(COUNTS_EVENT));
   };
 
   const handleQuickSaveOffer = async (details: AcceptedDetails) => {
+    setOpenAddOffer(false);
+
     const id = makeUuidV4();
     const offerReceivedDate = details.offerReceivedDate ?? details.decisionDate;
 
@@ -735,7 +779,8 @@ export default function StatsCard() {
       }
     );
 
-    setOpenAddOffer(false);
+    if (!aliveRef.current) return;
+    window.dispatchEvent(new Event(COUNTS_EVENT));
   };
 
   const handleQuickSaveNote = async (payload: {
@@ -745,6 +790,8 @@ export default function StatsCard() {
     tags: string[];
     color: ColorKey;
   }) => {
+    setOpenAddNote(false);
+
     const nowIso = new Date().toISOString();
 
     const note: Note = {
@@ -758,8 +805,8 @@ export default function StatsCard() {
     };
 
     await upsertNote(note, mode as NotesStorageMode);
+    if (!aliveRef.current) return;
     notifyNotesChanged();
-    setOpenAddNote(false);
   };
 
   const quickActions = [
@@ -944,8 +991,16 @@ export default function StatsCard() {
                       allowDecimals={false}
                     />
                     <Tooltip contentStyle={tooltipStyle} />
-                    <Bar dataKey="applications" radius={[6, 6, 0, 0]} fill="#0ea5e9" />
-                    <Bar dataKey="interviews" radius={[6, 6, 0, 0]} fill="#22c55e" />
+                    <Bar
+                      dataKey="applications"
+                      radius={[6, 6, 0, 0]}
+                      fill="#0ea5e9"
+                    />
+                    <Bar
+                      dataKey="interviews"
+                      radius={[6, 6, 0, 0]}
+                      fill="#22c55e"
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -979,9 +1034,30 @@ export default function StatsCard() {
                     />
                     <YAxis hide />
                     <Tooltip contentStyle={tooltipStyle} />
-                    <Line type="monotone" dataKey="applications" stroke="#0ea5e9" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-                    <Line type="monotone" dataKey="interviews" stroke="#22c55e" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-                    <Line type="monotone" dataKey="offers" stroke="#f97316" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 4 }} />
+                    <Line
+                      type="monotone"
+                      dataKey="applications"
+                      stroke="#0ea5e9"
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={{ r: 4 }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="interviews"
+                      stroke="#22c55e"
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={{ r: 4 }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="offers"
+                      stroke="#f97316"
+                      strokeWidth={2}
+                      dot={{ r: 3 }}
+                      activeDot={{ r: 4 }}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </div>

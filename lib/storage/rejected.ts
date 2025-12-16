@@ -3,6 +3,7 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { idbGet, idbSet, idbDel } from "./indexedDb";
 import type { Rejection } from "@/app/rejected/RejectedCard";
+import { getModeCached } from "../supabase/sessionCache";
 
 export type RejectedApplication = Rejection;
 export type RejectedStorageMode = "guest" | "user";
@@ -116,9 +117,7 @@ async function deleteUserRejected(id: string) {
 // ---------- mode detection ----------
 
 export async function detectRejectedMode(): Promise<RejectedStorageMode> {
-  const supabase = getSupabaseClient();
-  const { data } = await supabase.auth.getSession();
-  return data.session?.user ? "user" : "guest";
+  return getModeCached();
 }
 
 // ---------- public API ----------

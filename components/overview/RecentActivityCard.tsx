@@ -1,7 +1,7 @@
 // app/components/RecentActivityCard.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Clock, ListTodo } from "lucide-react";
 
 import { getSupabaseClient } from "@/lib/supabase/client";
@@ -176,61 +176,87 @@ export default function RecentActivityCard() {
   const [allItems, setAllItems] = useState<InternalActivityItem[]>([]);
   const [now, setNow] = useState(() => Date.now());
 
+  // ✅ avoid setState after unmount + coalesce refresh storms
+  const aliveRef = useRef(true);
+  const inFlightRef = useRef(false);
+  const queuedRef = useRef(false);
+
+  const refresh = useCallback(async () => {
+    if (inFlightRef.current) {
+      queuedRef.current = true;
+      return;
+    }
+
+    inFlightRef.current = true;
+
+    try {
+      const variants: ActivityVariant[] = [
+        "applied",
+        "interviews",
+        "rejected",
+        "withdrawn",
+        "offers",
+      ];
+
+      const results = await Promise.all(
+        variants.map(async (v) => {
+          const { items } = await loadActivity(v);
+          const source = mapVariantToSource(v);
+          return (items as InternalActivityItem[]).map((it) => ({
+            ...it,
+            __source: source,
+          }));
+        })
+      );
+
+      if (!aliveRef.current) return;
+
+      const merged = results.flat();
+
+      // Deduplicate by id (fallback key if missing)
+      const map = new Map<string, InternalActivityItem>();
+      for (const it of merged) {
+        const key =
+          it?.id ??
+          `${it.type ?? "unknown"}-${it.timestamp ?? ""}-${it.company ?? ""}-${it.role ?? ""}`;
+        map.set(key, it);
+      }
+
+      const unique = Array.from(map.values());
+      unique.sort((a, b) => toMs(b.timestamp) - toMs(a.timestamp));
+
+      if (aliveRef.current) setAllItems(unique);
+    } catch (e) {
+      console.error("RecentActivityCard: failed to load activity", e);
+      if (aliveRef.current) setAllItems([]);
+    } finally {
+      inFlightRef.current = false;
+
+      if (queuedRef.current && aliveRef.current) {
+        queuedRef.current = false;
+        void refresh();
+      }
+    }
+  }, []);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    let alive = true;
+    aliveRef.current = true;
     const supabase = getSupabaseClient();
-
-    const refresh = async () => {
-      try {
-        const variants: ActivityVariant[] = [
-          "applied",
-          "interviews",
-          "rejected",
-          "withdrawn",
-          "offers",
-        ];
-
-        const results = await Promise.all(
-          variants.map(async (v) => {
-            const { items } = await loadActivity(v);
-            const source = mapVariantToSource(v);
-            return (items as InternalActivityItem[]).map((it) => ({
-              ...it,
-              __source: source,
-            }));
-          })
-        );
-
-        if (!alive) return;
-
-        const merged = results.flat();
-
-        // Deduplicate by id
-        const map = new Map<string, InternalActivityItem>();
-        for (const it of merged) {
-          if (it?.id) map.set(it.id, it);
-        }
-
-        const unique = Array.from(map.values());
-        unique.sort((a, b) => toMs(b.timestamp) - toMs(a.timestamp));
-        setAllItems(unique);
-      } catch (e) {
-        console.error("RecentActivityCard: failed to load activity", e);
-        if (alive) setAllItems([]);
-      }
-    };
 
     // subscribe first, then hydrate session
     const { data: sub } = supabase.auth.onAuthStateChange(() => {
       void refresh();
     });
-    supabase.auth.getSession().finally(() => void refresh());
+
+    supabase.auth.getSession().finally(() => {
+      void refresh();
+    });
 
     const onFocus = () => void refresh();
     const onVis = () => {
-      if (!document.hidden) refresh();
+      if (!document.hidden) void refresh();
     };
     const onEvent = () => void refresh();
 
@@ -240,10 +266,13 @@ export default function RecentActivityCard() {
     window.addEventListener(ACTIVITY_EVENT, onEvent);
 
     // keep “time ago” fresh
-    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
+    const timer = window.setInterval(() => {
+      if (!aliveRef.current) return;
+      setNow(Date.now());
+    }, 60_000);
 
     return () => {
-      alive = false;
+      aliveRef.current = false;
       sub?.subscription?.unsubscribe();
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVis);
@@ -251,7 +280,7 @@ export default function RecentActivityCard() {
       window.removeEventListener(ACTIVITY_EVENT, onEvent);
       window.clearInterval(timer);
     };
-  }, []);
+  }, [refresh]);
 
   const recent = useMemo(() => {
     const cutoff = now - LAST_DAYS * MS_DAY;
@@ -263,10 +292,12 @@ export default function RecentActivityCard() {
       })
       .slice(0, MAX_FEEDS)
       .map((i) => ({
-        id: i.id,
+        id:
+          i.id ??
+          `${i.type ?? "unknown"}-${i.timestamp ?? ""}-${i.company ?? ""}-${i.role ?? ""}`,
         category: inferCategory(i),
         label: buildLabel(i),
-        time: timeAgoLabel(i.timestamp, now),
+        time: i.timestamp ? timeAgoLabel(i.timestamp, now) : "",
       }));
   }, [allItems, now]);
 
@@ -305,9 +336,7 @@ export default function RecentActivityCard() {
         <ol className="mt-4 space-y-3 text-sm">
           {empty && (
             <li className="rounded-xl border border-dashed border-neutral-200 bg-white/80 p-4 text-center">
-              <p className="text-[12px] text-neutral-600">
-                No recent activity yet.
-              </p>
+              <p className="text-[12px] text-neutral-600">No recent activity yet.</p>
               <p className="mt-1 text-[11px] text-neutral-500">
                 As you add, move, or update items, your timeline will appear here.
               </p>

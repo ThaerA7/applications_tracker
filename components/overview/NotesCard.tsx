@@ -1,7 +1,7 @@
 // app/components/NotesCard.tsx
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { FileText, Palette, Plus, Tag, Save, X } from "lucide-react";
 
 import {
@@ -289,29 +289,51 @@ export default function NotesOverviewCard() {
   const [isNoteDialogOpen, setIsNoteDialogOpen] = useState(false);
   const [editingNote, setEditingNote] = useState<NoteItem | null>(null);
 
-  const [longPressTimeoutId, setLongPressTimeoutId] = useState<number | null>(
-    null
-  );
+  // ✅ refs to avoid extra renders + avoid setState after unmount
+  const aliveRef = useRef(true);
+
+  // ✅ coalesce refresh storms (focus/visibility/events)
+  const inFlightRef = useRef(false);
+  const queuedRef = useRef(false);
+
+  // ✅ for long press (ref instead of state)
+  const longPressTimeoutRef = useRef<number | null>(null);
 
   // for mobile double-tap
   const lastTapRef = useRef<number>(0);
 
-  const refreshNotes = async () => {
-    const res = await loadNotes();
-    setMode(res.mode);
-    setNotes(res.items);
-  };
+  const refreshNotes = useCallback(async () => {
+    if (inFlightRef.current) {
+      queuedRef.current = true;
+      return;
+    }
+
+    inFlightRef.current = true;
+    try {
+      const res = await loadNotes();
+      if (!aliveRef.current) return;
+      setMode(res.mode);
+      setNotes(res.items);
+    } finally {
+      inFlightRef.current = false;
+
+      if (queuedRef.current && aliveRef.current) {
+        queuedRef.current = false;
+        void refreshNotes();
+      }
+    }
+  }, []);
 
   useEffect(() => {
-    let alive = true;
+    aliveRef.current = true;
 
     (async () => {
       try {
         await migrateGuestNotesToUser().catch(() => {});
-        if (!alive) return;
+        if (!aliveRef.current) return;
         await refreshNotes();
       } finally {
-        if (alive) setLoading(false);
+        if (aliveRef.current) setLoading(false);
       }
     })();
 
@@ -327,14 +349,19 @@ export default function NotesOverviewCard() {
     document.addEventListener("visibilitychange", onVis);
 
     return () => {
-      alive = false;
+      aliveRef.current = false;
+
+      if (longPressTimeoutRef.current != null) {
+        window.clearTimeout(longPressTimeoutRef.current);
+        longPressTimeoutRef.current = null;
+      }
+
       window.removeEventListener(COUNTS_EVENT, handler);
       window.removeEventListener(NOTES_EVENT, handler);
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVis);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [refreshNotes]);
 
   const overviewNotes = useMemo(() => {
     const sorted = [...notes].sort((a, b) => {
@@ -418,16 +445,20 @@ export default function NotesOverviewCard() {
   };
 
   const startLongPress = (note: NoteItem) => {
-    const id = window.setTimeout(() => {
+    if (longPressTimeoutRef.current != null) {
+      window.clearTimeout(longPressTimeoutRef.current);
+      longPressTimeoutRef.current = null;
+    }
+
+    longPressTimeoutRef.current = window.setTimeout(() => {
       openEditDialog(note);
     }, LONG_PRESS_MS);
-    setLongPressTimeoutId(id);
   };
 
   const cancelLongPress = () => {
-    if (longPressTimeoutId != null) {
-      window.clearTimeout(longPressTimeoutId);
-      setLongPressTimeoutId(null);
+    if (longPressTimeoutRef.current != null) {
+      window.clearTimeout(longPressTimeoutRef.current);
+      longPressTimeoutRef.current = null;
     }
   };
 
@@ -536,7 +567,7 @@ export default function NotesOverviewCard() {
                         </span>
                       </span>
                     </div>
-                    <p className="mt-1 line-clamp-2 text-[12px] text-neutral-600 whitespace-pre-line">
+                    <p className="mt-1 line-clamp-2 whitespace-pre-line text-[12px] text-neutral-600">
                       {note.content ?? ""}
                     </p>
                   </article>

@@ -3,6 +3,7 @@
 
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { idbGet, idbSet, idbDel } from "./indexedDb";
+import { getModeCached } from "../supabase/sessionCache";
 
 export type StoredInterview = {
   id: string;
@@ -115,9 +116,7 @@ async function deleteUserInterview(id: string) {
 // ---------- mode detection ----------
 
 export async function detectInterviewsMode(): Promise<InterviewsStorageMode> {
-  const supabase = getSupabaseClient();
-  const { data } = await supabase.auth.getSession();
-  return data.session?.user ? "user" : "guest";
+  return getModeCached();
 }
 
 // ---------- public API ----------

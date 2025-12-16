@@ -65,6 +65,35 @@ export default function Sidebar({ collapsed }: SidebarProps) {
   const len = (v: any) => (Array.isArray(v?.items) ? v.items.length : 0);
 
   const refreshCounts = async () => {
+    // Run loads in parallel but guard against a hung Supabase/network call
+    const loads = [
+      loadApplied(),
+      loadInterviews(),
+      loadWithdrawn(),
+      loadRejected(),
+      loadOffers(),
+      loadWishlist(),
+      loadNotes(),
+    ];
+
+    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000));
+
+    const settled = (await Promise.race([Promise.allSettled(loads), timeout])) as
+      | PromiseSettledResult<any>[]
+      | null;
+
+    if (settled === null) {
+      // Timeout occurred — mark counts as zero so UI doesn't remain blank
+      safeSet(() => setAppliedCount(0));
+      safeSet(() => setInterviewsCount(0));
+      safeSet(() => setWithdrawnCount(0));
+      safeSet(() => setRejectedCount(0));
+      safeSet(() => setOffersCount(0));
+      safeSet(() => setWishlistCount(0));
+      safeSet(() => setNotesCount(0));
+      return;
+    }
+
     const [
       appliedRes,
       interviewsRes,
@@ -73,15 +102,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
       offersRes,
       wishlistRes,
       notesRes,
-    ] = await Promise.allSettled([
-      loadApplied(),
-      loadInterviews(),
-      loadWithdrawn(),
-      loadRejected(),
-      loadOffers(),
-      loadWishlist(),
-      loadNotes(),
-    ]);
+    ] = settled;
 
     // Applied
     if (appliedRes.status === "fulfilled") safeSet(() => setAppliedCount(len(appliedRes.value)));
@@ -119,10 +140,13 @@ export default function Sidebar({ collapsed }: SidebarProps) {
   }
 );
 
-  // ✅ Kick session hydration and then refresh once
-  supabase.auth.getSession().finally(() => {
+  // ✅ Kick session hydration and then refresh once. Guard with a short timeout
+  void (async () => {
+    try {
+      await Promise.race([supabase.auth.getSession(), new Promise((r) => setTimeout(r, 3000))]);
+    } catch {}
     void refreshCounts();
-  });
+  })();
 
   const handler = () => void refreshCounts();
   const onFocus = () => void refreshCounts();
