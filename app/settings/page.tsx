@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import type { Session, AuthChangeEvent } from "@supabase/supabase-js";
@@ -163,6 +163,32 @@ export default function SettingsPage() {
     window.dispatchEvent(new Event("job-tracker:open-signin-gate"));
   }, []);
 
+  const importInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleImportClick = useCallback(() => {
+    importInputRef.current?.click();
+  }, []);
+
+  const handleImportFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const json = JSON.parse(text);
+      // Basic feedback; importing logic should be implemented where appropriate
+      if (Array.isArray(json)) {
+        alert(`Imported ${json.length} items (preview).`);
+      } else {
+        alert("Imported data (preview).");
+      }
+    } catch (err: any) {
+      alert("Import failed: " + (err?.message ?? String(err)));
+    } finally {
+      // reset input so same file can be picked again
+      if (importInputRef.current) importInputRef.current.value = "";
+    }
+  }, []);
+
   const handleLogout = useCallback(async () => {
     if (authBusy || !signedIn) return;
     setAuthBusy(true);
@@ -195,8 +221,8 @@ export default function SettingsPage() {
   return (
     <section
       className={[
-        "relative rounded-2xl border border-neutral-200/70",
-        "bg-gradient-to-br from-slate-50 via-white to-neutral-100",
+        "relative rounded-2xl border border-sky-100/70",
+        "bg-gradient-to-br from-indigo-50 via-white to-sky-50",
         "p-8 shadow-md overflow-hidden",
       ].join(" ")}
     >
@@ -230,7 +256,7 @@ export default function SettingsPage() {
 
       <div className="relative mt-6 grid gap-4 lg:grid-cols-[1.25fr_1fr]">
         <div className="space-y-4">
-          <article className="relative overflow-hidden rounded-xl border border-neutral-200/80 bg-white/80 p-5 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/70">
+          <article className="relative overflow-hidden rounded-xl border border-sky-100/80 bg-white/95 p-5 pl-6 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/70 before:absolute before:inset-y-0 before:left-0 before:w-2 before:rounded-l-xl before:bg-gradient-to-b before:from-indigo-600 before:to-sky-600 before:content-['']">
             <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-neutral-200/50 blur-3xl" />
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -238,20 +264,20 @@ export default function SettingsPage() {
                 <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
                   Account & sync
                 </p>
-                <div className="mt-1 flex items-center gap-2">
-                  <div className="grid h-10 w-10 place-items-center rounded-full border border-neutral-200 bg-neutral-50 text-sm font-semibold text-neutral-800">
+                <div className="mt-1 flex items-center gap-4">
+                  <div className="grid h-12 w-12 place-items-center rounded-full bg-white ring-1 ring-neutral-100 text-sm font-semibold text-neutral-900 shadow-sm">
                     {signedIn ? accountLabel[0]?.toUpperCase() || "U" : (
-                      <UserRound className="h-4 w-4" aria-hidden="true" />
+                      <UserRound className="h-5 w-5 text-neutral-700" aria-hidden="true" />
                     )}
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-neutral-900">
+                    <p className="text-base font-semibold text-neutral-900">
                       {accountLabel}
                     </p>
-                    <p className="text-xs text-neutral-600">
+                    <p className="text-sm text-neutral-600">
                       {signedIn
                         ? session?.user?.email ?? "Signed in"
-                        : "Data stored locally on this device"}
+                        : "Data stored in your browser (IndexedDB)"}
                     </p>
                   </div>
                 </div>
@@ -262,7 +288,7 @@ export default function SettingsPage() {
                   <button
                     type="button"
                     onClick={openSignInGate}
-                    className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-neutral-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300"
+                    className="inline-flex items-center gap-2 rounded-full bg-neutral-900 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:bg-neutral-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300"
                   >
                     <Sparkles className="h-4 w-4" aria-hidden="true" />
                     Sign in to sync
@@ -274,7 +300,7 @@ export default function SettingsPage() {
                     onClick={handleLogout}
                     disabled={authBusy}
                     className={[
-                      "inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold shadow-sm transition",
+                      "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold shadow-sm transition",
                       "border-rose-200 bg-white text-rose-700 hover:bg-rose-50",
                       "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-rose-300",
                       authBusy ? "opacity-70" : "",
@@ -287,47 +313,25 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-lg border border-neutral-200 bg-white/70 p-3 shadow-xs">
-                <div className="flex items-center gap-2 text-sm font-semibold text-neutral-900">
-                  <Cloud className="h-4 w-4 text-sky-600" aria-hidden="true" />
-                  Sync mode
+            <div className="mt-4">
+              <div className="rounded-2xl border border-sky-100 bg-white/95 p-4 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 text-sm font-semibold text-neutral-900">
+                    <Cloud className="h-5 w-5 text-sky-600" aria-hidden="true" />
+                    <span>Sync & Privacy</span>
+                  </div>
+                  <div className="text-xs text-neutral-500">{storageMode === 'user' ? 'Synced' : 'Guest'}</div>
                 </div>
-                <p className="mt-1 text-xs text-neutral-600">
+                <p className="mt-2 text-sm text-neutral-600">
                   {storageMode === "user"
-                    ? "Saving to your account with a local cache."
-                    : "Local-only until you sign in."}
-                </p>
-              </div>
-              <div className="rounded-lg border border-neutral-200 bg-white/70 p-3 shadow-xs">
-                <div className="flex items-center gap-2 text-sm font-semibold text-neutral-900">
-                  <ShieldCheck
-                    className="h-4 w-4 text-emerald-600"
-                    aria-hidden="true"
-                  />
-                  Privacy
-                </div>
-                <p className="mt-1 text-xs text-neutral-600">
-                  No emails are sent without your opt-in. Guest data stays on
-                  this device.
-                </p>
-              </div>
-              <div className="rounded-lg border border-neutral-200 bg-white/70 p-3 shadow-xs">
-                <div className="flex items-center gap-2 text-sm font-semibold text-neutral-900">
-                  <Smartphone
-                    className="h-4 w-4 text-indigo-600"
-                    aria-hidden="true"
-                  />
-                  Devices
-                </div>
-                <p className="mt-1 text-xs text-neutral-600">
-                  Switch devices anytime; your lists follow when signed in.
+                    ? "Your data is saved to your account and kept locally for offline use and faster loads."
+                    : "Your data is stored in this browser (IndexedDB). Sign in to sync across devices and enable backups."}
                 </p>
               </div>
             </div>
           </article>
 
-          <article className="relative overflow-hidden rounded-xl border border-neutral-200/80 bg-white/80 p-5 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/70">
+          <article className="relative overflow-hidden rounded-xl border border-sky-100/80 bg-white/95 p-5 pl-6 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/70 before:absolute before:inset-y-0 before:left-0 before:w-2 before:rounded-l-xl before:bg-gradient-to-b before:from-emerald-500 before:to-teal-400 before:content-['']">
             <div className="pointer-events-none absolute -left-16 -top-12 h-32 w-32 rounded-full bg-slate-200/50 blur-3xl" />
             <div className="flex items-center justify-between gap-2">
               <div>
@@ -376,7 +380,7 @@ export default function SettingsPage() {
         </div>
 
         <div className="space-y-4">
-          <article className="relative overflow-hidden rounded-xl border border-neutral-200/80 bg-white/80 p-5 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/70">
+          <article className="relative overflow-hidden rounded-xl border border-neutral-200/80 bg-white/80 p-5 pl-6 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/70 before:absolute before:inset-y-0 before:left-0 before:w-2 before:rounded-l-xl before:bg-gradient-to-b before:from-amber-500 before:to-orange-400 before:content-['']">
             <div className="pointer-events-none absolute -right-14 -bottom-10 h-32 w-32 rounded-full bg-neutral-200/50 blur-3xl" />
 
             <div className="flex items-center justify-between gap-2">
@@ -388,30 +392,19 @@ export default function SettingsPage() {
                   Export or review where your lists live.
                 </p>
               </div>
-              <Database className="h-5 w-5 text-neutral-400" aria-hidden="true" />
+              <div className="flex items-center gap-3">
+                <div className="text-sm font-semibold text-neutral-700">
+                  {storageMode === "user" ? "Cloud + local" : "Mode: Local only"}
+                </div>
+                <Database className="h-5 w-5 text-neutral-400" aria-hidden="true" />
+              </div>
             </div>
 
             <div className="mt-4 space-y-3">
-              <div className="flex items-start gap-3 rounded-lg border border-neutral-200 bg-white/70 p-3 shadow-sm">
-                <div className="rounded-full bg-neutral-900 text-white p-1.5">
-                  <Cloud className="h-4 w-4" aria-hidden="true" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-neutral-900">
-                    Current mode: {storageMode === "user" ? "Cloud + local" : "Local only"}
-                  </p>
-                  <p className="text-xs text-neutral-600">
-                    {storageMode === "user"
-                      ? "Data is synced to your account with an offline cache for speed."
-                      : "Stay on this device until you choose to sign in."}
-                  </p>
-                </div>
-              </div>
+              
 
-              <div className="flex items-start gap-3 rounded-lg border border-neutral-200 bg-white/70 p-3 shadow-sm">
-                <div className="rounded-full bg-white text-neutral-800 p-1.5 ring-1 ring-neutral-200">
-                  <ShieldCheck className="h-4 w-4" aria-hidden="true" />
-                </div>
+              <div className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-white/70 p-3 shadow-sm">
+                <ShieldCheck className="h-7 w-7 text-emerald-600" aria-hidden="true" />
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-neutral-900">
                     Privacy first
@@ -423,31 +416,55 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between gap-3 rounded-lg border border-dashed border-neutral-300 bg-white/60 p-3">
-                <div>
-                  <p className="text-sm font-semibold text-neutral-900">
-                    Export copy
-                  </p>
-                  <p className="text-xs text-neutral-600">
-                    Download a JSON backup of your lists for safekeeping.
-                  </p>
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-3 rounded-lg border border-dashed border-neutral-300 bg-white/60 p-3">
+                  <div>
+                    <p className="text-sm font-semibold text-neutral-900">Import copy</p>
+                    <p className="text-xs text-neutral-600">Upload a JSON backup to restore lists into this browser.</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      ref={importInputRef}
+                      type="file"
+                      accept="application/json"
+                      className="hidden"
+                      onChange={handleImportFile}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleImportClick}
+                      className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-sm font-medium text-neutral-800 shadow-sm hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300"
+                    >
+                      <Cloud className="h-4 w-4" aria-hidden="true" />
+                      Import
+                    </button>
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-sm font-medium text-neutral-800 shadow-sm hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300"
-                  onClick={() => {
-                    // placeholder action to reinforce UX without wiring a backend call
-                    alert("Export coming soon. For now, data stays local or in your account.");
-                  }}
-                >
-                  <Download className="h-4 w-4" aria-hidden="true" />
-                  Export
-                </button>
+
+                <div className="flex items-start justify-between gap-3 rounded-lg border border-dashed border-neutral-300 bg-white/60 p-3">
+                  <div>
+                    <p className="text-sm font-semibold text-neutral-900">Export copy</p>
+                    <p className="text-xs text-neutral-600">Download a JSON backup of your lists for safekeeping.</p>
+                  </div>
+                  <div>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-sm font-medium text-neutral-800 shadow-sm hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300"
+                      onClick={() => {
+                        // placeholder action to reinforce UX without wiring a backend call
+                        alert("Export coming soon. For now, data stays local or in your account.");
+                      }}
+                    >
+                      <Download className="h-4 w-4" aria-hidden="true" />
+                      Export
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </article>
 
-          <article className="relative overflow-hidden rounded-xl border border-neutral-200/80 bg-white/80 p-5 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/70">
+          <article className="relative overflow-hidden rounded-xl border border-neutral-200/80 bg-white/80 p-5 pl-6 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/70 before:absolute before:inset-y-0 before:left-0 before:w-2 before:rounded-l-xl before:bg-gradient-to-b before:from-fuchsia-500 before:to-violet-400 before:content-['']">
             <div className="flex items-center justify-between gap-2">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">

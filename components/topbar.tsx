@@ -90,10 +90,10 @@ const ACCENTS: Record<string, Accent> = {
     focus: "focus-visible:ring-fuchsia-300",
   },
   "/settings": {
-    washFrom: "from-slate-50",
-    barFrom: "after:from-slate-500",
-    barTo: "after:to-neutral-500",
-    focus: "focus-visible:ring-slate-300",
+    washFrom: "from-indigo-50",
+    barFrom: "after:from-indigo-500",
+    barTo: "after:to-sky-500",
+    focus: "focus-visible:ring-indigo-300",
   },
 };
 
