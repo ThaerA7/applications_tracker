@@ -1,4 +1,3 @@
-// app/components/overview/UpcomingCard.tsx
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -16,7 +15,7 @@ import {
   getCountdownParts,
 } from "../../app/calendar/calendarUtils";
 
-// ✅ Storage (guest: IDB/local mirror, user: Supabase)
+// Storage helpers (guest: IndexedDB mirror, user: Supabase).
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { loadInterviews } from "@/lib/storage/interviews";
 
@@ -45,12 +44,12 @@ export default function UpcomingCard() {
   // Quick-add dialog state (from overview card)
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  // ✅ avoid setState after unmount + coalesce refresh storms
+  // Avoid setState after unmount and coalesce refresh storms.
   const aliveRef = useRef(true);
   const inFlightRef = useRef(false);
   const queuedRef = useRef(false);
 
-  // ✅ Load interview events from storage (guest IDB/local mirror, user Supabase)
+  // Load interview events from storage (guest IndexedDB mirror, user Supabase).
   const refreshInterviewEvents = useCallback(async () => {
     if (inFlightRef.current) {
       queuedRef.current = true;
@@ -134,7 +133,7 @@ export default function UpcomingCard() {
 
     (async () => {
       try {
-        await supabase.auth.getSession(); // ✅ hydrate first
+        await supabase.auth.getSession(); // Hydrate session first.
       } catch {
         // ignore
       }

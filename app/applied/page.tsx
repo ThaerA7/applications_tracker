@@ -14,10 +14,10 @@ import type { WithdrawnDetails } from '../../components/dialogs/MoveToWithdrawnD
 import type { Interview } from '../../components/dialogs/ScheduleInterviewDialog';
 import ApplicationCard, { type Application } from './ApplicationCard';
 import ActivityLogSidebar from '@/components/ActivityLogSidebar';
-import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
+import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 
 import { getSupabaseClient } from '@/lib/supabase/client';
- import {
+import {
    loadApplied,
    upsertApplied,
    deleteApplied,
@@ -27,10 +27,9 @@ import { getSupabaseClient } from '@/lib/supabase/client';
 import {
   upsertInterview,
   detectInterviewsMode,
-} from "@/lib/storage/interviews";
-import { upsertRejected, detectRejectedMode } from "@/lib/storage/rejected";
-import { upsertWithdrawn, detectWithdrawnMode } from "@/lib/storage/withdrawn";
-
+} from '@/lib/storage/interviews';
+import { upsertRejected, detectRejectedMode } from '@/lib/storage/rejected';
+import { upsertWithdrawn, detectWithdrawnMode } from '@/lib/storage/withdrawn';
 
 import ApplicationsFilter, {
   DEFAULT_APPLICATION_FILTERS,
@@ -39,7 +38,7 @@ import ApplicationsFilter, {
   type ApplicationFilters,
 } from '@/components/filters/ApplicationsFilter';
 
-// ✅ NEW: persistent activity storage
+// Persistent activity storage.
 import {
   loadActivity,
   appendActivity,
@@ -100,7 +99,7 @@ function appToForm(app: Application): NewApplicationForm {
   return rest;
 }
 
-// ✅ UUID helper (valid uuid even without crypto.randomUUID)
+// UUID helper (works even without crypto.randomUUID).
 function makeUuidV4() {
   const cryptoObj = globalThis.crypto as Crypto | undefined;
   if (cryptoObj?.randomUUID) return cryptoObj.randomUUID();
@@ -108,7 +107,7 @@ function makeUuidV4() {
   const buf = new Uint8Array(16);
   cryptoObj?.getRandomValues?.(buf);
 
-  // If crypto is missing (very rare in modern browsers), fallback to a fixed-ish uuid shape
+  // If crypto is missing (rare), fall back to a Math.random-based UUID v4 shape.
   if (!cryptoObj?.getRandomValues) {
     const s = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
       const r = (Math.random() * 16) | 0;
@@ -176,28 +175,29 @@ export default function AppliedPage() {
     void loadAppliedActivity();
 
     const { data: sub } = supabase.auth.onAuthStateChange(
-  (event: AuthChangeEvent, session: Session | null) => {
-      if (!alive) return;
+      (event: AuthChangeEvent, session: Session | null) => {
+        if (!alive) return;
 
-      if (event === 'SIGNED_IN' && session?.user) {
-        setTimeout(async () => {
-          if (!alive) return;
+        if (event === 'SIGNED_IN' && session?.user) {
+          setTimeout(async () => {
+            if (!alive) return;
 
-          // ✅ migrate guest data (apps + ALL activity variants) then reload
-          await migrateGuestAppliedToUser();
-          await migrateGuestActivityToUser();
+            // Migrate guest data (applications + activity), then reload.
+            await migrateGuestAppliedToUser();
+            await migrateGuestActivityToUser();
 
-          await loadApps();
-          await loadAppliedActivity();
-        }, 0);
-      } else if (event === 'SIGNED_OUT') {
-        setTimeout(async () => {
-          if (!alive) return;
-          await loadApps();
-          await loadAppliedActivity();
-        }, 0);
-      }
-    });
+            await loadApps();
+            await loadAppliedActivity();
+          }, 0);
+        } else if (event === 'SIGNED_OUT') {
+          setTimeout(async () => {
+            if (!alive) return;
+            await loadApps();
+            await loadAppliedActivity();
+          }, 0);
+        }
+      },
+    );
 
     return () => {
       alive = false;
@@ -206,9 +206,9 @@ export default function AppliedPage() {
   }, []);
 
   /**
-   * ✅ persistent logger:
-   * - writes to Supabase if user, else guest store
-   * - updates local state
+   * Persistent activity logger:
+   * - Writes to Supabase in user mode, otherwise guest storage.
+   * - Updates local state for the current page's sidebar.
    */
   const logActivity = useCallback(
     async (
@@ -365,29 +365,29 @@ export default function AppliedPage() {
   };
 
   const moveToInterviews = async (interview: Interview) => {
-  if (!appBeingMoved) {
+    if (!appBeingMoved) {
+      moveOutOfApplied();
+      return;
+    }
+
+    // Persist interview card.
+    const interviewsMode = await detectInterviewsMode();
+    await upsertInterview(interview as any, interviewsMode);
+
+    // Log on Applied page.
+    await logActivity('applied', 'moved_to_interviews', appBeingMoved, {
+      fromStatus: 'Applied',
+      toStatus: 'Interviews',
+    });
+
+    // Log on Interviews page.
+    await logActivity('interviews', 'moved_to_interviews', appBeingMoved, {
+      fromStatus: 'Applied',
+      toStatus: 'Interviews',
+    });
+
     moveOutOfApplied();
-    return;
-  }
-
-  // ✅ persist interview card
-  const interviewsMode = await detectInterviewsMode();
-  await upsertInterview(interview as any, interviewsMode);
-
-  // ✅ log on Applied page
-  await logActivity("applied", "moved_to_interviews", appBeingMoved, {
-    fromStatus: "Applied",
-    toStatus: "Interviews",
-  });
-
-  // ✅ log on Interviews page
-  await logActivity("interviews", "moved_to_interviews", appBeingMoved, {
-    fromStatus: "Applied",
-    toStatus: "Interviews",
-  });
-
-  moveOutOfApplied();
-};
+  };
 
   const moveToRejected = async (details: RejectionDetails) => {
     const id = makeUuidV4();
@@ -400,14 +400,14 @@ export default function AppliedPage() {
     await upsertRejected(newRejection as any, await detectRejectedMode());
 
     if (appBeingMoved) {
-      // ✅ log on Applied page
+      // Log on Applied page.
       await logActivity('applied', 'moved_to_rejected', appBeingMoved, {
         fromStatus: 'Applied',
         toStatus: 'Rejected',
         note: 'Marked as rejected',
       });
 
-      // ✅ ALSO log on Rejected page (note appId should match the rejected-card id)
+      // Also log on Rejected page (appId should match the rejected-card id).
       await logActivity(
         'rejected',
         'moved_to_rejected',
@@ -456,14 +456,14 @@ export default function AppliedPage() {
 
     await upsertWithdrawn(newWithdrawn as any, await detectWithdrawnMode());
 
-    // ✅ log on Applied page
+    // Log on Applied page.
     await logActivity('applied', 'moved_to_withdrawn', source, {
       fromStatus: 'Applied',
       toStatus: 'Withdrawn',
       note: details.reason || 'Moved to withdrawn',
     });
 
-    // ✅ ALSO log on Withdrawn page (appId should match withdrawn-card id)
+    // Also log on Withdrawn page (appId should match withdrawn-card id).
     await logActivity(
       'withdrawn',
       'moved_to_withdrawn',

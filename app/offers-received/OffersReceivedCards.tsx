@@ -36,22 +36,15 @@ export type OfferReceivedJob = {
   decisionDate?: string;
 
   /**
-   * ✅ NEW:
-   * When you actually received the offer.
-   * If missing, we fallback to decisionDate during normalization.
+   * When you received the offer.
+   * If missing, we fall back to `decisionDate` during normalization.
    */
   offerReceivedDate?: string;
 
-  /**
-   * ✅ NEW:
-   * When you accepted the offer.
-   */
+  /** When you accepted the offer. */
   offerAcceptedDate?: string;
 
-  /**
-   * ✅ NEW:
-   * When you declined the offer.
-   */
+  /** When you declined the offer. */
   offerDeclinedDate?: string;
 
   /**

@@ -1,4 +1,3 @@
-// components/ScheduleInterviewDialog.tsx
 "use client";
 
 import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
@@ -130,7 +129,7 @@ function makeInitialForm(
   const today = `${yyyy}-${mm}-${dd}`;
   const defaultTime = `${hh}:${min}`;
 
-  // ✅ Try to use existing interview date/time if provided
+  // Prefer the existing interview date/time when editing.
   let date = today;
   let time = defaultTime;
   let type: InterviewType = "phone";

@@ -131,7 +131,7 @@ export default function SignInGateDialog({
 
     onContinueAsGuest?.();
     setOpen(false);
-    router.push("/"); // ✅ always go to Overview
+    router.push("/"); // Always go to Overview.
   }, [onContinueAsGuest, router]);
 
   const handleGoogle = useCallback(async () => {
@@ -147,7 +147,7 @@ export default function SignInGateDialog({
       }
 
       const supabase = getSupabaseClient();
-      const redirectTo = `${window.location.origin}/auth/callback?next=/`; // ✅ force Overview
+      const redirectTo = `${window.location.origin}/auth/callback?next=/`; // Force Overview on return.
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",

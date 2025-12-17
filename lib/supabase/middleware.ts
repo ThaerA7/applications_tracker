@@ -1,4 +1,3 @@
-// lib/supabase/middleware.ts
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
@@ -47,6 +46,6 @@ export async function updateSession(request: NextRequest) {
   // Keep this pattern to avoid random logouts with SSR
   await supabase.auth.getUser();
 
-  // ✅ Make all pages accessible (UI gate only)
+  // All pages are accessible; authentication is enforced in the UI.
   return supabaseResponse;
 }

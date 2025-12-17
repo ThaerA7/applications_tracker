@@ -1,4 +1,3 @@
-// app/offers/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState, type ComponentType } from "react";
@@ -41,7 +40,7 @@ import {
   type OffersStorageMode,
 } from "@/lib/storage/offers";
 
-// ✅ NEW: persistent activity storage (guest + Supabase user)
+// Persistent activity storage (guest + Supabase user).
 import {
   loadActivity,
   appendActivity as appendActivityToStorage,
@@ -113,7 +112,7 @@ const VIEW_STATUS_LABEL: Record<OfferDecisionStatus, string> = {
   declined: "Declined",
 };
 
-// ✅ helper to generate a real UUID (safe for Supabase UUID columns)
+// UUID helper (safe for Supabase UUID columns).
 function makeUuid(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
@@ -139,7 +138,7 @@ export default function OffersReceivedPage() {
   const [isTagDialogOpen, setIsTagDialogOpen] = useState(false);
   const [taggingItem, setTaggingItem] = useState<OfferReceivedJob | null>(null);
 
-  // ✅ Activity log sidebar & persistent storage mode
+  // Activity log sidebar and storage mode.
   const [activityOpen, setActivityOpen] = useState(false);
   const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
   const [activityMode, setActivityMode] = useState<ActivityStorageMode>("guest");
@@ -147,7 +146,7 @@ export default function OffersReceivedPage() {
   // Delete confirmation dialog target
   const [deleteTarget, setDeleteTarget] = useState<OfferReceivedJob | null>(null);
 
-  // ✅ persist activity (guest + user)
+  // Persist activity (guest + user).
   const persistActivity = async (entry: ActivityItem) => {
     const saved = await appendActivityToStorage("offers", entry, activityMode);
     setActivityItems((prev) => [saved, ...prev].slice(0, 100));
@@ -171,12 +170,12 @@ export default function OffersReceivedPage() {
         setActivityMode(act.mode);
         setActivityItems(act.items);
 
-        // 👇 No more demo seeding – just use real stored items
+        // Use stored items only (no demo seeding).
         setItems(normalizeOffers(items));
       } catch (err) {
         console.error("Failed to load offers/activity:", err);
         if (!alive) return;
-        // If something explodes, just show nothing instead of demo
+        // If loading fails, keep the UI empty rather than showing demo data.
         setItems([]);
       } finally {
         if (alive) setHydrated(true);
@@ -186,23 +185,24 @@ export default function OffersReceivedPage() {
     void loadAll();
 
     const { data: sub } = supabase.auth.onAuthStateChange(
-  (event: AuthChangeEvent, session: Session | null) => {
-      if (!alive) return;
+      (event: AuthChangeEvent, session: Session | null) => {
+        if (!alive) return;
 
-      if (event === "SIGNED_IN" && session?.user) {
-        setTimeout(async () => {
-          if (!alive) return;
-          await migrateGuestOffersToUser();
-          await migrateGuestActivityToUser(); // ✅ migrate all variants (including offers)
-          await loadAll();
-        }, 0);
-      } else if (event === "SIGNED_OUT") {
-        setTimeout(async () => {
-          if (!alive) return;
-          await loadAll();
-        }, 0);
-      }
-    });
+        if (event === "SIGNED_IN" && session?.user) {
+          setTimeout(async () => {
+            if (!alive) return;
+            await migrateGuestOffersToUser();
+            await migrateGuestActivityToUser(); // Migrate activity (all variants), then reload.
+            await loadAll();
+          }, 0);
+        } else if (event === "SIGNED_OUT") {
+          setTimeout(async () => {
+            if (!alive) return;
+            await loadAll();
+          }, 0);
+        }
+      },
+    );
 
     return () => {
       alive = false;

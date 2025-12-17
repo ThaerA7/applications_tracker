@@ -1,4 +1,3 @@
-// components/dialogs/MoveToAcceptedDialog.tsx
 "use client";
 
 import { useEffect, useState, type FC, type FormEvent } from "react";
@@ -26,14 +25,10 @@ export type AcceptedDetails = {
    */
   decisionDate?: string;
 
-  /**
-   * ✅ NEW
-   */
+  /** Date the offer was received. */
   offerReceivedDate?: string;
 
-  /**
-   * ✅ NEW
-   */
+  /** Date the offer was accepted. */
   offerAcceptedDate?: string;
 
   startDate?: string;
@@ -341,7 +336,7 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
               </div>
             </label>
 
-            {/* Employment type (✅ dropdown) */}
+            {/* Employment type */}
             <label className="space-y-1 text-sm">
               <span className="font-medium text-neutral-800">Employment type</span>
               <div className="relative">

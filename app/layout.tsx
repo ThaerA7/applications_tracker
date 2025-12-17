@@ -1,9 +1,8 @@
-// app/layout.tsx
 import "./globals.css";
 import type { Metadata } from "next";
 import { Merriweather } from "next/font/google";
 import AppShell from "@/components/AppShell";
-import AuthProvider from "@/app/providers/AuthProvider"; // ✅ add this
+import AuthProvider from "@/app/providers/AuthProvider";
 
 export const metadata: Metadata = {
   title: "Application Tracker",

@@ -252,31 +252,29 @@ export default function TopBar({ collapsed, onToggleSidebar }: TopBarProps) {
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
-  // Load session + subscribe
-  // Load session + subscribe
-useEffect(() => {
-  const supabase = getSupabaseClient();
-  let active = true;
+  // Load session and subscribe to auth changes.
+  useEffect(() => {
+    const supabase = getSupabaseClient();
+    let active = true;
 
-  supabase.auth
-    .getSession()
-    .then(({ data }: { data: { session: Session | null } }) => {
-      if (!active) return;
-      setUser(data.session?.user ?? null);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data }: { data: { session: Session | null } }) => {
+        if (!active) return;
+        setUser(data.session?.user ?? null);
+      });
 
-  const { data: sub } = supabase.auth.onAuthStateChange(
-    (_event: AuthChangeEvent, session: Session | null) => {
-      setUser(session?.user ?? null);
-    }
-  );
+    const { data: sub } = supabase.auth.onAuthStateChange(
+      (_event: AuthChangeEvent, session: Session | null) => {
+        setUser(session?.user ?? null);
+      },
+    );
 
-  return () => {
-    active = false;
-    sub.subscription.unsubscribe();
-  };
-}, []);
-
+    return () => {
+      active = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
 
   const avatarLabel = useMemo(() => {
     if (!user) return "Guest";
@@ -310,9 +308,7 @@ useEffect(() => {
     setLogoutOpen(true);
   }, []);
 
-  
-
-      const handleLogout = useCallback(async () => {
+  const handleLogout = useCallback(async () => {
     if (loggingOut) return;
 
     setLogoutOpen(false);
@@ -334,8 +330,6 @@ useEffect(() => {
       setLoggingOut(false);
     }
   }, [loggingOut, router]);
-
-
 
   return (
     <>
@@ -394,7 +388,6 @@ useEffect(() => {
               {user ? (
                 avatarInitial
               ) : (
-                // ✅ Always show guest avatar icon unless signed in
                 <UserRound className="h-4 w-4" aria-hidden="true" />
               )}
             </div>

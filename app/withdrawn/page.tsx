@@ -22,7 +22,7 @@ import {
   type WithdrawnStorageMode,
 } from "@/lib/storage/withdrawn";
 
-// ✅ NEW: persistent activity storage (guest + Supabase user)
+// Persistent activity storage (guest + Supabase user).
 import {
   loadActivity,
   appendActivity as appendActivityToStorage,
@@ -50,11 +50,12 @@ function makeUuidV4() {
   }
   buf[6] = (buf[6] & 0x0f) | 0x40;
   buf[8] = (buf[8] & 0x3f) | 0x80;
- const hex = [...buf].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const hex = [...buf].map((b) => b.toString(16).padStart(2, "0")).join("");
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-type ApplicationLike = React.ComponentProps<typeof MoveToWithdrawnDialog>["application"];
+type ApplicationLike =
+  React.ComponentProps<typeof MoveToWithdrawnDialog>["application"];
 
 export default function WithdrawnPage() {
   const [withdrawn, setWithdrawn] = useState<WithdrawnRecord[]>([]);
@@ -68,12 +69,12 @@ export default function WithdrawnPage() {
   const [dialogApplication, setDialogApplication] = useState<ApplicationLike>(null);
   const [editingWithdrawn, setEditingWithdrawn] = useState<WithdrawnRecord | null>(null);
 
-  // ✅ Activity log sidebar & data (guest + user)
+  // Activity log sidebar state (guest + user).
   const [activityOpen, setActivityOpen] = useState(false);
   const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
   const [activityMode, setActivityMode] = useState<ActivityStorageMode>("guest");
 
-  // ✅ Persist activity (guest + user)
+  // Persist activity (guest + user).
   const persistActivity = (entry: ActivityItem) => {
     appendActivityToStorage("withdrawn", entry, activityMode)
       .then((saved) => {
@@ -86,7 +87,7 @@ export default function WithdrawnPage() {
       });
   };
 
-  // ✅ Load withdrawn + withdrawn activity, and handle auth switching
+  // Load withdrawn + activity, and handle auth switching.
   useEffect(() => {
     let alive = true;
     const supabase = getSupabaseClient();
@@ -115,23 +116,24 @@ export default function WithdrawnPage() {
     void loadAll();
 
     const { data: sub } = supabase.auth.onAuthStateChange(
-  (event: AuthChangeEvent, session: Session | null) => {
-      if (!alive) return;
+      (event: AuthChangeEvent, session: Session | null) => {
+        if (!alive) return;
 
-      if (event === "SIGNED_IN" && session?.user) {
-        setTimeout(async () => {
-          if (!alive) return;
-          await migrateGuestWithdrawnToUser();
-          await migrateGuestActivityToUser(); // ✅ migrates withdrawn activity too
-          await loadAll();
-        }, 0);
-      } else if (event === "SIGNED_OUT") {
-        setTimeout(async () => {
-          if (!alive) return;
-          await loadAll();
-        }, 0);
-      }
-    });
+        if (event === "SIGNED_IN" && session?.user) {
+          setTimeout(async () => {
+            if (!alive) return;
+            await migrateGuestWithdrawnToUser();
+            await migrateGuestActivityToUser(); // Migrate activity, then reload.
+            await loadAll();
+          }, 0);
+        } else if (event === "SIGNED_OUT") {
+          setTimeout(async () => {
+            if (!alive) return;
+            await loadAll();
+          }, 0);
+        }
+      },
+    );
 
     return () => {
       alive = false;
@@ -454,7 +456,6 @@ export default function WithdrawnPage() {
             Add
           </button>
 
-          {/* (still placeholder) */}
           <button
             type="button"
             className={[

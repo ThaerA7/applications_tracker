@@ -1,4 +1,3 @@
-// lib/supabase/sessionCache.ts
 "use client";
 
 import type { Session } from "@supabase/supabase-js";

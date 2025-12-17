@@ -387,7 +387,6 @@ export default function AddApplicationDialog({
               </div>
             </label>
 
-            {/* ✅ Status field removed from dialog */}
           </div>
 
           {/* Offer + contacts */}

@@ -1,4 +1,3 @@
-// app/job-search/page.tsx
 "use client";
 
 import {
@@ -599,7 +598,7 @@ export default function JobSearchPage() {
   const [page, setPage] = useState(1);
   const [totalAvailable, setTotalAvailable] = useState<number | null>(null);
 
-  // ✅ wishlist state (sourceKey-based)
+  // Wishlist state (sourceKey-based).
   const [wishlistKeys, setWishlistKeys] = useState<Set<string>>(new Set());
   const [wishlistIndex, setWishlistIndex] = useState<Map<string, string>>(new Map()); // sourceKey -> uuid id
   const [wishlistMode, setWishlistMode] = useState<WishlistStorageMode>("guest");

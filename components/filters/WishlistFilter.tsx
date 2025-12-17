@@ -1,4 +1,3 @@
-// app/wishlist/WishlistFilter.tsx
 "use client";
 
 import {

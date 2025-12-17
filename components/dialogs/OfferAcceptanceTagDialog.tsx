@@ -1,4 +1,3 @@
-// components/dialogs/OfferAcceptanceTagDialog.tsx
 "use client";
 
 import { useEffect, useMemo, useState, type FC, type FormEvent } from "react";

@@ -180,7 +180,7 @@ export async function GET(req: NextRequest) {
 
       const detailUrl = externalUrl ?? baDetailUrl;
 
-      // 👇 ALWAYS a human-readable label
+      // Human-readable offer type label.
       const offerType = deriveOfferTypeLabel(j);
 
       const logoUrl = j?.arbeitgeberLogo ?? j?.logoUrl ?? undefined;

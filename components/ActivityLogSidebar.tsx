@@ -37,9 +37,9 @@ export type ActivityItem = {
   appliedOn?: string;
 
   /**
-   * ✅ Offer-specific dates
-   * We store these in offers activity so the sidebar can show
-   * the correct accepted/declined/received date.
+   * Offer-specific dates.
+   * Stored on offers activity so the sidebar can show the correct
+   * accepted/declined/received date.
    */
   offerReceivedDate?: string;
   offerAcceptedDate?: string;
@@ -83,9 +83,7 @@ function getActivityIconSrc(type: ActivityType): string {
   }
 }
 
-/**
- * ✅ Item-aware labels
- */
+/** Item-aware labels. */
 function getActivityLabel(
   variant: ActivityVariant,
   item: ActivityItem
@@ -120,7 +118,6 @@ function getActivityLabel(
         case "deleted":
           return "Interview deleted";
         case "moved_to_interviews":
-          // ✅ move from applied → interviews
           return "Interview scheduled";
         case "moved_to_rejected":
           return "Moved to rejected";
@@ -167,7 +164,6 @@ function getActivityLabel(
       }
 
     case "offers": {
-      // ✅ Requested uppercase labels
       if (type === "added") return "OFFER RECEIVED";
       if (type === "deleted") return "OFFER DELETED";
 
@@ -189,9 +185,7 @@ function getActivityLabel(
   }
 }
 
-/**
- * ✅ For offers: choose the correct primary date & label per activity item.
- */
+/** For offers: choose the primary date and label for each activity item. */
 function getOffersPrimaryDate(item: ActivityItem): {
   label: string;
   value?: string;

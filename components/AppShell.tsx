@@ -1,38 +1,38 @@
-// components/AppShell.tsx
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import Sidebar from '@/components/sidebar';
-import TopBar from '@/components/topbar';
-import SignInGateDialog from '@/components/dialogs/SignInGateDialog'; // ✅ add
+import { useEffect, useState } from "react";
+import SignInGateDialog from "@/components/dialogs/SignInGateDialog";
+import Sidebar from "@/components/sidebar";
+import TopBar from "@/components/topbar";
 
-const STORAGE_KEY = 'job-tracker:sidebar-collapsed';
+const STORAGE_KEY = "job-tracker:sidebar-collapsed";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
 
   // Load persisted state
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
     const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored === '1' || stored === 'true') {
+    if (stored === "1" || stored === "true") {
       setCollapsed(true);
     }
   }, []);
 
   // Persist + drive CSS variable for layout
   useEffect(() => {
-    if (typeof window === 'undefined' || typeof document === 'undefined') return;
-    window.localStorage.setItem(STORAGE_KEY, collapsed ? '1' : '0');
+    if (typeof window === "undefined" || typeof document === "undefined") {
+      return;
+    }
+    window.localStorage.setItem(STORAGE_KEY, collapsed ? "1" : "0");
 
     // w-64 = 16rem, w-20 = 5rem
-    const width = collapsed ? '5rem' : '16rem';
-    document.documentElement.style.setProperty('--sidebar-width', width);
+    const width = collapsed ? "5rem" : "16rem";
+    document.documentElement.style.setProperty("--sidebar-width", width);
   }, [collapsed]);
 
   return (
     <>
-      {/* ✅ UI-only sign in gate */}
       <SignInGateDialog defaultOpen={false} />
 
       <Sidebar collapsed={collapsed} />

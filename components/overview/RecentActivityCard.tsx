@@ -1,4 +1,3 @@
-// app/components/RecentActivityCard.tsx
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -176,7 +175,7 @@ export default function RecentActivityCard() {
   const [allItems, setAllItems] = useState<InternalActivityItem[]>([]);
   const [now, setNow] = useState(() => Date.now());
 
-  // ✅ avoid setState after unmount + coalesce refresh storms
+  // Avoid setState after unmount and coalesce refresh storms.
   const aliveRef = useRef(true);
   const inFlightRef = useRef(false);
   const queuedRef = useRef(false);

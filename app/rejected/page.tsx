@@ -27,7 +27,7 @@ import {
   type RejectedStorageMode,
 } from "@/lib/storage/rejected";
 
-// ✅ NEW: persistent activity storage (guest + Supabase user)
+// Persistent activity storage (guest + Supabase user).
 import {
   loadActivity,
   appendActivity as appendActivityToStorage,
@@ -35,7 +35,8 @@ import {
   type ActivityStorageMode,
 } from "@/lib/storage/activity";
 
-type ApplicationLike = React.ComponentProps<typeof MoveToRejectedDialog>["application"];
+type ApplicationLike =
+  React.ComponentProps<typeof MoveToRejectedDialog>["application"];
 
 function makeUuidV4() {
   const cryptoObj = globalThis.crypto as Crypto | undefined;
@@ -51,7 +52,7 @@ function makeUuidV4() {
   }
   buf[6] = (buf[6] & 0x0f) | 0x40;
   buf[8] = (buf[8] & 0x3f) | 0x80;
- const hex = [...buf].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const hex = [...buf].map((b) => b.toString(16).padStart(2, "0")).join("");
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
@@ -68,7 +69,7 @@ export default function RejectedPage() {
   // Delete confirmation dialog target
   const [deleteTarget, setDeleteTarget] = useState<Rejection | null>(null);
 
-  // ✅ Activity log sidebar & data (guest + user)
+  // Activity log sidebar state (guest + user).
   const [activityOpen, setActivityOpen] = useState(false);
   const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
   const [activityMode, setActivityMode] = useState<ActivityStorageMode>("guest");
@@ -76,13 +77,13 @@ export default function RejectedPage() {
   // Rejected filters state
   const [filters, setFilters] = useState<RejectedFilters>(DEFAULT_REJECTED_FILTERS);
 
-  // ✅ Persist activity (guest + user)
+  // Persist activity (guest + user).
   const persistActivity = async (entry: ActivityItem) => {
     const saved = await appendActivityToStorage("rejected", entry, activityMode);
     setActivityItems((prev) => [saved, ...prev].slice(0, 100));
   };
 
-  // ✅ Load rejected + rejected activity (and handle auth switching)
+  // Load rejected + activity, and handle auth switching.
   useEffect(() => {
     let alive = true;
     const supabase = getSupabaseClient();
@@ -111,23 +112,24 @@ export default function RejectedPage() {
     void loadAll();
 
     const { data: sub } = supabase.auth.onAuthStateChange(
-  (event: AuthChangeEvent, session: Session | null) => {
-      if (!alive) return;
+      (event: AuthChangeEvent, session: Session | null) => {
+        if (!alive) return;
 
-      if (event === "SIGNED_IN" && session?.user) {
-        setTimeout(async () => {
-          if (!alive) return;
-          await migrateGuestRejectedToUser();
-          await migrateGuestActivityToUser(); // ✅ migrates rejected activity too
-          await loadAll();
-        }, 0);
-      } else if (event === "SIGNED_OUT") {
-        setTimeout(async () => {
-          if (!alive) return;
-          await loadAll();
-        }, 0);
-      }
-    });
+        if (event === "SIGNED_IN" && session?.user) {
+          setTimeout(async () => {
+            if (!alive) return;
+            await migrateGuestRejectedToUser();
+            await migrateGuestActivityToUser(); // Migrate activity, then reload.
+            await loadAll();
+          }, 0);
+        } else if (event === "SIGNED_OUT") {
+          setTimeout(async () => {
+            if (!alive) return;
+            await loadAll();
+          }, 0);
+        }
+      },
+    );
 
     return () => {
       alive = false;

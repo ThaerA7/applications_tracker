@@ -1,4 +1,3 @@
-// app/components/NotesCard.tsx
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
@@ -95,7 +94,7 @@ function parseTags(raw: string): string[] {
 }
 
 /**
- * ✅ Reusable dialog (kept exported)
+ * Reusable dialog (kept exported)
  */
 export function AddNoteDialog(props: {
   open: boolean;
@@ -289,14 +288,14 @@ export default function NotesOverviewCard() {
   const [isNoteDialogOpen, setIsNoteDialogOpen] = useState(false);
   const [editingNote, setEditingNote] = useState<NoteItem | null>(null);
 
-  // ✅ refs to avoid extra renders + avoid setState after unmount
+  // Refs to avoid extra renders and setState after unmount.
   const aliveRef = useRef(true);
 
-  // ✅ coalesce refresh storms (focus/visibility/events)
+  // Coalesce refresh storms (focus/visibility/events).
   const inFlightRef = useRef(false);
   const queuedRef = useRef(false);
 
-  // ✅ for long press (ref instead of state)
+  // Long-press handling (use a ref instead of state).
   const longPressTimeoutRef = useRef<number | null>(null);
 
   // for mobile double-tap
@@ -462,7 +461,7 @@ export default function NotesOverviewCard() {
     }
   };
 
-  // ✅ mobile: double-tap edits
+  // Mobile: double-tap to edit.
   const handleTouchEnd = (note: NoteItem) => {
     const now = Date.now();
     const delta = now - lastTapRef.current;
@@ -542,14 +541,14 @@ export default function NotesOverviewCard() {
                       "cursor-pointer",
                       COLOR_ACCENT[color],
                     ].join(" ")}
-                    // ✅ hold-press edits (mouse + touch)
+                    // Hold-press to edit (mouse + touch).
                     onMouseDown={() => startLongPress(note)}
                     onMouseUp={cancelLongPress}
                     onMouseLeave={cancelLongPress}
                     onTouchStart={() => startLongPress(note)}
                     onTouchEnd={() => handleTouchEnd(note)}
                     onTouchCancel={cancelLongPress}
-                    // ✅ 2 clicks edits (desktop)
+                    // Double-click to edit (desktop).
                     onDoubleClick={() => {
                       cancelLongPress();
                       openEditDialog(note);

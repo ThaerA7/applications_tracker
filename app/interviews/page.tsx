@@ -1,4 +1,3 @@
-// app/interviews/page.tsx
 "use client";
 
 import {
@@ -52,7 +51,7 @@ import {
   type InterviewsStorageMode,
 } from "@/lib/storage/interviews";
 
-// ✅ NEW: persistent activity storage (guest + Supabase user)
+// Persistent activity storage (guest + Supabase user).
 import {
   loadActivity,
   appendActivity,
@@ -64,8 +63,6 @@ import {
 } from "@/lib/storage/activity";
 import { OfferReceivedJob } from "../offers-received/OffersReceivedCards";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
-
-
 
 type ApplicationLike = ComponentProps<typeof ScheduleInterviewDialog>["application"];
 type MoveDialogApplication = ComponentProps<typeof MoveApplicationDialog>["application"];
@@ -229,17 +226,17 @@ function inferStageFromDate(iso: string | undefined | null): InterviewStage {
 function ensureInterviewStage(interview: Interview | InterviewWithStage): InterviewWithStage {
   const withStage = interview as InterviewWithStage;
 
-  // ✅ keep "done" as a manual state
+  // Keep "done" as a manual state.
   if (withStage.stage === "done") return withStage;
 
-  // ✅ always derive past/upcoming from date (prevents stale stage)
+  // Always derive past/upcoming from date to prevent stale state.
   return {
     ...withStage,
     stage: inferStageFromDate((interview as Interview).date),
   };
 }
 
-// ✅ UUID helper (valid uuid even without crypto.randomUUID)
+// UUID helper (works even without crypto.randomUUID).
 function makeUuidV4() {
   const cryptoObj = globalThis.crypto as Crypto | undefined;
   if (cryptoObj?.randomUUID) return cryptoObj.randomUUID();
@@ -284,7 +281,7 @@ export default function InterviewsPage() {
   const [moveDialogApplication, setMoveDialogApplication] = useState<MoveDialogApplication>(null);
   const [moveTargetInterview, setMoveTargetInterview] = useState<InterviewWithStage | null>(null);
 
-  // ✅ Activity log state (persistent, guest + user)
+  // Activity log state (persistent, guest + user).
   const [activityOpen, setActivityOpen] = useState(false);
   const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
   const [activityMode, setActivityMode] = useState<ActivityStorageMode>("guest");
@@ -319,23 +316,24 @@ export default function InterviewsPage() {
     void loadAll();
 
     const { data: sub } = supabase.auth.onAuthStateChange(
-  (event: AuthChangeEvent, session: Session | null) => {
-      if (!alive) return;
+      (event: AuthChangeEvent, session: Session | null) => {
+        if (!alive) return;
 
-      if (event === "SIGNED_IN" && session?.user) {
-        setTimeout(async () => {
-          if (!alive) return;
-          await migrateGuestInterviewsToUser();
-          await migrateGuestActivityToUser(); // ✅ migrates all variants
-          await loadAll();
-        }, 0);
-      } else if (event === "SIGNED_OUT") {
-        setTimeout(async () => {
-          if (!alive) return;
-          await loadAll();
-        }, 0);
-      }
-    });
+        if (event === "SIGNED_IN" && session?.user) {
+          setTimeout(async () => {
+            if (!alive) return;
+            await migrateGuestInterviewsToUser();
+            await migrateGuestActivityToUser(); // Migrate activity (all variants), then reload.
+            await loadAll();
+          }, 0);
+        } else if (event === "SIGNED_OUT") {
+          setTimeout(async () => {
+            if (!alive) return;
+            await loadAll();
+          }, 0);
+        }
+      },
+    );
 
     return () => {
       alive = false;
@@ -343,7 +341,7 @@ export default function InterviewsPage() {
     };
   }, []);
 
-  // ✅ persistent activity logger
+  // Persistent activity logger.
   const logActivity = async (
     variant: ActivityVariant,
     type: ActivityType,
@@ -568,22 +566,22 @@ export default function InterviewsPage() {
     let newItem: WithdrawnRecord | null = null;
 
     newItem = {
- id: makeUuidV4(),
- company: details.company || source.company,
- role: details.role || source.role,
- location: details.location || source.location,
- appliedOn: details.appliedDate || source.appliedOn,
- employmentType: details.employmentType || source.employmentType,
- contactName: details.contactName || source.contact?.name,
- contactEmail: details.contactEmail || source.contact?.email,
- contactPhone: details.contactPhone || source.contact?.phone,
- url: details.url || source.url,
- logoUrl: details.logoUrl || source.logoUrl,
- interviewDate: source.date,
- interviewType: source.type,
- notes: details.notes || source.notes,
- withdrawnDate: details.withdrawnDate,
- withdrawnReason: details.reason,
+      id: makeUuidV4(),
+      company: details.company || source.company,
+      role: details.role || source.role,
+      location: details.location || source.location,
+      appliedOn: details.appliedDate || source.appliedOn,
+      employmentType: details.employmentType || source.employmentType,
+      contactName: details.contactName || source.contact?.name,
+      contactEmail: details.contactEmail || source.contact?.email,
+      contactPhone: details.contactPhone || source.contact?.phone,
+      url: details.url || source.url,
+      logoUrl: details.logoUrl || source.logoUrl,
+      interviewDate: source.date,
+      interviewType: source.type,
+      notes: details.notes || source.notes,
+      withdrawnDate: details.withdrawnDate,
+      withdrawnReason: details.reason,
     };
     await upsertWithdrawn(newItem as any, await detectWithdrawnMode());
 
@@ -632,51 +630,50 @@ export default function InterviewsPage() {
     }
 
     const newId = makeUuidV4();
-   const offerReceived = details.offerReceivedDate ?? details.decisionDate ?? source.appliedOn;
-   const offerAccepted = details.offerAcceptedDate ?? undefined;
+    const offerReceived =
+      details.offerReceivedDate ?? details.decisionDate ?? source.appliedOn;
+    const offerAccepted = details.offerAcceptedDate ?? undefined;
 
-   const newOffer: OfferReceivedJob = {
-id: newId,
-company: details.company || source.company,
-role: details.role || source.role,
-location: details.location || source.location,
-appliedOn: details.appliedOn || source.appliedOn,
-employmentType: details.employmentType || source.employmentType,
-url: details.url || source.url,
-logoUrl: details.logoUrl || source.logoUrl,
-notes: details.notes || source.notes,
-startDate: details.startDate,
-salary: details.salary,
-offerReceivedDate: offerReceived,
-decisionDate: offerReceived,
-offerAcceptedDate: offerAccepted,
-offerDeclinedDate: undefined,
-taken: Boolean(offerAccepted),
-   };
+    const newOffer: OfferReceivedJob = {
+      id: newId,
+      company: details.company || source.company,
+      role: details.role || source.role,
+      location: details.location || source.location,
+      appliedOn: details.appliedOn || source.appliedOn,
+      employmentType: details.employmentType || source.employmentType,
+      url: details.url || source.url,
+      logoUrl: details.logoUrl || source.logoUrl,
+      notes: details.notes || source.notes,
+      startDate: details.startDate,
+      salary: details.salary,
+      offerReceivedDate: offerReceived,
+      decisionDate: offerReceived,
+      offerAcceptedDate: offerAccepted,
+      offerDeclinedDate: undefined,
+      taken: Boolean(offerAccepted),
+    };
 
-  await upsertOffer(newOffer, await detectOffersMode());
+    await upsertOffer(newOffer, await detectOffersMode());
 
-    // ✅ 1b) Log into Offers activity (persistent) as "OFFER ACCEPTED"
+    // Log into Offers activity (persistent) as "OFFER ACCEPTED".
     // (Offers sidebar reads `type=edited` + `toStatus=accepted`)
-     {
-      await logActivity(
-        "offers" as ActivityVariant,
-        "edited",
-        source,
-        {
-          company: newOffer.company,
-         role: newOffer.role,
-         location: newOffer.location,
-         appliedOn: newOffer.appliedOn,
-          toStatus: "accepted",
-          fromStatus: "Interview",
-          note: newOffer.notes,
-         offerAcceptedDate: newOffer.offerAcceptedDate,
-         offerReceivedDate: newOffer.offerReceivedDate,
-        },
-        newOffer.id
-      );
-    }
+    await logActivity(
+      "offers" as ActivityVariant,
+      "edited",
+      source,
+      {
+        company: newOffer.company,
+        role: newOffer.role,
+        location: newOffer.location,
+        appliedOn: newOffer.appliedOn,
+        toStatus: "accepted",
+        fromStatus: "Interview",
+        note: newOffer.notes,
+        offerAcceptedDate: newOffer.offerAcceptedDate,
+        offerReceivedDate: newOffer.offerReceivedDate,
+      },
+      newOffer.id,
+    );
 
     // 2) Log move in Interviews activity
     await logActivity("interviews", "edited", source, {

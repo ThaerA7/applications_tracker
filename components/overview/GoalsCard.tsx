@@ -1,4 +1,3 @@
-// app/components/GoalsCard.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -10,7 +9,7 @@ import GoalSettingsDialog, {
   type OverviewGoalValues,
 } from "../dialogs/GoalSettingsDialog";
 
-// ✅ Storage (guest: IDB/local mirror, user: Supabase via storage modules)
+// Storage helpers (guest: IndexedDB mirror, user: Supabase via storage modules).
 import { loadInterviews } from "@/lib/storage/interviews";
 import { loadOffers } from "@/lib/storage/offers";
 import { idbGet, idbSet } from "@/lib/storage/indexedDb";

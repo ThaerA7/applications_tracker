@@ -1,4 +1,3 @@
-// lib/storage/wishlist.ts
 "use client";
 
 import { getSupabaseClient } from "@/lib/supabase/client";
@@ -6,8 +5,8 @@ import { idbGet, idbSet, idbDel } from "./indexedDb";
 import { getModeCached } from "../supabase/sessionCache";
 
 export type WishlistItem = {
-  id: string; // ✅ UUID for Supabase
-  sourceKey?: string; // ✅ stable key (jobIdentity/detailUrl/hashId) for toggling stars
+  id: string; // UUID for Supabase.
+  sourceKey?: string; // Stable key (jobIdentity/detailUrl/hashId) for toggling stars.
   company: string;
   role?: string;
   location?: string;
@@ -24,7 +23,7 @@ export type WishlistStorageMode = "guest" | "user";
 const BUCKET = "wishlist";
 const TABLE = "applications";
 
-// ✅ IndexedDB-only guest key
+// IndexedDB-only guest key.
 const GUEST_IDB_KEY = "wishlist-v1";
 
 // sidebar refresh event (same pattern as offers)
@@ -66,8 +65,8 @@ function safeParseList(raw: any): WishlistItem[] {
 }
 
 /**
- * ✅ Normalizes old local items that used non-UUID ids (e.g. jobIdentity strings)
- * - If id is not UUID: move it into sourceKey, generate uuid id.
+ * Normalizes old local items that used non-UUID ids (e.g. jobIdentity strings).
+ * If id is not UUID, preserve it in `sourceKey` and generate a new UUID.
  */
 function normalizeWishlist(list: WishlistItem[]) {
   let changed = false;

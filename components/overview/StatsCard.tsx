@@ -1,4 +1,3 @@
-// components/overview/StatsCard.tsx
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -17,7 +16,7 @@ import { CalendarDays, Clock, ListChecks, Plus, TrendingUp } from "lucide-react"
 
 import { AddNoteDialog } from "@/components/overview/NotesCard";
 
-// ✅ Dialogs
+// Dialogs
 import AddApplicationDialog, {
   type NewApplicationForm,
 } from "@/components/dialogs/AddApplicationDialog";
@@ -34,7 +33,7 @@ import MoveToAcceptedDialog, {
   type AcceptedDetails,
 } from "@/components/dialogs/MoveToAcceptedDialog";
 
-// ✅ Storage
+// Storage
 import { getSupabaseClient } from "@/lib/supabase/client";
 
 import {
@@ -78,7 +77,7 @@ import {
   type NotesStorageMode,
 } from "@/lib/storage/notes";
 
-// ✅ Activity (this is what RecentActivityCard reads)
+// Activity (used by RecentActivityCard)
 import {
   loadActivity,
   appendActivity,
@@ -368,7 +367,7 @@ function countAppliedInRange(
   return count;
 }
 
-// ✅ UUID helper (valid uuid even without crypto.randomUUID)
+// UUID helper (works even without crypto.randomUUID)
 function makeUuidV4() {
   const cryptoObj = globalThis.crypto as Crypto | undefined;
   if (cryptoObj?.randomUUID) return cryptoObj.randomUUID();
@@ -401,7 +400,7 @@ export default function StatsCard() {
   const [withdrawn, setWithdrawn] = useState<AnyRecord[]>([]);
   const [offers, setOffers] = useState<OfferReceivedJobLike[]>([]);
 
-  // ✅ Quick-add dialog state
+  // Quick-add dialog state
   const [openAddApp, setOpenAddApp] = useState(false);
   const [openAddInterview, setOpenAddInterview] = useState(false);
   const [openAddRejected, setOpenAddRejected] = useState(false);
@@ -414,7 +413,7 @@ export default function StatsCard() {
 
   const [now, setNow] = useState(() => new Date());
 
-  // ✅ avoid setState after unmount + coalesce refresh storms
+  // Avoid setState after unmount and coalesce refresh storms
   const aliveRef = useRef(true);
   const inFlightRef = useRef(false);
   const queuedRef = useRef(false);
@@ -616,7 +615,7 @@ export default function StatsCard() {
   }, [now, applied, interviews, rejected, withdrawn, offers]);
 
   // =========================
-  // ✅ QUICK ADD (persist + activity log)
+  // Quick add (persist + activity log)
   // =========================
 
   const handleQuickSaveApplication = async (data: NewApplicationForm) => {
@@ -1066,7 +1065,7 @@ export default function StatsCard() {
         </div>
       </section>
 
-      {/* ✅ QUICK ADD DIALOGS */}
+      {/* Quick add dialogs */}
       <AddApplicationDialog
         open={openAddApp}
         onClose={() => setOpenAddApp(false)}

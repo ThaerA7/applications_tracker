@@ -1,4 +1,3 @@
-// lib/storage/notes.ts
 "use client";
 
 import { getSupabaseClient } from "@/lib/supabase/client";
@@ -32,7 +31,7 @@ export type Note = StoredNote;
 
 export type NotesStorageMode = "guest" | "user";
 
-// ✅ IndexedDB-only guest key
+// IndexedDB-only guest key.
 const GUEST_IDB_KEY = "notes";
 
 const TABLE = "applications";

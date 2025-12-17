@@ -23,7 +23,7 @@ export type RejectionType =
   | "after-second-interview";
 
 export type RejectionDetails = {
-  // ✅ kept for compatibility (we now derive it from rejectionType)
+  // Kept for compatibility (derived from rejectionType).
   reason: string;
 
   company: string;
@@ -235,7 +235,7 @@ export default function MoveToRejectedDialog({
       role,
       decisionDate,
       rejectionType: form.rejectionType,
-      reason: labelForRejectionType(form.rejectionType), // ✅ ensures `reason` is always present
+      reason: labelForRejectionType(form.rejectionType), // Always populate `reason` for compatibility.
       logoUrl: application?.logoUrl,
     };
 

@@ -1,4 +1,3 @@
-// lib/storage/activity.ts
 "use client";
 
 import { getSupabaseClient } from "@/lib/supabase/client";

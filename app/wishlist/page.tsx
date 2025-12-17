@@ -1,4 +1,3 @@
-// app/wishlist/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState, useRef, FormEvent } from "react";
@@ -229,7 +228,7 @@ function AddWishlistItemDialog({ open, onClose, onSave }: AddDialogProps) {
       setForm((f) => ({ ...f, [field]: value }));
     };
 
-  // ✅ Persistable logo: read as Data URL (base64)
+  // Persist logo as a Data URL (base64) for local storage.
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
 
