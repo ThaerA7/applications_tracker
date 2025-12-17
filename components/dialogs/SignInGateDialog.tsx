@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import {
   UserRound,
   ShieldCheck,
-  Sparkles,
   Cloud,
   CheckCircle2,
 } from "lucide-react";
