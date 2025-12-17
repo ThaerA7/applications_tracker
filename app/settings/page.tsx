@@ -187,7 +187,7 @@ export default function SettingsPage() {
           "border-emerald-200 bg-emerald-50 text-emerald-800 shadow-[0_1px_2px_rgba(16,185,129,0.18)]",
       }
     : {
-        text: "Guest mode",
+        text: "Guest mode only",
         className:
           "border-amber-200 bg-amber-50 text-amber-800 shadow-[0_1px_2px_rgba(251,191,36,0.18)]",
       };
@@ -203,33 +203,29 @@ export default function SettingsPage() {
       <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-neutral-400/15 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-slate-400/15 blur-3xl" />
 
-      <div className="relative flex items-center gap-3">
-        <Image
-          src="/icons/settings.png"
-          alt=""
-          width={37}
-          height={37}
-          aria-hidden="true"
-          className="shrink-0 -mt-1"
-        />
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold text-neutral-900">
-              Settings
-            </h1>
-            <span
-              className={[
-                "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold",
-                badge.className,
-              ].join(" ")}
-            >
-              {badge.text}
-            </span>
-          </div>
-          <p className="text-neutral-700">
-            Personalize the tracker, manage sync, and tune notifications.
-          </p>
+      <div className="relative">
+        <div className="flex items-center gap-2">
+          <Image
+            src="/icons/settings.png"
+            alt=""
+            width={37}
+            height={37}
+            aria-hidden="true"
+            className="shrink-0"
+          />
+          <h1 className="text-2xl font-semibold text-neutral-900">Settings</h1>
+          <span
+            className={[
+              "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold",
+              badge.className,
+            ].join(" ")}
+          >
+            {badge.text}
+          </span>
         </div>
+        <p className="text-neutral-700 mt-2">
+          Personalize the tracker, manage sync, and tune notifications.
+        </p>
       </div>
 
       <div className="relative mt-6 grid gap-4 lg:grid-cols-[1.25fr_1fr]">

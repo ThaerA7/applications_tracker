@@ -416,7 +416,7 @@ export default function CalendarPage() {
                   Activity calendar
                 </h1>
               </div>
-              <p className="mt-1 text-sm text-neutral-700">
+              <p className="mt-1 text-neutral-700">
                 See when you applied, interviewed, got responses, or withdrew —
                 all in one clean view.
               </p>
