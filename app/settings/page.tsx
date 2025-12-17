@@ -19,6 +19,15 @@ import {
 
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { getModeCached } from "@/lib/supabase/sessionCache";
+import { loadApplied, upsertApplied } from "@/lib/storage/applied";
+import { loadInterviews, upsertInterview } from "@/lib/storage/interviews";
+import { loadNotes, upsertNote } from "@/lib/storage/notes";
+import { loadOffers, upsertOffer } from "@/lib/storage/offers";
+import { loadRejected, upsertRejected } from "@/lib/storage/rejected";
+import { loadWishlist, upsertWishlistItem } from "@/lib/storage/wishlist";
+import { loadWithdrawn, upsertWithdrawn } from "@/lib/storage/withdrawn";
+import { loadActivity, appendActivity } from "@/lib/storage/activity";
+import ImportConfirmDialog from "@/components/dialogs/ImportConfirmDialog";
 
 type Preferences = {
   reminders: boolean;
@@ -165,26 +174,239 @@ export default function SettingsPage() {
 
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
+  const [importPreview, setImportPreview] = useState<any | null>(null);
+  const [importSummary, setImportSummary] = useState<Record<string, number> | null>(null);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+
   const handleImportClick = useCallback(() => {
     importInputRef.current?.click();
+  }, []);
+
+  const handleExport = useCallback(async () => {
+    try {
+      const [appliedRes, interviewsRes, notesRes, offersRes, rejectedRes, wishlistRes, withdrawnRes] = await Promise.all([
+        loadApplied(),
+        loadInterviews(),
+        loadNotes(),
+        loadOffers(),
+        loadRejected(),
+        loadWishlist(),
+        loadWithdrawn(),
+      ]);
+
+      const activityVariants: Array<any> = ["applied", "interviews", "rejected", "withdrawn", "offers"];
+      const activity: Record<string, any[]> = {};
+      for (const v of activityVariants) {
+        const r = await loadActivity(v as any);
+        activity[v] = r.items;
+      }
+
+      const payload = {
+        meta: { exportedAt: new Date().toISOString(), source: "job-tracker" },
+        applied: appliedRes.items,
+        interviews: interviewsRes.items,
+        notes: notesRes.items,
+        offers: offersRes.items,
+        rejected: rejectedRes.items,
+        wishlist: wishlistRes.items,
+        withdrawn: withdrawnRes.items,
+        activity,
+      };
+
+      const text = JSON.stringify(payload, null, 2);
+      const blob = new Blob([text], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `job-tracker-backup-${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert("Export failed: " + (err?.message ?? String(err)));
+    }
   }, []);
 
   const handleImportFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     try {
       const text = await file.text();
       const json = JSON.parse(text);
-      // Basic feedback; importing logic should be implemented where appropriate
-      if (Array.isArray(json)) {
-        alert(`Imported ${json.length} items (preview).`);
-      } else {
-        alert("Imported data (preview).");
+      if (!json || typeof json !== "object") {
+        alert("Invalid backup file");
+        return;
       }
+
+      const summary: Record<string, number | string> = {};
+      let total = 0;
+      const keys = [
+        "applied",
+        "interviews",
+        "notes",
+        "offers",
+        "rejected",
+        "wishlist",
+        "withdrawn",
+      ];
+      for (const k of keys) {
+        if (Array.isArray(json[k])) {
+          summary[k] = json[k].length;
+          total += json[k].length;
+        }
+      }
+
+      if (json.activity && typeof json.activity === "object") {
+        let actTotal = 0;
+        for (const v of Object.keys(json.activity)) {
+          if (Array.isArray(json.activity[v])) {
+            actTotal += json.activity[v].length;
+          }
+        }
+        if (actTotal > 0) {
+          summary.activity = actTotal;
+          total += actTotal;
+        }
+      }
+
+      summary.total = total;
+      summary.fileName = file.name;
+
+      setImportPreview(json);
+      setImportSummary(summary as any);
+      setImportDialogOpen(true);
+    } catch (err: any) {
+      alert("Import failed: " + (err?.message ?? String(err)));
+      if (importInputRef.current) importInputRef.current.value = "";
+    }
+  }, []);
+
+  const performImport = useCallback(async (json: any | null) => {
+    if (!json) return;
+
+    function isEqual(a: any, b: any) {
+      try {
+        return JSON.stringify(a) === JSON.stringify(b);
+      } catch {
+        return false;
+      }
+    }
+
+    function makeId() {
+      try {
+        return (globalThis.crypto as Crypto & { randomUUID?: () => string })?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      } catch {
+        return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      }
+    }
+
+    try {
+      const tasks: Promise<any>[] = [];
+      let added = 0;
+
+      if (Array.isArray(json.applied)) {
+        const { mode, items: existing } = await loadApplied();
+        for (const it of json.applied) {
+          if (existing.some((x) => isEqual(x, it))) continue;
+          const collision = existing.some((x) => x.id === it.id);
+          const toInsert = collision ? { ...it, id: makeId() } : it;
+          tasks.push(upsertApplied(toInsert, mode));
+          added++;
+        }
+      }
+
+      if (Array.isArray(json.interviews)) {
+        const { mode, items: existing } = await loadInterviews();
+        for (const it of json.interviews) {
+          if (existing.some((x) => isEqual(x, it))) continue;
+          const collision = existing.some((x) => x.id === it.id);
+          const toInsert = collision ? { ...it, id: makeId() } : it;
+          tasks.push(upsertInterview(toInsert, mode));
+          added++;
+        }
+      }
+
+      if (Array.isArray(json.notes)) {
+        const { mode, items: existing } = await loadNotes();
+        for (const it of json.notes) {
+          if (existing.some((x) => isEqual(x, it))) continue;
+          const collision = existing.some((x) => x.id === it.id);
+          const toInsert = collision ? { ...it, id: makeId() } : it;
+          tasks.push(upsertNote(toInsert, mode));
+          added++;
+        }
+      }
+
+      if (Array.isArray(json.offers)) {
+        const { mode, items: existing } = await loadOffers();
+        for (const it of json.offers) {
+          if (existing.some((x) => isEqual(x, it))) continue;
+          const collision = existing.some((x) => x.id === it.id);
+          const toInsert = collision ? { ...it, id: makeId() } : it;
+          tasks.push(upsertOffer(toInsert, mode));
+          added++;
+        }
+      }
+
+      if (Array.isArray(json.rejected)) {
+        const { mode, items: existing } = await loadRejected();
+        for (const it of json.rejected) {
+          if (existing.some((x) => isEqual(x, it))) continue;
+          const collision = existing.some((x) => x.id === it.id);
+          const toInsert = collision ? { ...it, id: makeId() } : it;
+          tasks.push(upsertRejected(toInsert, mode));
+          added++;
+        }
+      }
+
+      if (Array.isArray(json.wishlist)) {
+        const { mode, items: existing } = await loadWishlist();
+        for (const it of json.wishlist) {
+          if (existing.some((x) => isEqual(x, it))) continue;
+          const collision = existing.some((x) => x.id === it.id);
+          const toInsert = collision ? { ...it, id: makeId() } : it;
+          tasks.push(upsertWishlistItem(toInsert, mode));
+          added++;
+        }
+      }
+
+      if (Array.isArray(json.withdrawn)) {
+        const { mode, items: existing } = await loadWithdrawn();
+        for (const it of json.withdrawn) {
+          if (existing.some((x) => isEqual(x, it))) continue;
+          const collision = existing.some((x) => x.id === it.id);
+          const toInsert = collision ? { ...it, id: makeId() } : it;
+          tasks.push(upsertWithdrawn(toInsert, mode));
+          added++;
+        }
+      }
+
+      if (json.activity && typeof json.activity === "object") {
+        const variants = ["applied", "interviews", "rejected", "withdrawn", "offers"];
+        for (const v of variants) {
+          const arr = json.activity[v];
+          if (!Array.isArray(arr)) continue;
+          const { mode, items: existing } = await loadActivity(v as any);
+          for (const it of arr) {
+            if (existing.some((x) => isEqual(x, it))) continue;
+            const collision = existing.some((x) => x.id === it.id);
+            const toInsert = collision ? { ...it, id: makeId() } : it;
+            tasks.push(appendActivity(v as any, toInsert, mode));
+            added++;
+          }
+        }
+      }
+
+      await Promise.all(tasks);
+      alert(`Import finished — added ${added} new items.`);
     } catch (err: any) {
       alert("Import failed: " + (err?.message ?? String(err)));
     } finally {
-      // reset input so same file can be picked again
+      setImportPreview(null);
+      setImportSummary(null);
+      setImportDialogOpen(false);
       if (importInputRef.current) importInputRef.current.value = "";
     }
   }, []);
@@ -450,10 +672,7 @@ export default function SettingsPage() {
                     <button
                       type="button"
                       className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-sm font-medium text-neutral-800 shadow-sm hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300"
-                      onClick={() => {
-                        // placeholder action to reinforce UX without wiring a backend call
-                        alert("Export coming soon. For now, data stays local or in your account.");
-                      }}
+                      onClick={handleExport}
                     >
                       <Download className="h-4 w-4" aria-hidden="true" />
                       Export
@@ -509,6 +728,14 @@ export default function SettingsPage() {
           </article>
         </div>
       </div>
+      {importDialogOpen && (
+        <ImportConfirmDialog
+          open={importDialogOpen}
+          onClose={() => setImportDialogOpen(false)}
+          onConfirm={() => performImport(importPreview)}
+          summary={importSummary as any}
+        />
+      )}
     </section>
   );
 }
