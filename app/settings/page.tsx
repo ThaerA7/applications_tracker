@@ -177,8 +177,13 @@ export default function SettingsPage() {
   const [importPreview, setImportPreview] = useState<any | null>(null);
   const [importSummary, setImportSummary] = useState<Record<string, number> | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importResult, setImportResult] = useState<
+    | { type: "success" | "error"; message: string }
+    | null
+  >(null);
 
   const handleImportClick = useCallback(() => {
+    setImportResult(null);
     importInputRef.current?.click();
   }, []);
 
@@ -231,6 +236,7 @@ export default function SettingsPage() {
   const handleImportFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setImportResult(null);
 
     try {
       const text = await file.text();
@@ -400,9 +406,15 @@ export default function SettingsPage() {
       }
 
       await Promise.all(tasks);
-      alert(`Import finished — added ${added} new items.`);
+      setImportResult({
+        type: "success",
+        message: `Import finished — added ${added} new items.`,
+      });
     } catch (err: any) {
-      alert("Import failed: " + (err?.message ?? String(err)));
+      setImportResult({
+        type: "error",
+        message: "Import failed: " + (err?.message ?? String(err)),
+      });
     } finally {
       setImportPreview(null);
       setImportSummary(null);
@@ -643,6 +655,18 @@ export default function SettingsPage() {
                   <div>
                     <p className="text-sm font-semibold text-neutral-900">Import copy</p>
                     <p className="text-xs text-neutral-600">Upload a JSON backup to restore lists into this browser.</p>
+                    {importResult && (
+                      <p
+                        className={[
+                          "mt-2 text-xs",
+                          importResult.type === "success"
+                            ? "text-emerald-700"
+                            : "text-rose-600",
+                        ].join(" ")}
+                      >
+                        {importResult.message}
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <input
