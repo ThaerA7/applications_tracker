@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import type { Session, AuthChangeEvent } from "@supabase/supabase-js";
 import {
+  AlertTriangle,
   Bell,
   CheckCircle2,
   Cloud,
@@ -28,6 +29,9 @@ import { loadWishlist, upsertWishlistItem } from "@/lib/storage/wishlist";
 import { loadWithdrawn, upsertWithdrawn } from "@/lib/storage/withdrawn";
 import { loadActivity, appendActivity } from "@/lib/storage/activity";
 import ImportConfirmDialog from "@/components/dialogs/ImportConfirmDialog";
+import DeleteAllDataConfirmDialog from "@/components/dialogs/DeleteAllDataConfirmDialog";
+import DeleteAccountConfirmDialog from "@/components/dialogs/DeleteAccountConfirmDialog";
+import { clearAllData, clearAllLocalData } from "@/lib/storage/purge";
 
 type Preferences = {
   reminders: boolean;
@@ -178,6 +182,14 @@ export default function SettingsPage() {
   const [importSummary, setImportSummary] = useState<Record<string, number> | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importResult, setImportResult] = useState<
+    | { type: "success" | "error"; message: string }
+    | null
+  >(null);
+
+  const [deleteDataDialogOpen, setDeleteDataDialogOpen] = useState(false);
+  const [deleteAccountDialogOpen, setDeleteAccountDialogOpen] = useState(false);
+  const [dangerBusy, setDangerBusy] = useState(false);
+  const [dangerResult, setDangerResult] = useState<
     | { type: "success" | "error"; message: string }
     | null
   >(null);
@@ -440,6 +452,74 @@ export default function SettingsPage() {
     }
   }, [authBusy, router, signedIn]);
 
+  const handleDeleteAllData = useCallback(async () => {
+    if (dangerBusy) return;
+    setDangerBusy(true);
+    setDangerResult(null);
+
+    try {
+      await clearAllData(storageMode);
+      setDangerResult({
+        type: "success",
+        message:
+          storageMode === "user"
+            ? "All your data was deleted from this device and from sync."
+            : "All your local data was deleted from this browser.",
+      });
+      router.refresh();
+    } catch (err: any) {
+      setDangerResult({
+        type: "error",
+        message: err?.message ? `Delete failed: ${err.message}` : "Delete failed.",
+      });
+    } finally {
+      setDeleteDataDialogOpen(false);
+      setDangerBusy(false);
+    }
+  }, [dangerBusy, router, storageMode]);
+
+  const handleDeleteAccount = useCallback(async () => {
+    if (dangerBusy || !signedIn) return;
+    setDangerBusy(true);
+    setDangerResult(null);
+
+    try {
+      const res = await fetch("/api/account/delete", { method: "POST" });
+      const payload = await res.json().catch(() => null);
+
+      if (!res.ok || !payload?.ok) {
+        const msg = payload?.error ? String(payload.error) : `Request failed (${res.status})`;
+        throw new Error(msg);
+      }
+
+      // Remove local caches/preferences after account deletion
+      await clearAllLocalData();
+
+      // Best-effort sign out (session may already be invalid)
+      try {
+        const supabase = getSupabaseClient();
+        await supabase.auth.signOut();
+      } catch {
+        // ignore
+      }
+
+      setDangerResult({
+        type: "success",
+        message: "Account deleted successfully.",
+      });
+
+      router.refresh();
+    } catch (err: any) {
+      setDangerResult({
+        type: "error",
+        message: err?.message ? `Delete failed: ${err.message}` : "Delete failed.",
+      });
+    } finally {
+      setDeleteAccountDialogOpen(false);
+      setDangerBusy(false);
+    }
+  }, [dangerBusy, router, signedIn]);
+
   const badge = signedIn
     ? {
         text: "Synced",
@@ -529,20 +609,40 @@ export default function SettingsPage() {
                   </button>
                 )}
                 {signedIn && (
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    disabled={authBusy}
-                    className={[
-                      "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold shadow-sm transition",
-                      "border-rose-200 bg-white text-rose-700 hover:bg-rose-50",
-                      "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-rose-300",
-                      authBusy ? "opacity-70" : "",
-                    ].join(" ")}
-                  >
-                    <LogOut className="h-4 w-4" aria-hidden="true" />
-                    {authBusy ? "Signing out…" : "Sign out"}
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDangerResult(null);
+                        setDeleteAccountDialogOpen(true);
+                      }}
+                      disabled={authBusy || dangerBusy}
+                      className={[
+                        "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold shadow-sm transition",
+                        "border-rose-700 bg-rose-600 text-white hover:bg-rose-500",
+                        "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-rose-300",
+                        authBusy || dangerBusy ? "opacity-70" : "",
+                      ].join(" ")}
+                    >
+                      <AlertTriangle className="h-4 w-4 text-white" aria-hidden="true" />
+                      Delete account
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      disabled={authBusy || dangerBusy}
+                      className={[
+                        "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold shadow-sm transition",
+                        "border-neutral-200 bg-white text-neutral-800 hover:bg-neutral-50",
+                        "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300",
+                        authBusy || dangerBusy ? "opacity-70" : "",
+                      ].join(" ")}
+                    >
+                      <LogOut className="h-4 w-4" aria-hidden="true" />
+                      {authBusy ? "Signing out…" : "Sign out"}
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -628,7 +728,7 @@ export default function SettingsPage() {
               </div>
               <div className="flex items-center gap-3">
                 <div className="text-sm font-semibold text-neutral-700">
-                  {storageMode === "user" ? "Cloud + local" : "Mode: Local only"}
+                  {storageMode === "user" ? "Cloud" : "Mode: Local only"}
                 </div>
                 <Database className="h-5 w-5 text-neutral-400" aria-hidden="true" />
               </div>
@@ -683,6 +783,45 @@ export default function SettingsPage() {
                     >
                       <Cloud className="h-4 w-4" aria-hidden="true" />
                       Import
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-start justify-between gap-3 rounded-lg border border-dashed border-rose-200 bg-white/60 p-3">
+                  <div>
+                    <p className="text-sm font-semibold text-neutral-900">Delete all data</p>
+                    <p className="text-xs text-neutral-600">
+                      Permanently remove all your lists and activity {storageMode === "user" ? "(local + sync)" : "from this browser"}.
+                    </p>
+                    {dangerResult && (
+                      <p
+                        className={[
+                          "mt-2 text-xs",
+                          dangerResult.type === "success"
+                            ? "text-emerald-700"
+                            : "text-rose-600",
+                        ].join(" ")}
+                      >
+                        {dangerResult.message}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDangerResult(null);
+                        setDeleteDataDialogOpen(true);
+                      }}
+                      disabled={dangerBusy}
+                      className={[
+                        "inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-sm font-medium text-rose-700 shadow-sm hover:bg-rose-50",
+                        "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-rose-300",
+                        dangerBusy ? "opacity-70" : "",
+                      ].join(" ")}
+                    >
+                      <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+                      Delete
                     </button>
                   </div>
                 </div>
@@ -760,6 +899,21 @@ export default function SettingsPage() {
           summary={importSummary as any}
         />
       )}
+
+      <DeleteAllDataConfirmDialog
+        open={deleteDataDialogOpen}
+        onClose={() => setDeleteDataDialogOpen(false)}
+        onConfirm={handleDeleteAllData}
+        busy={dangerBusy}
+        modeLabel={storageMode === "user" ? "account" : "browser"}
+      />
+
+      <DeleteAccountConfirmDialog
+        open={deleteAccountDialogOpen}
+        onClose={() => setDeleteAccountDialogOpen(false)}
+        onConfirm={handleDeleteAccount}
+        busy={dangerBusy}
+      />
     </section>
   );
 }
