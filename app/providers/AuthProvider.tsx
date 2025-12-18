@@ -3,6 +3,14 @@
 import { useEffect } from "react";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { setCachedSession } from "@/lib/supabase/sessionCache";
+import { migrateGuestAppliedToUser } from "@/lib/storage/applied";
+import { migrateGuestInterviewsToUser } from "@/lib/storage/interviews";
+import { migrateGuestRejectedToUser } from "@/lib/storage/rejected";
+import { migrateGuestWithdrawnToUser } from "@/lib/storage/withdrawn";
+import { migrateGuestOffersToUser } from "@/lib/storage/offers";
+import { migrateGuestWishlistToUser } from "@/lib/storage/wishlist";
+import { migrateGuestNotesToUser } from "@/lib/storage/notes";
+import { migrateGuestActivityToUser } from "@/lib/storage/activity";
 
 const COUNTS_EVENT = "job-tracker:refresh-counts";
 const NOTES_EVENT = "job-tracker:refresh-notes";
@@ -12,19 +20,78 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     const supabase = getSupabaseClient();
 
-    supabase.auth.getSession().then(({ data }) => {
-      setCachedSession(data.session ?? null);
-      window.dispatchEvent(new Event(COUNTS_EVENT));
-    });
+    let disposed = false;
+    let migrateInFlight = false;
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_evt, session) => {
-      setCachedSession(session);
+    const dispatchRefreshEvents = () => {
       window.dispatchEvent(new Event(COUNTS_EVENT));
       window.dispatchEvent(new Event(NOTES_EVENT));
       window.dispatchEvent(new Event(ACTIVITY_EVENT));
+    };
+
+    const migrateGuestDataIfNeeded = async () => {
+      if (migrateInFlight) return;
+      migrateInFlight = true;
+      try {
+        // Merge guest data into cloud (does not delete cloud data).
+        // Individual migrations are defensive and no-op when guest storage is empty.
+        await Promise.allSettled([
+          migrateGuestAppliedToUser(),
+          migrateGuestInterviewsToUser(),
+          migrateGuestRejectedToUser(),
+          migrateGuestWithdrawnToUser(),
+          migrateGuestOffersToUser(),
+          migrateGuestWishlistToUser(),
+          migrateGuestNotesToUser(),
+        ]);
+
+        // Activity migration touches multiple variants; keep it separate.
+        await migrateGuestActivityToUser();
+      } finally {
+        migrateInFlight = false;
+      }
+    };
+
+    supabase.auth.getSession().then(({ data }) => {
+      const session = data.session ?? null;
+      setCachedSession(session);
+
+      // If the app boots already signed-in, we still want to merge any guest data
+      // created before login into the cloud account.
+      if (session?.user) {
+        setTimeout(() => {
+          void (async () => {
+            if (disposed) return;
+            await migrateGuestDataIfNeeded();
+            if (!disposed) dispatchRefreshEvents();
+          })();
+        }, 0);
+      } else {
+        dispatchRefreshEvents();
+      }
     });
 
-    return () => sub?.subscription?.unsubscribe();
+    const { data: sub } = supabase.auth.onAuthStateChange((evt, session) => {
+      setCachedSession(session);
+
+      if (evt === "SIGNED_IN" && session?.user) {
+        setTimeout(() => {
+          void (async () => {
+            if (disposed) return;
+            await migrateGuestDataIfNeeded();
+            if (!disposed) dispatchRefreshEvents();
+          })();
+        }, 0);
+        return;
+      }
+
+      dispatchRefreshEvents();
+    });
+
+    return () => {
+      disposed = true;
+      sub?.subscription?.unsubscribe();
+    };
   }, []);
 
   return <>{children}</>;
