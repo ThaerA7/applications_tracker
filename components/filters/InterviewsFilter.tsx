@@ -83,10 +83,10 @@ export function getActiveFilterCount(filters: InterviewFilters): number {
 // Minimal shape the filter logic expects
 export type FilterableInterviewContact =
   | {
-      name?: string | null;
-      email?: string | null;
-      phone?: string | null;
-    }
+    name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+  }
   | null
   | undefined;
 
@@ -189,9 +189,8 @@ function summarizeSelection(
   if (values.length === 1) return getLabel(values[0]);
   if (values.length === 2)
     return `${getLabel(values[0])}, ${getLabel(values[1])}`;
-  return `${getLabel(values[0])}, ${getLabel(values[1])} +${
-    values.length - 2
-  }`;
+  return `${getLabel(values[0])}, ${getLabel(values[1])} +${values.length - 2
+    }`;
 }
 
 function formatInterviewTypeLabel(value: string) {
@@ -252,7 +251,7 @@ export function filterInterviews<T extends FilterableInterview>(
   }
 
   // Boolean toggles
- if (filters.hasNotes) {
+  if (filters.hasNotes) {
     list = list.filter((i) => !!(i.notes && i.notes.trim().length > 0));
   }
   if (filters.hasContact) {
@@ -653,7 +652,7 @@ export default function InterviewsFilter({
   );
 
   const clearFilters = useCallback(
-    () => setFilters((f) => ({ ...DEFAULT_INTERVIEW_FILTERS })),
+    () => setFilters(() => ({ ...DEFAULT_INTERVIEW_FILTERS })),
     [setFilters]
   );
 

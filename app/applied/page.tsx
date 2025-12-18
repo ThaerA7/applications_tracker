@@ -18,12 +18,12 @@ import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 
 import { getSupabaseClient } from '@/lib/supabase/client';
 import {
-   loadApplied,
-   upsertApplied,
-   deleteApplied,
-   migrateGuestAppliedToUser,
-   type AppliedStorageMode,
- } from '@/lib/storage/applied';
+  loadApplied,
+  upsertApplied,
+  deleteApplied,
+  migrateGuestAppliedToUser,
+  type AppliedStorageMode,
+} from '@/lib/storage/applied';
 import {
   upsertInterview,
   detectInterviewsMode,
@@ -95,7 +95,7 @@ function statusClasses(status: string) {
 
 // Helper to convert full Application -> dialog form data
 function appToForm(app: Application): NewApplicationForm {
-  const { id, website, ...rest } = app;
+  const { ...rest } = app;
   return rest;
 }
 

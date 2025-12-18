@@ -7,7 +7,6 @@ import {
   Clock,
   MapPin,
   Phone,
-  Video,
   User2,
   Mail,
   Link as LinkIcon,
@@ -185,22 +184,22 @@ export default function ScheduleInterviewDialog({
     effectiveMode === "edit"
       ? "Edit interview"
       : effectiveMode === "add"
-      ? "Add interview"
-      : "Schedule interview";
+        ? "Add interview"
+        : "Schedule interview";
 
   const description =
     effectiveMode === "edit"
       ? "Update the interview details and save your changes."
       : effectiveMode === "add"
-      ? "Fill in the details to add a new interview."
-      : "Confirm the details before moving this application to the interviews section.";
+        ? "Fill in the details to add a new interview."
+        : "Confirm the details before moving this application to the interviews section.";
 
   const submitLabel =
     effectiveMode === "edit"
       ? "Save changes"
       : effectiveMode === "add"
-      ? "Add interview"
-      : "Save & move to interviews";
+        ? "Add interview"
+        : "Save & move to interviews";
 
   // Reset form whenever dialog opens or application changes
   useEffect(() => {
@@ -248,12 +247,12 @@ export default function ScheduleInterviewDialog({
 
   const handleChange =
     (field: keyof FormState) =>
-    (
-      e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
-    ) => {
-      const { value } = e.target;
-      setForm((prev) => ({ ...prev, [field]: value }));
-    };
+      (
+        e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+      ) => {
+        const { value } = e.target;
+        setForm((prev) => ({ ...prev, [field]: value }));
+      };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -277,8 +276,8 @@ export default function ScheduleInterviewDialog({
       effectiveMode === "edit" && application?.id
         ? application.id
         : typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}`;
+          ? crypto.randomUUID()
+          : `${Date.now()}`;
 
     const interview: Interview = {
       id,
@@ -288,10 +287,10 @@ export default function ScheduleInterviewDialog({
       contact:
         contactName || contactEmail || contactPhone
           ? {
-              name: contactName || undefined,
-              email: contactEmail || undefined,
-              phone: contactPhone || undefined,
-            }
+            name: contactName || undefined,
+            email: contactEmail || undefined,
+            phone: contactPhone || undefined,
+          }
           : undefined,
       date: iso,
       type: form.type,

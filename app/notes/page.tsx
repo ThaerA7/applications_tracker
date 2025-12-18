@@ -120,7 +120,7 @@ function makeId(): string {
     if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
       return crypto.randomUUID();
     }
-  } catch {}
+  } catch { }
   return `note-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
@@ -151,7 +151,7 @@ export default function NotesPage() {
 
     (async () => {
       try {
-        await migrateGuestNotesToUser().catch(() => {});
+        await migrateGuestNotesToUser().catch(() => { });
         const res = await loadNotes();
         if (!alive) return;
         setMode(res.mode);
@@ -175,7 +175,7 @@ export default function NotesPage() {
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
 
-    let res = notes.filter((n) => {
+    const res = notes.filter((n) => {
       const title = (n.title ?? "").toLowerCase();
       const content = (n.content ?? "").toLowerCase();
       const tags = (n.tags ?? []).map((t: string) => t.toLowerCase());
@@ -728,13 +728,11 @@ export default function NotesPage() {
                         onClick={() => setDraftColor(c)}
                         aria-label={`Set note color: ${c}`}
                         aria-pressed={selected}
-                        className={`h-7 w-7 rounded-full border transition ${
-                          selected ? `ring-2 ${COLOR_STYLES[c].ring}` : "ring-0"
-                        } ${
-                          c === "yellow" || c === "gray"
+                        className={`h-7 w-7 rounded-full border transition ${selected ? `ring-2 ${COLOR_STYLES[c].ring}` : "ring-0"
+                          } ${c === "yellow" || c === "gray"
                             ? "border-neutral-300"
                             : "border-transparent"
-                        }`}
+                          }`}
                         style={{ background: getColorHex(c) }}
                         title={c}
                       />

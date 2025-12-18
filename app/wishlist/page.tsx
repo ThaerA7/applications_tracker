@@ -223,10 +223,10 @@ function AddWishlistItemDialog({ open, onClose, onSave }: AddDialogProps) {
 
   const handleChange =
     (field: keyof NewWishlistItemForm) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-      const { value } = e.target;
-      setForm((f) => ({ ...f, [field]: value }));
-    };
+      (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        const { value } = e.target;
+        setForm((f) => ({ ...f, [field]: value }));
+      };
 
   // Persist logo as a Data URL (base64) for local storage.
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -518,17 +518,6 @@ export default function WishlistPage() {
   const [filters, setFilters] = useState<WishlistFilters>(
     DEFAULT_WISHLIST_FILTERS
   );
-
-  const reload = async () => {
-    try {
-      const { mode, items } = await loadWishlist();
-      setStorageMode(mode);
-      setItems(items);
-    } catch (err) {
-      console.error("Failed to load wishlist", err);
-      setItems([]);
-    }
-  };
 
   // Load on mount + refresh when other pages change wishlist
   useEffect(() => {

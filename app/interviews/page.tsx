@@ -88,21 +88,6 @@ type WithdrawnRecord = {
   withdrawnReason?: WithdrawnDetails["reason"];
 };
 
-type AcceptedRecord = {
-  id: string;
-  company: string;
-  role: string;
-  location?: string;
-  appliedOn?: string;
-  employmentType?: string;
-  decisionDate?: string;
-  startDate?: string;
-  salary?: string;
-  url?: string;
-  logoUrl?: string;
-  notes?: string;
-};
-
 type InterviewStage = "upcoming" | "past" | "done";
 
 const STAGE_FILTERS: {
@@ -111,10 +96,10 @@ const STAGE_FILTERS: {
   shortLabel: string;
   icon: ComponentType<any>;
 }[] = [
-  { id: "upcoming", label: "Upcoming interviews", shortLabel: "Upcoming", icon: Calendar },
-  { id: "past", label: "Interviews with passed dates", shortLabel: "Passed", icon: History },
-  { id: "done", label: "Done • waiting for answer", shortLabel: "Done", icon: CheckCircle2 },
-];
+    { id: "upcoming", label: "Upcoming interviews", shortLabel: "Upcoming", icon: Calendar },
+    { id: "past", label: "Interviews with passed dates", shortLabel: "Passed", icon: History },
+    { id: "done", label: "Done • waiting for answer", shortLabel: "Done", icon: CheckCircle2 },
+  ];
 
 const INTERVIEW_TYPE_META: Record<InterviewType, { label: string; Icon: ComponentType<any> }> = {
   phone: { label: "Phone screening", Icon: PhoneCall },
@@ -130,7 +115,7 @@ const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "S
 function getWeekday(year: number, month: number, day: number): string {
   const t = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4];
   let y = year;
-  let m = month;
+  const m = month;
   if (m < 3) y -= 1;
   const w =
     (y +
@@ -746,7 +731,7 @@ export default function InterviewsPage() {
         open={moveDialogOpen && !!moveDialogApplication}
         application={moveDialogApplication}
         onClose={handleMoveDialogClose}
-        onMoveToInterviews={() => {}}
+        onMoveToInterviews={() => { }}
         onMoveToRejected={handleMoveToRejectedFromInterviews}
         onMoveToWithdrawn={handleMoveToWithdrawnFromInterviews}
         onMoveToAccepted={handleMoveToAcceptedFromInterviews}

@@ -400,6 +400,8 @@ export default function StatsCard() {
   const [withdrawn, setWithdrawn] = useState<AnyRecord[]>([]);
   const [offers, setOffers] = useState<OfferReceivedJobLike[]>([]);
 
+  const [chartsMounted, setChartsMounted] = useState(false);
+
   // Quick-add dialog state
   const [openAddApp, setOpenAddApp] = useState(false);
   const [openAddInterview, setOpenAddInterview] = useState(false);
@@ -458,6 +460,10 @@ export default function StatsCard() {
         void loadAll();
       }
     }
+  }, []);
+
+  useEffect(() => {
+    setChartsMounted(true);
   }, []);
 
   useEffect(() => {
@@ -971,37 +977,44 @@ export default function StatsCard() {
               </div>
 
               <div className="mt-3 h-32">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={weeklyActivity} barSize={14}>
-                    <CartesianGrid vertical={false} stroke="#e5e7eb" />
-                    <XAxis
-                      dataKey="day"
-                      tickLine={false}
-                      axisLine={false}
-                      tickMargin={8}
-                      tick={{ fontSize: 11, fill: "#6b7280" }}
-                    />
-                    <YAxis
-                      width={18}
-                      tickLine={false}
-                      axisLine={false}
-                      tickMargin={8}
-                      tick={{ fontSize: 11, fill: "#6b7280" }}
-                      allowDecimals={false}
-                    />
-                    <Tooltip contentStyle={tooltipStyle} />
-                    <Bar
-                      dataKey="applications"
-                      radius={[6, 6, 0, 0]}
-                      fill="#0ea5e9"
-                    />
-                    <Bar
-                      dataKey="interviews"
-                      radius={[6, 6, 0, 0]}
-                      fill="#22c55e"
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+                {chartsMounted ? (
+                  <ResponsiveContainer
+                    width="100%"
+                    height="100%"
+                    minWidth={0}
+                    minHeight={1}
+                  >
+                    <BarChart data={weeklyActivity} barSize={14}>
+                      <CartesianGrid vertical={false} stroke="#e5e7eb" />
+                      <XAxis
+                        dataKey="day"
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={8}
+                        tick={{ fontSize: 11, fill: "#6b7280" }}
+                      />
+                      <YAxis
+                        width={18}
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={8}
+                        tick={{ fontSize: 11, fill: "#6b7280" }}
+                        allowDecimals={false}
+                      />
+                      <Tooltip contentStyle={tooltipStyle} />
+                      <Bar
+                        dataKey="applications"
+                        radius={[6, 6, 0, 0]}
+                        fill="#0ea5e9"
+                      />
+                      <Bar
+                        dataKey="interviews"
+                        radius={[6, 6, 0, 0]}
+                        fill="#22c55e"
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : null}
               </div>
             </div>
 
@@ -1021,44 +1034,51 @@ export default function StatsCard() {
               </div>
 
               <div className="mt-3 h-32">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={conversionOverTime}>
-                    <CartesianGrid vertical={false} stroke="#e5e7eb" />
-                    <XAxis
-                      dataKey="label"
-                      tickLine={false}
-                      axisLine={false}
-                      tickMargin={8}
-                      tick={{ fontSize: 10, fill: "#6b7280" }}
-                    />
-                    <YAxis hide />
-                    <Tooltip contentStyle={tooltipStyle} />
-                    <Line
-                      type="monotone"
-                      dataKey="applications"
-                      stroke="#0ea5e9"
-                      strokeWidth={2}
-                      dot={false}
-                      activeDot={{ r: 4 }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="interviews"
-                      stroke="#22c55e"
-                      strokeWidth={2}
-                      dot={false}
-                      activeDot={{ r: 4 }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="offers"
-                      stroke="#f97316"
-                      strokeWidth={2}
-                      dot={{ r: 3 }}
-                      activeDot={{ r: 4 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+                {chartsMounted ? (
+                  <ResponsiveContainer
+                    width="100%"
+                    height="100%"
+                    minWidth={0}
+                    minHeight={1}
+                  >
+                    <LineChart data={conversionOverTime}>
+                      <CartesianGrid vertical={false} stroke="#e5e7eb" />
+                      <XAxis
+                        dataKey="label"
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={8}
+                        tick={{ fontSize: 10, fill: "#6b7280" }}
+                      />
+                      <YAxis hide />
+                      <Tooltip contentStyle={tooltipStyle} />
+                      <Line
+                        type="monotone"
+                        dataKey="applications"
+                        stroke="#0ea5e9"
+                        strokeWidth={2}
+                        dot={false}
+                        activeDot={{ r: 4 }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="interviews"
+                        stroke="#22c55e"
+                        strokeWidth={2}
+                        dot={false}
+                        activeDot={{ r: 4 }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="offers"
+                        stroke="#f97316"
+                        strokeWidth={2}
+                        dot={{ r: 3 }}
+                        activeDot={{ r: 4 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : null}
               </div>
             </div>
           </div>

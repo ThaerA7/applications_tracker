@@ -75,17 +75,20 @@ export default function WithdrawnPage() {
   const [activityMode, setActivityMode] = useState<ActivityStorageMode>("guest");
 
   // Persist activity (guest + user).
-  const persistActivity = (entry: ActivityItem) => {
-    appendActivityToStorage("withdrawn", entry, activityMode)
-      .then((saved) => {
-        setActivityItems((prev) => [saved, ...prev].slice(0, 100));
-      })
-      .catch((err) => {
-        console.error("Failed to persist withdrawn activity", err);
-        // fallback: still show it in UI
-        setActivityItems((prev) => [entry, ...prev].slice(0, 100));
-      });
-  };
+  const persistActivity = useCallback(
+    (entry: ActivityItem) => {
+      appendActivityToStorage("withdrawn", entry, activityMode)
+        .then((saved) => {
+          setActivityItems((prev) => [saved, ...prev].slice(0, 100));
+        })
+        .catch((err) => {
+          console.error("Failed to persist withdrawn activity", err);
+          // fallback: still show it in UI
+          setActivityItems((prev) => [entry, ...prev].slice(0, 100));
+        });
+    },
+    [activityMode]
+  );
 
   // Load withdrawn + activity, and handle auth switching.
   useEffect(() => {
@@ -315,7 +318,7 @@ export default function WithdrawnPage() {
       setEditingWithdrawn(null);
       setDialogApplication(null);
     },
-    [editingWithdrawn, storageMode, activityMode] // activityMode is used indirectly via persistActivity
+    [editingWithdrawn, storageMode, persistActivity]
   );
 
   return (

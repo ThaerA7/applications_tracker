@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -264,7 +265,7 @@ function FloatingMenu({
     visibility: "hidden",
   });
 
-  const calc = () => {
+  const calc = useCallback(() => {
     const anchor = anchorRef.current;
     const menu = menuRef.current;
     if (!anchor || !menu) return;
@@ -279,7 +280,7 @@ function FloatingMenu({
     const m = menu.getBoundingClientRect();
     if (m.bottom > window.innerHeight - 8) top = Math.max(8, a.top - m.height - 6);
     setPos({ left, top, visibility: "visible" });
-  };
+  }, [align, anchorRef, width]);
 
   useLayoutEffect(() => {
     if (!open) return;
@@ -295,7 +296,7 @@ function FloatingMenu({
       window.removeEventListener("resize", onResize);
       window.removeEventListener("keydown", onKey);
     };
-  }, [open, onClose]);
+  }, [open, onClose, calc]);
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
@@ -608,7 +609,7 @@ export default function JobSearchPage() {
   const dq = useDebounced(q, 220);
   const dwo = useDebounced(wo, 220);
 
-  const syncWishlist = async () => {
+  const syncWishlist = useCallback(async () => {
     try {
       const { mode, items } = await loadWishlist();
       setWishlistMode(mode);
@@ -628,7 +629,7 @@ export default function JobSearchPage() {
     } catch (err) {
       console.error("Failed to load wishlist", err);
     }
-  };
+  }, []);
 
   // Load wishlist on mount + refresh when other pages change it
   useEffect(() => {
@@ -655,8 +656,7 @@ export default function JobSearchPage() {
         window.removeEventListener(COUNTS_EVENT, handler);
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [syncWishlist]);
 
   // toggle wishlist entry for a job (uuid id in storage, sourceKey for toggling)
   function toggleWishlist(job: JobRow) {
@@ -744,7 +744,7 @@ export default function JobSearchPage() {
     return { batch, total: parsedTotal };
   }
 
-  async function runSearch(_form?: HTMLFormElement) {
+  async function runSearch() {
     if (!q.trim() || !wo.trim()) return;
     setLoadingFirst(true);
     setAllResults([]);
@@ -756,7 +756,7 @@ export default function JobSearchPage() {
       setAllResults(dedupeJobs(firstBatch));
       setTotalAvailable(
         (typeof total === "number" ? total : null) ??
-          (firstBatch.length < PAGE_SIZE ? firstBatch.length : null)
+        (firstBatch.length < PAGE_SIZE ? firstBatch.length : null)
       );
     } finally {
       setLoadingFirst(false);
@@ -915,7 +915,7 @@ export default function JobSearchPage() {
         className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-[1fr,1fr,auto]"
         onSubmit={(e) => {
           e.preventDefault();
-          runSearch(e.currentTarget);
+          runSearch();
         }}
       >
         <div className="relative">

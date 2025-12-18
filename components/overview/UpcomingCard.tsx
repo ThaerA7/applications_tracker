@@ -3,9 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PhoneCall, Plus } from "lucide-react";
 
-import ScheduleInterviewDialog, {
-  type Interview,
-} from "../../components/dialogs/ScheduleInterviewDialog";
+import ScheduleInterviewDialog from "../../components/dialogs/ScheduleInterviewDialog";
 import {
   type CalendarEvent,
   MONTH_NAMES,
@@ -192,7 +190,7 @@ export default function UpcomingCard() {
   const handleOpenDialog = () => setDialogOpen(true);
   const handleCloseDialog = () => setDialogOpen(false);
 
-  const handleInterviewCreated = (_interview: Interview) => {
+  const handleInterviewCreated = () => {
     // After saving (handled inside the dialog), refresh so the new interview shows immediately.
     void refreshInterviewEvents();
   };

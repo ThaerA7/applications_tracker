@@ -12,7 +12,6 @@ import { loadRejected } from "@/lib/storage/rejected";
 import { loadOffers } from "@/lib/storage/offers";
 import { loadWishlist } from "@/lib/storage/wishlist";
 import { loadNotes } from "@/lib/storage/notes";
-import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 
 type Item = {
   href: string;
@@ -149,7 +148,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
 
     // Subscribe early to catch INITIAL_SESSION on hard refresh.
     const { data: sub } = supabase.auth.onAuthStateChange(
-      (_event: AuthChangeEvent, _session: Session | null) => {
+      () => {
         void refreshCounts();
       },
     );
@@ -161,7 +160,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
           supabase.auth.getSession(),
           new Promise((r) => setTimeout(r, 3000)),
         ]);
-      } catch {}
+      } catch { }
       void refreshCounts();
     })();
 

@@ -13,7 +13,6 @@ import {
   Download,
   LogOut,
   ShieldCheck,
-  Smartphone,
   Sparkles,
   UserRound,
 } from "lucide-react";
@@ -522,15 +521,15 @@ export default function SettingsPage() {
 
   const badge = signedIn
     ? {
-        text: "Synced",
-        className:
-          "border-emerald-200 bg-emerald-50 text-emerald-800 shadow-[0_1px_2px_rgba(16,185,129,0.18)]",
-      }
+      text: "Synced",
+      className:
+        "border-emerald-200 bg-emerald-50 text-emerald-800 shadow-[0_1px_2px_rgba(16,185,129,0.18)]",
+    }
     : {
-        text: "Guest mode only",
-        className:
-          "border-amber-200 bg-amber-50 text-amber-800 shadow-[0_1px_2px_rgba(251,191,36,0.18)]",
-      };
+      text: "Guest mode only",
+      className:
+        "border-amber-200 bg-amber-50 text-amber-800 shadow-[0_1px_2px_rgba(251,191,36,0.18)]",
+    };
 
   return (
     <section
@@ -735,7 +734,7 @@ export default function SettingsPage() {
             </div>
 
             <div className="mt-4 space-y-3">
-              
+
 
               <div className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-white/70 p-3 shadow-sm">
                 <ShieldCheck className="h-7 w-7 text-emerald-600" aria-hidden="true" />
