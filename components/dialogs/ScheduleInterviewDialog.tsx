@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import {
   CalendarDays,
@@ -15,6 +15,7 @@ import {
   Briefcase,
   Building2,
   FileText,
+  Image as ImageIcon,
 } from "lucide-react";
 
 const INTERVIEWS_STORAGE_KEY = "job-tracker:interviews";
@@ -92,6 +93,7 @@ type ScheduleInterviewDialogProps = {
 type FormState = {
   company: string;
   role: string;
+  logoUrl: string;
   date: string; // YYYY-MM-DD
   time: string; // HH:mm
   type: InterviewType;
@@ -151,6 +153,7 @@ function makeInitialForm(
   return {
     company: app?.company ?? "",
     role: app?.role ?? "",
+    logoUrl: app?.logoUrl ?? "",
     date,
     time,
     type,
@@ -173,6 +176,8 @@ export default function ScheduleInterviewDialog({
   mode = "schedule",
 }: ScheduleInterviewDialogProps) {
   const [form, setForm] = useState<FormState>(() => makeInitialForm(null));
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
+  const [logoError, setLogoError] = useState<string | null>(null);
 
   const effectiveMode = mode ?? "schedule";
 
@@ -201,7 +206,45 @@ export default function ScheduleInterviewDialog({
   useEffect(() => {
     if (!open) return;
     setForm(makeInitialForm(application));
+    setLogoError(null);
+    if (logoInputRef.current) {
+      logoInputRef.current.value = "";
+    }
   }, [open, application]);
+
+  const handleLogoChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+
+    if (!file) {
+      setLogoError(null);
+      setForm((f) => ({ ...f, logoUrl: "" }));
+      return;
+    }
+
+    const maxSizeBytes = 1 * 1024 * 1024; // 1 MB
+    if (file.size > maxSizeBytes) {
+      setLogoError("Logo must be smaller than 1 MB.");
+      if (logoInputRef.current) logoInputRef.current.value = "";
+      return;
+    }
+
+    setLogoError(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result === "string") {
+        setForm((f) => ({ ...f, logoUrl: result }));
+      } else {
+        setLogoError("Failed to read the image file.");
+        if (logoInputRef.current) logoInputRef.current.value = "";
+      }
+    };
+    reader.onerror = () => {
+      setLogoError("Failed to read the image file.");
+      if (logoInputRef.current) logoInputRef.current.value = "";
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleChange =
     (field: keyof FormState) =>
@@ -253,7 +296,7 @@ export default function ScheduleInterviewDialog({
       date: iso,
       type: form.type,
       url: form.url.trim() || undefined,
-      logoUrl: application?.logoUrl,
+      logoUrl: form.logoUrl.trim() || undefined,
       appliedOn: appliedDate,
       employmentType: employmentType || undefined,
       notes: notes || undefined,
@@ -449,6 +492,39 @@ export default function ScheduleInterviewDialog({
                   className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 pl-8 pr-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
                   required
                 />
+              </div>
+            </label>
+
+            {/* Company logo upload + preview */}
+            <label className="space-y-1 text-sm md:col-span-2">
+              <span className="font-medium text-neutral-800">Company logo (optional)</span>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div>
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-neutral-200 bg-white/80 px-3 py-2 text-xs font-medium text-neutral-800 shadow-sm hover:bg-white">
+                    <ImageIcon className="h-4 w-4 text-neutral-400" aria-hidden="true" />
+                    <span>Upload logo (PNG, JPG, SVG. Max size 1 MB)</span>
+                    <input
+                      ref={logoInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoChange}
+                      className="sr-only"
+                    />
+                  </label>
+                  {logoError && (
+                    <p className="mt-1 text-[11px] text-rose-600">{logoError}</p>
+                  )}
+                </div>
+
+                {form.logoUrl?.trim() && (
+                  <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-md border border-neutral-200 bg-white/70">
+                    <img
+                      src={form.logoUrl}
+                      alt={`${form.company || "Company"} logo`}
+                      className="h-full w-full object-contain"
+                    />
+                  </div>
+                )}
               </div>
             </label>
 

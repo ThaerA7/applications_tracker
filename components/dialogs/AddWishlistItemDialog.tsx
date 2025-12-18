@@ -105,9 +105,9 @@ export default function AddWishlistItemDialog({
       return;
     }
 
-    const maxSizeBytes = 3 * 1024 * 1024; // 3 MB
+    const maxSizeBytes = 1 * 1024 * 1024; // 1 MB
     if (file.size > maxSizeBytes) {
-      setLogoError("Logo must be smaller than 3 MB.");
+      setLogoError("Logo must be smaller than 1 MB.");
       if (logoInputRef.current) {
         logoInputRef.current.value = "";
       }
@@ -115,8 +115,22 @@ export default function AddWishlistItemDialog({
     }
 
     setLogoError(null);
-    const objectUrl = URL.createObjectURL(file);
-    setForm((f) => ({ ...f, logoUrl: objectUrl }));
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result === "string") {
+        setForm((f) => ({ ...f, logoUrl: result }));
+      } else {
+        setLogoError("Failed to read the image file.");
+        if (logoInputRef.current) logoInputRef.current.value = "";
+      }
+    };
+    reader.onerror = () => {
+      setLogoError("Failed to read the image file.");
+      if (logoInputRef.current) logoInputRef.current.value = "";
+    };
+    reader.readAsDataURL(file);
   };
 
   const canSubmit =
@@ -220,7 +234,7 @@ export default function AddWishlistItemDialog({
                       className="h-4 w-4 text-neutral-400"
                       aria-hidden="true"
                     />
-                    <span>Upload logo (PNG, JPG, SVG. Max size 3 MB)</span>
+                    <span>Upload logo (PNG, JPG, SVG. Max size 1 MB)</span>
                     <input
                       ref={logoInputRef}
                       type="file"

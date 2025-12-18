@@ -238,9 +238,9 @@ function AddWishlistItemDialog({ open, onClose, onSave }: AddDialogProps) {
       return;
     }
 
-    const maxSizeBytes = 3 * 1024 * 1024; // 3 MB
+    const maxSizeBytes = 1 * 1024 * 1024; // 1 MB
     if (file.size > maxSizeBytes) {
-      setLogoError("Logo must be smaller than 3 MB.");
+      setLogoError("Logo must be smaller than 1 MB.");
       if (logoInputRef.current) logoInputRef.current.value = "";
       return;
     }
@@ -354,7 +354,7 @@ function AddWishlistItemDialog({ open, onClose, onSave }: AddDialogProps) {
                       className="h-4 w-4 text-neutral-400"
                       aria-hidden="true"
                     />
-                    <span>Upload logo (PNG, JPG, SVG. Max size 3 MB)</span>
+                    <span>Upload logo (PNG, JPG, SVG. Max size 1 MB)</span>
                     <input
                       ref={logoInputRef}
                       type="file"

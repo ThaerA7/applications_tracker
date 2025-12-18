@@ -37,7 +37,7 @@ export type NewApplicationForm = {
   source: string;       // where you found the job (LinkedIn, company site…)
   status: string;       // Applied, Interview, Offer, Rejected…
   notes: string;
-  logoUrl?: string;     // optional company logo URL / object URL from upload
+  logoUrl?: string;     // optional company logo URL / Data URL (base64) from upload
   website?: string;     // company website
 };
 
@@ -142,9 +142,9 @@ export default function AddApplicationDialog({
       return;
     }
 
-    const maxSizeBytes = 3 * 1024 * 1024; // 3 MB
+    const maxSizeBytes = 1 * 1024 * 1024; // 1 MB
     if (file.size > maxSizeBytes) {
-      setLogoError('Logo must be smaller than 3 MB.');
+      setLogoError('Logo must be smaller than 1 MB.');
       if (logoInputRef.current) {
         logoInputRef.current.value = '';
       }
@@ -152,8 +152,22 @@ export default function AddApplicationDialog({
     }
 
     setLogoError(null);
-    const objectUrl = URL.createObjectURL(file);
-    setForm((f) => ({ ...f, logoUrl: objectUrl }));
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result === 'string') {
+        setForm((f) => ({ ...f, logoUrl: result }));
+      } else {
+        setLogoError('Failed to read the image file.');
+        if (logoInputRef.current) logoInputRef.current.value = '';
+      }
+    };
+    reader.onerror = () => {
+      setLogoError('Failed to read the image file.');
+      if (logoInputRef.current) logoInputRef.current.value = '';
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSubmit = (e: FormEvent) => {
@@ -264,7 +278,7 @@ export default function AddApplicationDialog({
                       className="h-4 w-4 text-neutral-400"
                       aria-hidden="true"
                     />
-                    <span>Upload logo (PNG, JPG, SVG. Max size 3 MB)</span>
+                    <span>Upload logo (PNG, JPG, SVG. Max size 1 MB)</span>
                     <input
                       ref={logoInputRef}
                       type="file"

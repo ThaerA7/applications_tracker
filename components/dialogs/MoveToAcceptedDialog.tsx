@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FC, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FC, type FormEvent } from "react";
 import {
   CalendarDays,
   MapPin,
@@ -10,6 +10,7 @@ import {
   Trophy,
   Link as LinkIcon,
   CheckCircle2,
+  Image as ImageIcon,
 } from "lucide-react";
 
 export type AcceptedDetails = {
@@ -98,6 +99,10 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
   const [url, setUrl] = useState("");
   const [notes, setNotes] = useState("");
 
+  const [logoUrl, setLogoUrl] = useState("");
+  const [logoError, setLogoError] = useState<string | null>(null);
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
+
   useEffect(() => {
     if (!open) return;
 
@@ -120,6 +125,8 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
 
       setOfferReceivedDate(received);
       setOfferAcceptedDate(application.offerAcceptedDate ?? "");
+
+      setLogoUrl(application.logoUrl ?? "");
     } else {
       setCompany("");
       setRole("");
@@ -131,11 +138,51 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
 
       setOfferReceivedDate(todayIso);
       setOfferAcceptedDate("");
+
+      setLogoUrl("");
     }
 
     setStartDate("");
     setSalary("");
+    setLogoError(null);
+    if (logoInputRef.current) {
+      logoInputRef.current.value = "";
+    }
   }, [open, application]);
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+
+    if (!file) {
+      setLogoError(null);
+      setLogoUrl("");
+      return;
+    }
+
+    const maxSizeBytes = 1 * 1024 * 1024; // 1 MB
+    if (file.size > maxSizeBytes) {
+      setLogoError("Logo must be smaller than 1 MB.");
+      if (logoInputRef.current) logoInputRef.current.value = "";
+      return;
+    }
+
+    setLogoError(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result === "string") {
+        setLogoUrl(result);
+      } else {
+        setLogoError("Failed to read the image file.");
+        if (logoInputRef.current) logoInputRef.current.value = "";
+      }
+    };
+    reader.onerror = () => {
+      setLogoError("Failed to read the image file.");
+      if (logoInputRef.current) logoInputRef.current.value = "";
+    };
+    reader.readAsDataURL(file);
+  };
 
   if (!open) return null;
   if (mode === "move" && !application) return null;
@@ -163,7 +210,7 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
       startDate: startDate.trim() || undefined,
       salary: salary.trim() || undefined,
       url: url.trim() || application?.offerUrl || undefined,
-      logoUrl: application?.logoUrl,
+      logoUrl: logoUrl.trim() || undefined,
       notes: notes.trim() || undefined,
     });
 
@@ -302,6 +349,39 @@ const MoveToAcceptedDialog: FC<MoveToAcceptedDialogProps> = ({
                 className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 px-3 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300"
                 required
               />
+            </label>
+
+            {/* Company logo upload + preview */}
+            <label className="space-y-1 text-sm md:col-span-2">
+              <span className="font-medium text-neutral-800">Company logo (optional)</span>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div>
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-neutral-200 bg-white/80 px-3 py-2 text-xs font-medium text-neutral-800 shadow-sm hover:bg-white">
+                    <ImageIcon className="h-4 w-4 text-neutral-400" aria-hidden="true" />
+                    <span>Upload logo (PNG, JPG, SVG. Max size 1 MB)</span>
+                    <input
+                      ref={logoInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoChange}
+                      className="sr-only"
+                    />
+                  </label>
+                  {logoError && (
+                    <p className="mt-1 text-[11px] text-rose-600">{logoError}</p>
+                  )}
+                </div>
+
+                {logoUrl?.trim() && (
+                  <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-md border border-neutral-200 bg-white/70">
+                    <img
+                      src={logoUrl}
+                      alt={`${company || "Company"} logo`}
+                      className="h-full w-full object-contain"
+                    />
+                  </div>
+                )}
+              </div>
             </label>
 
             <label className="space-y-1 text-sm md:col-span-2">
