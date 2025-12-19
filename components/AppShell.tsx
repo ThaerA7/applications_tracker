@@ -1,14 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import SignInGateDialog from "@/components/dialogs/SignInGateDialog";
 import Sidebar from "@/components/sidebar";
 import TopBar from "@/components/topbar";
+import RouteTransition from "@/components/RouteTransition";
 
 const STORAGE_KEY = "job-tracker:sidebar-collapsed";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
+  const pathname = usePathname();
+  const [authChangeKey, setAuthChangeKey] = useState(0);
+
+  useEffect(() => {
+    const onAuth = () => setAuthChangeKey((k) => k + 1);
+    window.addEventListener("job-tracker:auth-changed", onAuth);
+    return () => window.removeEventListener("job-tracker:auth-changed", onAuth);
+  }, []);
 
   // Load persisted state
   useEffect(() => {
@@ -35,16 +45,22 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <>
       <SignInGateDialog defaultOpen={false} />
 
-      <Sidebar collapsed={collapsed} />
-      <div className="min-h-screen pl-[var(--sidebar-width)] transition-[padding-left] duration-200">
-        <TopBar
-          collapsed={collapsed}
-          onToggleSidebar={() => setCollapsed((prev) => !prev)}
-        />
-        <main className="min-h-screen bg-white">
-          <div className="w-full px-5 py-5">{children}</div>
-        </main>
-      </div>
+      <RouteTransition
+        triggerKey={`${pathname}|${authChangeKey}`}
+        fadeOutMs={320}
+        fadeInMs={360}
+      >
+        <Sidebar collapsed={collapsed} />
+        <div className="min-h-screen pl-[var(--sidebar-width)] transition-[padding-left] duration-200">
+          <TopBar
+            collapsed={collapsed}
+            onToggleSidebar={() => setCollapsed((prev) => !prev)}
+          />
+          <main className="min-h-screen bg-white">
+            <div className="w-full px-5 py-5">{children}</div>
+          </main>
+        </div>
+      </RouteTransition>
     </>
   );
 }

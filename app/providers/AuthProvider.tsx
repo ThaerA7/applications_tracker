@@ -15,6 +15,7 @@ import { migrateGuestActivityToUser } from "@/lib/storage/activity";
 const COUNTS_EVENT = "job-tracker:refresh-counts";
 const NOTES_EVENT = "job-tracker:refresh-notes";
 const ACTIVITY_EVENT = "job-tracker:refresh-activity";
+const AUTH_EVENT = "job-tracker:auth-changed";
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
@@ -27,6 +28,18 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       window.dispatchEvent(new Event(COUNTS_EVENT));
       window.dispatchEvent(new Event(NOTES_EVENT));
       window.dispatchEvent(new Event(ACTIVITY_EVENT));
+    };
+
+    const dispatchAuthEvent = (userId: string | null) => {
+      try {
+        window.dispatchEvent(
+          new CustomEvent(AUTH_EVENT, {
+            detail: { userId, at: Date.now() },
+          })
+        );
+      } catch {
+        // ignore
+      }
     };
 
     const migrateGuestDataIfNeeded = async () => {
@@ -55,6 +68,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     supabase.auth.getSession().then(({ data }) => {
       const session = data.session ?? null;
       setCachedSession(session);
+      dispatchAuthEvent(session?.user?.id ?? null);
 
       // If the app boots already signed-in, we still want to merge any guest data
       // created before login into the cloud account.
@@ -73,6 +87,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
     const { data: sub } = supabase.auth.onAuthStateChange((evt, session) => {
       setCachedSession(session);
+      dispatchAuthEvent(session?.user?.id ?? null);
 
       if (evt === "SIGNED_IN" && session?.user) {
         setTimeout(() => {
