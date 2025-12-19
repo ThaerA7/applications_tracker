@@ -35,6 +35,7 @@ import { upsertWithdrawn, detectWithdrawnMode } from "@/lib/storage/withdrawn";
 import { upsertOffer, detectOffersMode } from "@/lib/storage/offers";
 
 import ActivityLogSidebar from "@/components/ActivityLogSidebar";
+import ThreeBounceSpinner from "@/components/ThreeBounceSpinner";
 
 import InterviewsFilter, {
   DEFAULT_INTERVIEW_FILTERS,
@@ -43,6 +44,7 @@ import InterviewsFilter, {
 } from "@/components/filters/InterviewsFilter";
 
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { usePathname } from "next/navigation";
 import {
   loadInterviews,
   upsertInterview,
@@ -247,6 +249,9 @@ function makeUuidV4() {
 // --- Component ---
 
 export default function InterviewsPage() {
+  const pathname = usePathname();
+  const isActiveRoute = pathname === "/interviews";
+
   const [query, setQuery] = useState("");
   const [items, setItems] = useState<InterviewWithStage[]>([]);
   const [stageFilter, setStageFilter] = useState<InterviewStage>("upcoming");
@@ -271,6 +276,8 @@ export default function InterviewsPage() {
   const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
   const [activityMode, setActivityMode] = useState<ActivityStorageMode>("guest");
 
+  const [hydrated, setHydrated] = useState(false);
+
   // keep "now" ticking
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -285,17 +292,23 @@ export default function InterviewsPage() {
     const supabase = getSupabaseClient();
 
     const loadAll = async () => {
-      const [{ mode, items }, act] = await Promise.all([
-        loadInterviews(),
-        loadActivity("interviews"),
-      ]);
+      try {
+        const [{ mode, items }, act] = await Promise.all([
+          loadInterviews(),
+          loadActivity("interviews"),
+        ]);
 
-      if (!alive) return;
+        if (!alive) return;
 
-      setStorageMode(mode);
-      setItems(items.map((i) => ensureInterviewStage(i as Interview)));
-      setActivityMode(act.mode);
-      setActivityItems(act.items);
+        setStorageMode(mode);
+        setItems(items.map((i) => ensureInterviewStage(i as Interview)));
+        setActivityMode(act.mode);
+        setActivityItems(act.items);
+      } catch (err) {
+        console.error("Failed to load interviews/activity:", err);
+      } finally {
+        if (alive) setHydrated(true);
+      }
     };
 
     void loadAll();
@@ -923,55 +936,65 @@ export default function InterviewsPage() {
         </div>
 
         <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((item) => {
-            const { date, time } = formatDateTime(item.date);
-            const { label: typeLabel, Icon: TypeIcon } = INTERVIEW_TYPE_META[item.type];
-            const countdownLabel = getInterviewCountdownLabel(item.date, now);
-            const appliedLabel = getAppliedCountupLabel(item.appliedOn, now);
-
-            return (
-              <InterviewCard
-                key={item.id}
-                item={item}
-                typeIcon={TypeIcon}
-                typeLabel={typeLabel}
-                date={date}
-                time={time}
-                countdownLabel={countdownLabel}
-                appliedLabel={appliedLabel}
-                onEdit={handleEdit}
-                onMove={handleMove}
-                onDelete={openDeleteDialog}
-                onStageChange={(newStage) => handleStageChange(item.id, newStage)}
-              />
-            );
-          })}
-
-          {filtered.length === 0 && (
-            <div className="col-span-full flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
-              <div className="mb-2 text-5xl">📅</div>
-
-              {!hasItemsInCurrentStage ? (
-                <>
-                  <p className="text-sm text-neutral-700">
-                    You don&apos;t have any{" "}
-                    {stageFilter === "upcoming"
-                      ? "upcoming interviews"
-                      : stageFilter === "past"
-                        ? "interviews with passed dates"
-                        : "interviews marked as done and waiting for an answer"}
-                    .
-                  </p>
-                  <p className="mt-1 text-xs text-neutral-500">
-                    Click <span className="font-medium">Add</span> to schedule your next interview.
-                  </p>
-                </>
-              ) : (
-                <p className="text-sm text-neutral-700">
-                  No interviews match your search or filters in this view.
-                </p>
-              )}
+          {!hydrated ? (
+            <div className="col-span-full flex items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
+              {isActiveRoute ? (
+                <ThreeBounceSpinner label="Loading interviews" />
+              ) : null}
             </div>
+          ) : (
+            <>
+              {filtered.map((item) => {
+                const { date, time } = formatDateTime(item.date);
+                const { label: typeLabel, Icon: TypeIcon } = INTERVIEW_TYPE_META[item.type];
+                const countdownLabel = getInterviewCountdownLabel(item.date, now);
+                const appliedLabel = getAppliedCountupLabel(item.appliedOn, now);
+
+                return (
+                  <InterviewCard
+                    key={item.id}
+                    item={item}
+                    typeIcon={TypeIcon}
+                    typeLabel={typeLabel}
+                    date={date}
+                    time={time}
+                    countdownLabel={countdownLabel}
+                    appliedLabel={appliedLabel}
+                    onEdit={handleEdit}
+                    onMove={handleMove}
+                    onDelete={openDeleteDialog}
+                    onStageChange={(newStage) => handleStageChange(item.id, newStage)}
+                  />
+                );
+              })}
+
+              {filtered.length === 0 && (
+                <div className="col-span-full flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
+                  <div className="mb-2 text-5xl">📅</div>
+
+                  {!hasItemsInCurrentStage ? (
+                    <>
+                      <p className="text-sm text-neutral-700">
+                        You don&apos;t have any{" "}
+                        {stageFilter === "upcoming"
+                          ? "upcoming interviews"
+                          : stageFilter === "past"
+                            ? "interviews with passed dates"
+                            : "interviews marked as done and waiting for an answer"}
+                        .
+                      </p>
+                      <p className="mt-1 text-xs text-neutral-500">
+                        Click <span className="font-medium">Add</span> to schedule your next interview.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-neutral-700">
+                      No interviews match your search or filters in this view.
+                    </p>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </div>
       </section>

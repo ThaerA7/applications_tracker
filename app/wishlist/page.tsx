@@ -32,6 +32,8 @@ import WishlistFilter, {
   type WishlistFilters,
 } from "@/components/filters/WishlistFilter";
 
+import ThreeBounceSpinner from "@/components/ThreeBounceSpinner";
+
 import {
   loadWishlist,
   upsertWishlistItem,
@@ -513,6 +515,8 @@ export default function WishlistPage() {
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [storageMode, setStorageMode] = useState<WishlistStorageMode>("guest");
 
+  const [hydrated, setHydrated] = useState(false);
+
   const [query, setQuery] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [filters, setFilters] = useState<WishlistFilters>(
@@ -524,13 +528,17 @@ export default function WishlistPage() {
     let alive = true;
 
     const run = async () => {
-      const { mode, items } = await loadWishlist().catch(() => ({
-        mode: "guest" as WishlistStorageMode,
-        items: [] as WishlistItem[],
-      }));
-      if (!alive) return;
-      setStorageMode(mode);
-      setItems(items);
+      try {
+        const { mode, items } = await loadWishlist().catch(() => ({
+          mode: "guest" as WishlistStorageMode,
+          items: [] as WishlistItem[],
+        }));
+        if (!alive) return;
+        setStorageMode(mode);
+        setItems(items);
+      } finally {
+        if (alive) setHydrated(true);
+      }
     };
 
     void run();
@@ -668,28 +676,33 @@ export default function WishlistPage() {
 
       {/* Results grid */}
       <div className="mt-5 grid grid-cols-1 gap-3">
-        {filtered.map((item, i) => {
-          const Icon = pickJobIcon(item.role || item.company);
-          const idx = i + 1;
-          const startLabel = formatStartDate(item.startDate ?? null);
-          const offerLabel =
-            item.offerType && item.offerType.trim().length > 0
-              ? item.offerType.trim()
-              : undefined;
+        {!hydrated ? (
+          <div className="flex items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
+            <ThreeBounceSpinner label="Loading wishlist" />
+          </div>
+        ) : (
+          filtered.map((item, i) => {
+            const Icon = pickJobIcon(item.role || item.company);
+            const idx = i + 1;
+            const startLabel = formatStartDate(item.startDate ?? null);
+            const offerLabel =
+              item.offerType && item.offerType.trim().length > 0
+                ? item.offerType.trim()
+                : undefined;
 
-          return (
-            <article
-              key={item.id}
-              className={[
-                "relative grid grid-cols-[64px,1fr,auto] items-center gap-4",
-                "rounded-xl border border-neutral-200/80",
-                "bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70",
-                "p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md",
-                "before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl",
-                "before:bg-gradient-to-b before:from-yellow-500 before:via-amber-500 before:to-orange-400",
-                "before:opacity-90",
-              ].join(" ")}
-            >
+            return (
+              <article
+                key={item.id}
+                className={[
+                  "relative grid grid-cols-[64px,1fr,auto] items-center gap-4",
+                  "rounded-xl border border-neutral-200/80",
+                  "bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70",
+                  "p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md",
+                  "before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl",
+                  "before:bg-gradient-to-b before:from-yellow-500 before:via-amber-500 before:to-orange-400",
+                  "before:opacity-90",
+                ].join(" ")}
+              >
               {/* logo square */}
               <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-neutral-200 bg-white ring-1 ring-white/60">
                 <div className="absolute left-1 top-1 rounded-md bg-neutral-900/80 px-1.5 py-0.5 text-[11px] font-semibold text-white">
@@ -800,10 +813,11 @@ export default function WishlistPage() {
                 )}
               </div>
             </article>
-          );
-        })}
+            );
+          })
+        )}
 
-        {filtered.length === 0 && (
+        {hydrated && filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
             <div className="mb-2 text-5xl">🌟</div>
             <p className="text-sm text-neutral-700">

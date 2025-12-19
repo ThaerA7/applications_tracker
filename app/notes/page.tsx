@@ -16,6 +16,9 @@ import {
   Palette,
 } from "lucide-react";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
+
+import ThreeBounceSpinner from "@/components/ThreeBounceSpinner";
 
 import {
   loadNotes,
@@ -125,6 +128,9 @@ function makeId(): string {
 }
 
 export default function NotesPage() {
+  const pathname = usePathname();
+  const isActiveRoute = pathname === "/notes";
+
   const [mode, setMode] = useState<NotesStorageMode>("guest");
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
@@ -164,6 +170,10 @@ export default function NotesPage() {
     return () => {
       alive = false;
     };
+  }, []);
+
+  useEffect(() => {
+    // no-op (intentionally no warm cache)
   }, []);
 
   const allTags = useMemo(() => {
@@ -480,13 +490,11 @@ export default function NotesPage() {
 
         {/* Notes grid */}
         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {loading && (
-            <div className="md:col-span-2 xl:col-span-3 rounded-xl border border-neutral-200 bg-white/70 p-10 text-center">
-              <p className="text-sm text-neutral-700">Loading notes…</p>
+          {loading ? (
+            <div className="col-span-full flex items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
+              {isActiveRoute ? <ThreeBounceSpinner label="Loading notes" /> : null}
             </div>
-          )}
-
-          {!loading &&
+          ) : (
             filtered.map((n) => {
               const color: ColorKey = (n.color ?? "gray") as ColorKey;
               const long = isLong(n.content ?? "");
@@ -593,14 +601,13 @@ export default function NotesPage() {
                   </div>
                 </article>
               );
-            })}
+            })
+          )}
 
           {!loading && filtered.length === 0 && (
-            <div className="md:col-span-2 xl:col-span-3 flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
+            <div className="col-span-full flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
               <div className="mb-2 text-5xl">📝</div>
-              <p className="text-sm text-neutral-700">
-                No notes match your filters.
-              </p>
+              <p className="text-sm text-neutral-700">No notes match your filters.</p>
             </div>
           )}
         </div>

@@ -28,6 +28,8 @@ import OffersReceivedCards, {
   isPendingOffer,
 } from "./OffersReceivedCards";
 
+import ThreeBounceSpinner from "@/components/ThreeBounceSpinner";
+
 import ActivityLogSidebar from "@/components/ActivityLogSidebar";
 
 import { getSupabaseClient } from "@/lib/supabase/client";
@@ -822,13 +824,19 @@ export default function OffersReceivedPage() {
         </div>
 
         {/* cards */}
-        <OffersReceivedCards
-          items={hydrated ? filteredItems : []}
-          view={view}
-          onTagStatus={openTagDialog}
-          onEdit={handleEdit}
-          onDelete={openDeleteDialog}
-        />
+        {!hydrated ? (
+          <div className="mt-6 flex items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
+            <ThreeBounceSpinner label="Loading offers" />
+          </div>
+        ) : (
+          <OffersReceivedCards
+            items={filteredItems}
+            view={view}
+            onTagStatus={openTagDialog}
+            onEdit={handleEdit}
+            onDelete={openDeleteDialog}
+          />
+        )}
       </section>
 
       {/* Activity log sidebar */}

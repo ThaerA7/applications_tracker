@@ -38,6 +38,8 @@ import ApplicationsFilter, {
   type ApplicationFilters,
 } from '@/components/filters/ApplicationsFilter';
 
+import ThreeBounceSpinner from '@/components/ThreeBounceSpinner';
+
 // Persistent activity storage.
 import {
   loadActivity,
@@ -131,6 +133,8 @@ export default function AppliedPage() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [storageMode, setStorageMode] = useState<AppliedStorageMode>('guest');
 
+  const [hydrated, setHydrated] = useState(false);
+
   const [query, setQuery] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingApp, setEditingApp] = useState<Application | null>(null);
@@ -157,10 +161,16 @@ export default function AppliedPage() {
     const supabase = getSupabaseClient();
 
     const loadApps = async () => {
-      const { mode, items } = await loadApplied();
-      if (!alive) return;
-      setStorageMode(mode);
-      setApplications(items);
+      try {
+        const { mode, items } = await loadApplied();
+        if (!alive) return;
+        setStorageMode(mode);
+        setApplications(items);
+      } catch (err) {
+        console.error('Failed to load applied applications:', err);
+      } finally {
+        if (alive) setHydrated(true);
+      }
     };
 
     const loadAppliedActivity = async () => {
@@ -652,42 +662,50 @@ export default function AppliedPage() {
 
           {/* Results grid */}
           <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((app) => (
-              <ApplicationCard
-                key={app.id}
-                app={app}
-                onEdit={(a) => {
-                  setEditingApp(a);
-                  setDialogOpen(true);
-                }}
-                onMove={openMoveDialog}
-                onDelete={openDeleteDialog}
-                fmtDate={fmtDate}
-              />
-            ))}
-
-            {filtered.length === 0 && (
-              <div className="col-span-full flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
-                <div className="mb-2 text-5xl">🔎</div>
-                <p className="text-sm text-neutral-700">
-                  {!hasAnyApplications
-                    ? 'No applications yet. Click “Add” to create your first one.'
-                    : activeFilterCount > 0
-                      ? 'No applications match your filters. Try resetting or broadening them.'
-                      : 'No applications match your search.'}
-                </p>
-
-                {activeFilterCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setFilters(DEFAULT_APPLICATION_FILTERS)}
-                    className="mt-3 inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-800 shadow-sm hover:bg-neutral-50"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                    Reset filters
-                  </button>
-                )}
+            {!hydrated ? (
+              <div className="col-span-full flex items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
+                <ThreeBounceSpinner label="Loading applications" />
               </div>
+            ) : (
+              <>
+                {filtered.map((app) => (
+                  <ApplicationCard
+                    key={app.id}
+                    app={app}
+                    onEdit={(a) => {
+                      setEditingApp(a);
+                      setDialogOpen(true);
+                    }}
+                    onMove={openMoveDialog}
+                    onDelete={openDeleteDialog}
+                    fmtDate={fmtDate}
+                  />
+                ))}
+
+                {filtered.length === 0 && (
+                  <div className="col-span-full flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
+                    <div className="mb-2 text-5xl">🔎</div>
+                    <p className="text-sm text-neutral-700">
+                      {!hasAnyApplications
+                        ? 'No applications yet. Click “Add” to create your first one.'
+                        : activeFilterCount > 0
+                          ? 'No applications match your filters. Try resetting or broadening them.'
+                          : 'No applications match your search.'}
+                    </p>
+
+                    {activeFilterCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setFilters(DEFAULT_APPLICATION_FILTERS)}
+                        className="mt-3 inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-800 shadow-sm hover:bg-neutral-50"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                        Reset filters
+                      </button>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
 

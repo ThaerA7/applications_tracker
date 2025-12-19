@@ -12,13 +12,6 @@ const STORAGE_KEY = "job-tracker:sidebar-collapsed";
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
-  const [authChangeKey, setAuthChangeKey] = useState(0);
-
-  useEffect(() => {
-    const onAuth = () => setAuthChangeKey((k) => k + 1);
-    window.addEventListener("job-tracker:auth-changed", onAuth);
-    return () => window.removeEventListener("job-tracker:auth-changed", onAuth);
-  }, []);
 
   // Load persisted state
   useEffect(() => {
@@ -46,7 +39,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <SignInGateDialog defaultOpen={false} />
 
       <RouteTransition
-        triggerKey={`${pathname}|${authChangeKey}`}
+        triggerKey={pathname}
         fadeOutMs={320}
         fadeInMs={360}
       >

@@ -11,6 +11,7 @@ import MoveToWithdrawnDialog, {
 } from "@/components/dialogs/MoveToWithdrawnDialog";
 import { animateCardExit } from "@/components/dialogs/cardExitAnimation";
 import ActivityLogSidebar, { type ActivityItem } from "@/components/ActivityLogSidebar";
+import ThreeBounceSpinner from "@/components/ThreeBounceSpinner";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 
 import { getSupabaseClient } from "@/lib/supabase/client";
@@ -474,14 +475,20 @@ export default function WithdrawnPage() {
         </div>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((item) => (
-            <WithdrawnCard
-              key={item.id}
-              item={item}
-              onEdit={handleEdit}
-              onDelete={openDeleteDialog}
-            />
-          ))}
+          {!hydrated ? (
+            <div className="col-span-full flex items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
+              <ThreeBounceSpinner label="Loading withdrawn applications" />
+            </div>
+          ) : (
+            filtered.map((item) => (
+              <WithdrawnCard
+                key={item.id}
+                item={item}
+                onEdit={handleEdit}
+                onDelete={openDeleteDialog}
+              />
+            ))
+          )}
 
           {hydrated && filtered.length === 0 && (
             <div className="col-span-full flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">

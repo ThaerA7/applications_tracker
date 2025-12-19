@@ -81,3 +81,19 @@
 @layer utilities {
   .font-display { font-family: var(--font-display); }
 }
+
+/* SpinKit: Three Bounce */
+.sk-three-bounce-dot {
+  animation: sk-three-bounce 1.4s infinite ease-in-out both;
+}
+
+@keyframes sk-three-bounce {
+  0%,
+  80%,
+  100% {
+    transform: scale(0);
+  }
+  40% {
+    transform: scale(1);
+  }
+}
