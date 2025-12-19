@@ -284,7 +284,9 @@ export default function CalendarPage() {
     document.addEventListener("visibilitychange", onVis);
 
     const { data: sub } = supabase.auth.onAuthStateChange(() => refresh());
-    supabase.auth.getSession().finally(() => refresh());
+    // Avoid a second immediate refresh on mount; we already refreshed above.
+    // Keeping the session hydration call (without re-refresh) helps stabilize auth state.
+    supabase.auth.getSession().catch(() => undefined);
 
     return () => {
       aliveRef.current = false;

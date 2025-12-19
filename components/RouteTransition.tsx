@@ -44,12 +44,51 @@ async function waitForFonts(timeoutMs: number) {
   ]);
 }
 
+function waitForDomStability(
+  container: HTMLElement,
+  quietMs: number,
+  timeoutMs: number
+): Promise<void> {
+  return new Promise((resolve) => {
+    let done = false;
+    let quietTimer: number | null = null;
+    let hardTimer: number | null = null;
+
+    const finish = () => {
+      if (done) return;
+      done = true;
+      observer.disconnect();
+      if (quietTimer) window.clearTimeout(quietTimer);
+      if (hardTimer) window.clearTimeout(hardTimer);
+      resolve();
+    };
+
+    const bump = () => {
+      if (done) return;
+      if (quietTimer) window.clearTimeout(quietTimer);
+      quietTimer = window.setTimeout(finish, quietMs);
+    };
+
+    const observer = new MutationObserver(() => bump());
+    observer.observe(container, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      characterData: true,
+    });
+
+    bump();
+    hardTimer = window.setTimeout(finish, timeoutMs);
+  });
+}
+
 export default function RouteTransition({
   children,
   fadeOutMs = 220,
   fadeInMs = 260,
   revealOnLoad = true,
   contentReadyTimeoutMs = 2000,
+  stabilityQuietMs = 160,
   triggerKey,
 }: {
   children: React.ReactNode;
@@ -57,6 +96,7 @@ export default function RouteTransition({
   fadeInMs?: number;
   revealOnLoad?: boolean;
   contentReadyTimeoutMs?: number;
+  stabilityQuietMs?: number;
   triggerKey?: string | number;
 }) {
   const [renderedChildren, setRenderedChildren] = useState(children);
@@ -68,8 +108,48 @@ export default function RouteTransition({
 
   const [prefersReducedMotion] = useState(() => getPrefersReducedMotion());
 
+  // Keep latest config in a ref so effects can depend on a single stable key.
+  const configRef = useRef({
+    fadeOutMs,
+    fadeInMs,
+    revealOnLoad,
+    contentReadyTimeoutMs,
+    stabilityQuietMs,
+    triggerKey,
+    prefersReducedMotion,
+  });
+
+  useEffect(() => {
+    configRef.current = {
+      fadeOutMs,
+      fadeInMs,
+      revealOnLoad,
+      contentReadyTimeoutMs,
+      stabilityQuietMs,
+      triggerKey,
+      prefersReducedMotion,
+    };
+  }, [
+    fadeOutMs,
+    fadeInMs,
+    revealOnLoad,
+    contentReadyTimeoutMs,
+    stabilityQuietMs,
+    triggerKey,
+    prefersReducedMotion,
+  ]);
+
+  const revealKey = `${revealOnLoad ? 1 : 0}|${prefersReducedMotion ? 1 : 0}|${fadeInMs}`;
+  const transitionKey = `${String(triggerKey ?? "")}|${fadeOutMs}|${fadeInMs}|${revealOnLoad ? 1 : 0}|${prefersReducedMotion ? 1 : 0}|${contentReadyTimeoutMs}|${stabilityQuietMs}`;
+
+  // Always keep the latest children available for the moment we swap.
+  useEffect(() => {
+    nextChildrenRef.current = children;
+  }, [children]);
+
   // Initial reveal (first page load).
   useEffect(() => {
+    const { revealOnLoad, prefersReducedMotion, fadeInMs } = configRef.current;
     if (!revealOnLoad || prefersReducedMotion) return;
 
     let cancelled = false;
@@ -103,12 +183,20 @@ export default function RouteTransition({
       cancelled = true;
       if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
     };
-  }, [fadeInMs, prefersReducedMotion, revealOnLoad]);
+  }, [revealKey]);
 
   useEffect(() => {
-    nextChildrenRef.current = children;
+    const {
+      fadeOutMs,
+      fadeInMs,
+      prefersReducedMotion,
+      contentReadyTimeoutMs,
+      stabilityQuietMs,
+      triggerKey,
+    } = configRef.current;
+
     if (prefersReducedMotion) {
-      setRenderedChildren(children);
+      setRenderedChildren(nextChildrenRef.current);
       setPhase("idle");
       return;
     }
@@ -132,13 +220,22 @@ export default function RouteTransition({
 
       // Keep opacity at 0 while we wait for the new content to be ready.
       (async () => {
-        await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
         const container = containerRef.current;
+        const stability =
+          container
+            ? waitForDomStability(container, stabilityQuietMs, contentReadyTimeoutMs)
+            : Promise.resolve();
+
+        await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+
         if (container) {
           await Promise.all([
             waitForFonts(contentReadyTimeoutMs),
             waitForImages(container, contentReadyTimeoutMs),
+            stability,
           ]);
+        } else {
+          await stability;
         }
 
         setPhase("in");
@@ -152,15 +249,7 @@ export default function RouteTransition({
     return () => {
       if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
     };
-  }, [
-    children,
-    fadeOutMs,
-    fadeInMs,
-    prefersReducedMotion,
-    revealOnLoad,
-    contentReadyTimeoutMs,
-    triggerKey,
-  ]);
+  }, [transitionKey]);
 
   const opacityClass = phase === "out" ? "opacity-0" : "opacity-100";
   const durationMs = phase === "out" ? fadeOutMs : fadeInMs;
