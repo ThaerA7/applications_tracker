@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-
-type Phase = "idle" | "out" | "in";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion, useAnimation } from "framer-motion";
 
 function getPrefersReducedMotion(): boolean {
   if (typeof window === "undefined") return true;
@@ -99,168 +98,123 @@ export default function RouteTransition({
   stabilityQuietMs?: number;
   triggerKey?: string | number;
 }) {
-  const [renderedChildren, setRenderedChildren] = useState(children);
-  const [phase, setPhase] = useState<Phase>(revealOnLoad ? "out" : "idle");
-  const nextChildrenRef = useRef<React.ReactNode>(children);
-  const timeoutRef = useRef<number | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const lastTriggerRef = useRef<string | number | undefined>(triggerKey);
-
   const [prefersReducedMotion] = useState(() => getPrefersReducedMotion());
+  const key = useMemo(() => {
+    // Prefer an explicit triggerKey (e.g. pathname); fall back to a stable string.
+    // The key is what enables AnimatePresence to keep the old tree around for exit.
+    if (typeof triggerKey !== "undefined") return String(triggerKey);
+    return "route";
+  }, [triggerKey]);
 
-  // Keep latest config in a ref so effects can depend on a single stable key.
-  const configRef = useRef({
-    fadeOutMs,
-    fadeInMs,
-    revealOnLoad,
-    contentReadyTimeoutMs,
-    stabilityQuietMs,
-    triggerKey,
-    prefersReducedMotion,
-  });
+  if (prefersReducedMotion) {
+    return <>{children}</>;
+  }
+
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <AnimatedFadeThrough
+        key={key}
+        fadeOutMs={fadeOutMs}
+        fadeInMs={fadeInMs}
+        revealOnLoad={revealOnLoad}
+        contentReadyTimeoutMs={contentReadyTimeoutMs}
+        stabilityQuietMs={stabilityQuietMs}
+      >
+        {children}
+      </AnimatedFadeThrough>
+    </AnimatePresence>
+  );
+}
+
+function AnimatedFadeThrough({
+  children,
+  fadeOutMs,
+  fadeInMs,
+  revealOnLoad,
+  contentReadyTimeoutMs,
+  stabilityQuietMs,
+}: {
+  children: React.ReactNode;
+  fadeOutMs: number;
+  fadeInMs: number;
+  revealOnLoad: boolean;
+  contentReadyTimeoutMs: number;
+  stabilityQuietMs: number;
+}) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const controls = useAnimation();
+  const runIdRef = useRef(0);
+
+  const easing = useMemo(() => [0.4, 0, 0.2, 1] as const, []);
 
   useEffect(() => {
-    configRef.current = {
-      fadeOutMs,
-      fadeInMs,
-      revealOnLoad,
-      contentReadyTimeoutMs,
-      stabilityQuietMs,
-      triggerKey,
-      prefersReducedMotion,
-    };
-  }, [
-    fadeOutMs,
-    fadeInMs,
-    revealOnLoad,
-    contentReadyTimeoutMs,
-    stabilityQuietMs,
-    triggerKey,
-    prefersReducedMotion,
-  ]);
-
-  const revealKey = `${revealOnLoad ? 1 : 0}|${prefersReducedMotion ? 1 : 0}|${fadeInMs}`;
-  const transitionKey = `${String(triggerKey ?? "")}|${fadeOutMs}|${fadeInMs}|${revealOnLoad ? 1 : 0}|${prefersReducedMotion ? 1 : 0}|${contentReadyTimeoutMs}|${stabilityQuietMs}`;
-
-  // Always keep the latest children available for the moment we swap.
-  useEffect(() => {
-    nextChildrenRef.current = children;
-  }, [children]);
-
-  // Initial reveal (first page load).
-  useEffect(() => {
-    const { revealOnLoad, prefersReducedMotion, fadeInMs } = configRef.current;
-    if (!revealOnLoad || prefersReducedMotion) return;
+    runIdRef.current += 1;
+    const runId = runIdRef.current;
 
     let cancelled = false;
 
-    const reveal = async () => {
-      // Wait until the browser says the page is fully loaded.
-      if (document.readyState !== "complete") {
-        await new Promise<void>((resolve) => {
-          const done = () => resolve();
-          window.addEventListener("load", done, { once: true });
-        });
+    const start = async () => {
+      // Ensure we start hidden (especially important right after exit completes).
+      await controls.set({ opacity: 0 });
+
+      if (!revealOnLoad) {
+        // If revealOnLoad is false, we still want route transitions to animate in.
+        // This just avoids delaying the very first paint on initial mount.
+      } else {
+        // On first load, wait for 'load' to reduce flashes during hydration.
+        if (document.readyState !== "complete") {
+          await new Promise<void>((resolve) => {
+            const done = () => resolve();
+            window.addEventListener("load", done, { once: true });
+          });
+        }
       }
 
-      if (cancelled) return;
-
-      // Give the browser a frame to settle layout.
+      // Give layout a frame.
       await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
-      if (cancelled) return;
 
-      setPhase("in");
+      if (cancelled || runIdRef.current !== runId) return;
 
-      if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
-      timeoutRef.current = window.setTimeout(() => {
-        setPhase("idle");
-      }, fadeInMs);
+      const container = containerRef.current;
+      const stability =
+        container
+          ? waitForDomStability(container, stabilityQuietMs, contentReadyTimeoutMs)
+          : Promise.resolve();
+
+      if (container) {
+        await Promise.all([
+          waitForFonts(contentReadyTimeoutMs),
+          waitForImages(container, contentReadyTimeoutMs),
+          stability,
+        ]);
+      } else {
+        await stability;
+      }
+
+      if (cancelled || runIdRef.current !== runId) return;
+
+      await controls.start({
+        opacity: 1,
+        transition: { duration: fadeInMs / 1000, ease: easing },
+      });
     };
 
-    reveal();
+    start();
 
     return () => {
       cancelled = true;
-      if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
     };
-  }, [revealKey]);
-
-  useEffect(() => {
-    const {
-      fadeOutMs,
-      fadeInMs,
-      prefersReducedMotion,
-      contentReadyTimeoutMs,
-      stabilityQuietMs,
-      triggerKey,
-    } = configRef.current;
-
-    if (prefersReducedMotion) {
-      setRenderedChildren(nextChildrenRef.current);
-      setPhase("idle");
-      return;
-    }
-
-    // If a triggerKey is provided, only animate when it changes.
-    if (typeof triggerKey !== "undefined") {
-      const isInitial = lastTriggerRef.current === triggerKey;
-      lastTriggerRef.current = triggerKey;
-      if (isInitial) return;
-    }
-
-    // Two-step transition:
-    // 1) fade out current content
-    // 2) swap children
-    // 3) fade in new content
-    setPhase("out");
-
-    if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
-    timeoutRef.current = window.setTimeout(() => {
-      setRenderedChildren(nextChildrenRef.current);
-
-      // Keep opacity at 0 while we wait for the new content to be ready.
-      (async () => {
-        const container = containerRef.current;
-        const stability =
-          container
-            ? waitForDomStability(container, stabilityQuietMs, contentReadyTimeoutMs)
-            : Promise.resolve();
-
-        await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
-
-        if (container) {
-          await Promise.all([
-            waitForFonts(contentReadyTimeoutMs),
-            waitForImages(container, contentReadyTimeoutMs),
-            stability,
-          ]);
-        } else {
-          await stability;
-        }
-
-        setPhase("in");
-        if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
-        timeoutRef.current = window.setTimeout(() => {
-          setPhase("idle");
-        }, fadeInMs);
-      })();
-    }, fadeOutMs);
-
-    return () => {
-      if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
-    };
-  }, [transitionKey]);
-
-  const opacityClass = phase === "out" ? "opacity-0" : "opacity-100";
-  const durationMs = phase === "out" ? fadeOutMs : fadeInMs;
+  }, [controls, contentReadyTimeoutMs, easing, fadeInMs, revealOnLoad, stabilityQuietMs]);
 
   return (
-    <div
+    <motion.div
       ref={containerRef}
-      className={`transition-opacity ease-in-out ${opacityClass}`}
-      style={{ transitionDuration: `${durationMs}ms`, willChange: "opacity" }}
+      initial={{ opacity: revealOnLoad ? 0 : 1 }}
+      animate={controls}
+      exit={{ opacity: 0, transition: { duration: fadeOutMs / 1000, ease: easing } }}
+      style={{ willChange: "opacity" }}
     >
-      {renderedChildren}
-    </div>
+      {children}
+    </motion.div>
   );
 }
