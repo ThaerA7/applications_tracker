@@ -4,6 +4,13 @@ import { getSupabaseClient } from "@/lib/supabase/client";
 import { idbGet, idbSet, idbDel } from "./indexedDb";
 import type { NewApplicationForm } from "@/components/dialogs/AddApplicationDialog";
 import { getModeCached } from "../supabase/sessionCache";
+import {
+  getActiveUserId,
+  getFallbackUserId,
+  readUserCache,
+  updateUserCacheList,
+  writeUserCache,
+} from "./userCache";
 
 export type AppliedApplication = {
   id: string;
@@ -40,11 +47,9 @@ async function loadGuestApplied(): Promise<AppliedApplication[]> {
   try {
     const idb = await idbGet<AppliedApplication[]>(GUEST_IDB_KEY);
     return safeParseList(idb ?? []);
-  } catch {}
-
-  
+  } catch {
     return [];
-  
+  }
 }
 
 async function saveGuestApplied(list: AppliedApplication[]) {
@@ -126,16 +131,47 @@ export async function loadApplied(): Promise<{
   items: AppliedApplication[];
 }> {
   const mode = await detectAppliedMode();
-  const items = mode === "user" ? await loadUserApplied() : await loadGuestApplied();
+  if (mode === "user") {
+    const items = await loadUserApplied();
+    const userId = await getActiveUserId();
+    if (userId) await writeUserCache(GUEST_IDB_KEY, userId, items);
+    return { mode, items };
+  }
+
+  const items = await loadGuestApplied();
+  if (items.length > 0) return { mode, items };
+
+  const lastUserId = getFallbackUserId();
+  if (lastUserId) {
+    const cached = await readUserCache<AppliedApplication[]>(GUEST_IDB_KEY, lastUserId);
+    const fallback = safeParseList(cached ?? []);
+    if (fallback.length > 0) return { mode, items: fallback };
+  }
+
   return { mode, items };
 }
 
 export async function upsertApplied(
   app: AppliedApplication,
-  mode: AppliedStorageMode
+  _mode: AppliedStorageMode
 ) {
-  if (mode === "user") {
+  void _mode;
+  const actualMode = await detectAppliedMode();
+
+  if (actualMode === "user") {
     await upsertUserApplied(app);
+    const userId = await getActiveUserId();
+    if (userId) {
+      await updateUserCacheList<AppliedApplication>(
+        GUEST_IDB_KEY,
+        userId,
+        safeParseList,
+        (prev) => {
+          const idx = prev.findIndex((x) => x.id === app.id);
+          return idx === -1 ? [app, ...prev] : prev.map((x) => (x.id === app.id ? app : x));
+        }
+      );
+    }
   } else {
     const prev = await loadGuestApplied();
     const idx = prev.findIndex((x) => x.id === app.id);
@@ -152,10 +188,22 @@ export async function upsertApplied(
 
 export async function deleteApplied(
   id: string,
-  mode: AppliedStorageMode
+  _mode: AppliedStorageMode
 ) {
-  if (mode === "user") {
+  void _mode;
+  const actualMode = await detectAppliedMode();
+
+  if (actualMode === "user") {
     await deleteUserApplied(id);
+    const userId = await getActiveUserId();
+    if (userId) {
+      await updateUserCacheList<AppliedApplication>(
+        GUEST_IDB_KEY,
+        userId,
+        safeParseList,
+        (prev) => prev.filter((x) => x.id !== id)
+      );
+    }
   } else {
     const prev = await loadGuestApplied();
     const next = prev.filter((x) => x.id !== id);
@@ -173,6 +221,8 @@ export async function migrateGuestAppliedToUser() {
   const supabase = getSupabaseClient();
   const { data } = await supabase.auth.getSession();
   if (!data.session?.user) return;
+
+  const userId = data.session.user.id;
 
   const guest = await loadGuestApplied();
   if (guest.length === 0) return;
@@ -192,6 +242,8 @@ export async function migrateGuestAppliedToUser() {
     console.error("Guest → user applied migration failed:", error.message);
     return;
   }
+
+  await writeUserCache(GUEST_IDB_KEY, userId, guest);
 
   await clearGuestApplied();
   notifyCountsChanged();

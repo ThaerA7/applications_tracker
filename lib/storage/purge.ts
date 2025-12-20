@@ -2,6 +2,8 @@
 
 import { idbDel } from "@/lib/storage/indexedDb";
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { getLastKnownUserId } from "@/lib/supabase/sessionCache";
+import { userCacheKey } from "@/lib/storage/userCache";
 
 const COUNTS_EVENT = "job-tracker:refresh-counts";
 const NOTES_EVENT = "job-tracker:refresh-notes";
@@ -43,6 +45,9 @@ const LOCAL_STORAGE_KEYS = [
   // settings
   "job-tracker:settings-preferences",
 
+  // last signed-in user id
+  "job-tracker:last-user-id",
+
   // legacy interview storage
   "job-tracker:interviews",
   "job-tracker:interviews-activity",
@@ -66,6 +71,20 @@ export async function clearAllLocalData() {
       }
     })
   );
+
+  // Also clear per-user caches for the last known user.
+  const lastUserId = getLastKnownUserId();
+  if (lastUserId) {
+    await Promise.all(
+      IDB_KEYS.map(async (k) => {
+        try {
+          await idbDel(userCacheKey(k, lastUserId));
+        } catch {
+          // ignore
+        }
+      })
+    );
+  }
 
   // localStorage
   if (typeof window !== "undefined") {

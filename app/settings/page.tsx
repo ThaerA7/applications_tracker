@@ -725,9 +725,9 @@ export default function SettingsPage() {
                   Export or review where your lists live.
                 </p>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <div className="text-sm font-semibold text-neutral-700">
-                  {storageMode === "user" ? "Cloud" : "Mode: Local only"}
+                  {storageMode === "user" ? "Cloud + Local" : "Local only"}
                 </div>
                 <Database className="h-5 w-5 text-neutral-400" aria-hidden="true" />
               </div>

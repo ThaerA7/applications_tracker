@@ -4,6 +4,13 @@ import { getSupabaseClient } from "@/lib/supabase/client";
 import { idbGet, idbSet, idbDel } from "./indexedDb";
 import type { Rejection } from "@/app/rejected/RejectedCard";
 import { getModeCached } from "../supabase/sessionCache";
+import {
+  getActiveUserId,
+  getFallbackUserId,
+  readUserCache,
+  updateUserCacheList,
+  writeUserCache,
+} from "./userCache";
 
 export type RejectedApplication = Rejection;
 export type RejectedStorageMode = "guest" | "user";
@@ -127,17 +134,47 @@ export async function loadRejected(): Promise<{
   items: RejectedApplication[];
 }> {
   const mode = await detectRejectedMode();
-  const items =
-    mode === "user" ? await loadUserRejected() : await loadGuestRejected();
+  if (mode === "user") {
+    const items = await loadUserRejected();
+    const userId = await getActiveUserId();
+    if (userId) await writeUserCache(GUEST_IDB_KEY, userId, items);
+    return { mode, items };
+  }
+
+  const items = await loadGuestRejected();
+  if (items.length > 0) return { mode, items };
+
+  const lastUserId = getFallbackUserId();
+  if (lastUserId) {
+    const cached = await readUserCache<RejectedApplication[]>(GUEST_IDB_KEY, lastUserId);
+    const fallback = safeParseList(cached ?? []);
+    if (fallback.length > 0) return { mode, items: fallback };
+  }
+
   return { mode, items };
 }
 
 export async function upsertRejected(
   app: RejectedApplication,
-  mode: RejectedStorageMode
+  _mode: RejectedStorageMode
 ) {
-  if (mode === "user") {
+  void _mode;
+  const actualMode = await detectRejectedMode();
+
+  if (actualMode === "user") {
     await upsertUserRejected(app);
+    const userId = await getActiveUserId();
+    if (userId) {
+      await updateUserCacheList<RejectedApplication>(
+        GUEST_IDB_KEY,
+        userId,
+        safeParseList,
+        (prev) => {
+          const idx = prev.findIndex((x) => x.id === app.id);
+          return idx === -1 ? [app, ...prev] : prev.map((x) => (x.id === app.id ? app : x));
+        }
+      );
+    }
   } else {
     const prev = await loadGuestRejected();
     const idx = prev.findIndex((x) => x.id === app.id);
@@ -154,10 +191,22 @@ export async function upsertRejected(
 
 export async function deleteRejected(
   id: string,
-  mode: RejectedStorageMode
+  _mode: RejectedStorageMode
 ) {
-  if (mode === "user") {
+  void _mode;
+  const actualMode = await detectRejectedMode();
+
+  if (actualMode === "user") {
     await deleteUserRejected(id);
+    const userId = await getActiveUserId();
+    if (userId) {
+      await updateUserCacheList<RejectedApplication>(
+        GUEST_IDB_KEY,
+        userId,
+        safeParseList,
+        (prev) => prev.filter((x) => x.id !== id)
+      );
+    }
   } else {
     const prev = await loadGuestRejected();
     const next = prev.filter((x) => x.id !== id);
@@ -175,6 +224,8 @@ export async function migrateGuestRejectedToUser() {
   const supabase = getSupabaseClient();
   const { data } = await supabase.auth.getSession();
   if (!data.session?.user) return;
+
+  const userId = data.session.user.id;
 
   const guest = await loadGuestRejected();
   if (guest.length === 0) return;
@@ -196,6 +247,8 @@ export async function migrateGuestRejectedToUser() {
     );
     return;
   }
+
+  await writeUserCache(GUEST_IDB_KEY, userId, guest);
 
   await clearGuestRejected();
   notifyCountsChanged();

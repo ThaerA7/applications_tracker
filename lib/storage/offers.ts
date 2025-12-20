@@ -4,6 +4,13 @@ import { getSupabaseClient } from "@/lib/supabase/client";
 import { idbGet, idbSet, idbDel } from "./indexedDb";
 import type { OfferReceivedJob } from "@/app/offers-received/OffersReceivedCards";
 import { getModeCached } from "../supabase/sessionCache";
+import {
+  getActiveUserId,
+  getFallbackUserId,
+  readUserCache,
+  updateUserCacheList,
+  writeUserCache,
+} from "./userCache";
 
 export type OffersStorageMode = "guest" | "user";
 
@@ -142,16 +149,47 @@ export async function loadOffers(): Promise<{
   items: OfferReceivedJob[];
 }> {
   const mode = await detectOffersMode();
-  const items = mode === "user" ? await loadUserOffers() : await loadGuestOffers();
+  if (mode === "user") {
+    const items = await loadUserOffers();
+    const userId = await getActiveUserId();
+    if (userId) await writeUserCache(GUEST_IDB_KEY, userId, items);
+    return { mode, items };
+  }
+
+  const items = await loadGuestOffers();
+  if (items.length > 0) return { mode, items };
+
+  const lastUserId = getFallbackUserId();
+  if (lastUserId) {
+    const cached = await readUserCache<OfferReceivedJob[]>(GUEST_IDB_KEY, lastUserId);
+    const fallback = safeParseList(cached ?? []);
+    if (fallback.length > 0) return { mode, items: fallback };
+  }
+
   return { mode, items };
 }
 
 export async function upsertOffer(
   offer: OfferReceivedJob,
-  mode: OffersStorageMode
+  _mode: OffersStorageMode
 ) {
-  if (mode === "user") {
+  void _mode;
+  const actualMode = await detectOffersMode();
+
+  if (actualMode === "user") {
     await upsertUserOffer(offer);
+    const userId = await getActiveUserId();
+    if (userId) {
+      await updateUserCacheList<OfferReceivedJob>(
+        GUEST_IDB_KEY,
+        userId,
+        safeParseList,
+        (prev) => {
+          const idx = prev.findIndex((x) => x.id === offer.id);
+          return idx === -1 ? [offer, ...prev] : prev.map((x) => (x.id === offer.id ? offer : x));
+        }
+      );
+    }
   } else {
     const prev = await loadGuestOffers();
     const idx = prev.findIndex((x) => x.id === offer.id);
@@ -166,9 +204,21 @@ export async function upsertOffer(
   notifyCountsChanged();
 }
 
-export async function deleteOffer(id: string, mode: OffersStorageMode) {
-  if (mode === "user") {
+export async function deleteOffer(id: string, _mode: OffersStorageMode) {
+  void _mode;
+  const actualMode = await detectOffersMode();
+
+  if (actualMode === "user") {
     await deleteUserOffer(id);
+    const userId = await getActiveUserId();
+    if (userId) {
+      await updateUserCacheList<OfferReceivedJob>(
+        GUEST_IDB_KEY,
+        userId,
+        safeParseList,
+        (prev) => prev.filter((x) => x.id !== id)
+      );
+    }
   } else {
     const prev = await loadGuestOffers();
     const next = prev.filter((x) => x.id !== id);
@@ -187,6 +237,8 @@ export async function migrateGuestOffersToUser() {
   const { data } = await supabase.auth.getSession();
   if (!data.session?.user) return;
 
+  const userId = data.session.user.id;
+
   const guest = await loadGuestOffers();
   if (guest.length === 0) return;
 
@@ -199,6 +251,8 @@ export async function migrateGuestOffersToUser() {
     };
   });
 
+  const fixedGuest = payload.map((p) => p.data);
+
   const { error } = await supabase.from(TABLE).upsert(payload, {
     onConflict: "id",
   });
@@ -207,6 +261,8 @@ export async function migrateGuestOffersToUser() {
     console.error("Guest → user offers migration failed:", error.message);
     return;
   }
+
+  await writeUserCache(GUEST_IDB_KEY, userId, fixedGuest);
 
   await clearGuestOffers();
   notifyCountsChanged();

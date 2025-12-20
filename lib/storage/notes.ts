@@ -3,6 +3,13 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { idbGet, idbSet, idbDel } from "./indexedDb";
 import { getModeCached } from "../supabase/sessionCache";
+import {
+  getActiveUserId,
+  getFallbackUserId,
+  readUserCache,
+  updateUserCacheList,
+  writeUserCache,
+} from "./userCache";
 
 export type ColorKey =
   | "gray"
@@ -206,7 +213,23 @@ export async function loadNotes(): Promise<{
   items: StoredNote[];
 }> {
   const mode = await detectNotesMode();
-  const items = mode === "user" ? await loadUserNotes() : await loadGuestNotes();
+  if (mode === "user") {
+    const items = await loadUserNotes();
+    const userId = await getActiveUserId();
+    if (userId) await writeUserCache(GUEST_IDB_KEY, userId, items);
+    return { mode, items };
+  }
+
+  const items = await loadGuestNotes();
+  if (items.length > 0) return { mode, items };
+
+  const lastUserId = getFallbackUserId();
+  if (lastUserId) {
+    const cached = await readUserCache<StoredNote[]>(GUEST_IDB_KEY, lastUserId);
+    const fallback = safeParseList(cached ?? []);
+    if (fallback.length > 0) return { mode, items: fallback };
+  }
+
   return { mode, items };
 }
 
@@ -214,11 +237,26 @@ export async function loadNotes(): Promise<{
  * Upsert note and return the final note (id might be replaced with a uuid in user mode).
  */
 export async function upsertNote(note: StoredNote, mode?: NotesStorageMode) {
-  const actualMode = mode ?? (await detectNotesMode());
+  void mode;
+  const actualMode = await detectNotesMode();
   let finalNote = note;
 
   if (actualMode === "user") {
     finalNote = await upsertUserNote(note);
+    const userId = await getActiveUserId();
+    if (userId) {
+      await updateUserCacheList<StoredNote>(
+        GUEST_IDB_KEY,
+        userId,
+        safeParseList,
+        (prev) => {
+          const idx = prev.findIndex((x) => x.id === finalNote.id);
+          return idx === -1
+            ? [finalNote, ...prev]
+            : prev.map((x) => (x.id === finalNote.id ? finalNote : x));
+        }
+      );
+    }
   } else {
     const prev = await loadGuestNotes();
     const idx = prev.findIndex((x) => x.id === note.id);
@@ -232,10 +270,20 @@ export async function upsertNote(note: StoredNote, mode?: NotesStorageMode) {
 }
 
 export async function deleteNote(id: string, mode?: NotesStorageMode) {
-  const actualMode = mode ?? (await detectNotesMode());
+  void mode;
+  const actualMode = await detectNotesMode();
 
   if (actualMode === "user") {
     await deleteUserNote(id);
+    const userId = await getActiveUserId();
+    if (userId) {
+      await updateUserCacheList<StoredNote>(
+        GUEST_IDB_KEY,
+        userId,
+        safeParseList,
+        (prev) => prev.filter((x) => x.id !== id)
+      );
+    }
   } else {
     const prev = await loadGuestNotes();
     const next = prev.filter((x) => x.id !== id);
@@ -253,6 +301,8 @@ export async function migrateGuestNotesToUser() {
   const supabase = getSupabaseClient();
   const { data } = await supabase.auth.getSession();
   if (!data.session?.user) return;
+
+  const userId = data.session.user.id;
 
   const guest = await loadGuestNotes();
   if (guest.length === 0) return;
@@ -273,6 +323,8 @@ export async function migrateGuestNotesToUser() {
     console.error("Guest → user notes migration failed:", error.message);
     return;
   }
+
+  await writeUserCache(GUEST_IDB_KEY, userId, fixedGuest);
 
   await clearGuestNotes();
   notifyCountsChanged();

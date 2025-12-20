@@ -3,6 +3,14 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { idbGet, idbSet, idbDel } from "./indexedDb";
 import { getModeCached } from "../supabase/sessionCache";
+import {
+  clearUserCache,
+  getActiveUserId,
+  getFallbackUserId,
+  readUserCache,
+  updateUserCacheList,
+  writeUserCache,
+} from "./userCache";
 
 export type ActivityVariant =
   | "applied"
@@ -198,19 +206,49 @@ export async function loadActivity(variant: ActivityVariant): Promise<{
   items: ActivityItem[];
 }> {
   const mode = await detectActivityMode();
-  const items = mode === "user" ? await loadUser(variant) : await loadGuest(variant);
+  const baseKey = guestIdbKey(variant);
+
+  if (mode === "user") {
+    const items = await loadUser(variant);
+    const userId = await getActiveUserId();
+    if (userId) await writeUserCache(baseKey, userId, items);
+    return { mode, items };
+  }
+
+  const items = await loadGuest(variant);
+  if (items.length > 0) return { mode, items };
+
+  const lastUserId = getFallbackUserId();
+  if (lastUserId) {
+    const cached = await readUserCache<ActivityItem[]>(baseKey, lastUserId);
+    const fallback = safeParseList(cached ?? []);
+    if (fallback.length > 0) return { mode, items: fallback };
+  }
+
   return { mode, items };
 }
 
 export async function appendActivity(
   variant: ActivityVariant,
   item: ActivityItem,
-  mode: ActivityStorageMode
+  _mode: ActivityStorageMode
 ) {
+  void _mode;
   const clean = normalizeItem(item);
 
-  if (mode === "user") {
+  const actualMode = await detectActivityMode();
+
+  if (actualMode === "user") {
     await insertUser(variant, clean);
+    const userId = await getActiveUserId();
+    if (userId) {
+      await updateUserCacheList<ActivityItem>(
+        guestIdbKey(variant),
+        userId,
+        safeParseList,
+        (prev) => [clean, ...prev.filter((x) => x.id !== clean.id)].slice(0, MAX_ITEMS)
+      );
+    }
   } else {
     const prev = await loadGuest(variant);
     const next = [clean, ...prev].slice(0, MAX_ITEMS);
@@ -224,10 +262,22 @@ export async function appendActivity(
 export async function deleteActivity(
   variant: ActivityVariant,
   id: string,
-  mode: ActivityStorageMode
+  _mode: ActivityStorageMode
 ) {
-  if (mode === "user") {
+  void _mode;
+  const actualMode = await detectActivityMode();
+
+  if (actualMode === "user") {
     await deleteUser(variant, id);
+    const userId = await getActiveUserId();
+    if (userId) {
+      await updateUserCacheList<ActivityItem>(
+        guestIdbKey(variant),
+        userId,
+        safeParseList,
+        (prev) => prev.filter((x) => x.id !== id)
+      );
+    }
   } else {
     const prev = await loadGuest(variant);
     await saveGuest(variant, prev.filter((x) => x.id !== id));
@@ -236,9 +286,15 @@ export async function deleteActivity(
   notifyCountsChanged();
 }
 
-export async function clearActivity(variant: ActivityVariant, mode: ActivityStorageMode) {
-  if (mode === "user") await clearUser(variant);
-  else await clearGuest(variant);
+export async function clearActivity(variant: ActivityVariant, _mode: ActivityStorageMode) {
+  void _mode;
+  const actualMode = await detectActivityMode();
+
+  if (actualMode === "user") {
+    await clearUser(variant);
+    const userId = await getActiveUserId();
+    if (userId) await clearUserCache(guestIdbKey(variant), userId);
+  } else await clearGuest(variant);
 
   notifyCountsChanged();
 }
@@ -251,6 +307,8 @@ export async function migrateGuestActivityToUser() {
   const supabase = getSupabaseClient();
   const { data } = await supabase.auth.getSession();
   if (!data.session?.user) return;
+
+  const userId = data.session.user.id;
 
   const variants: ActivityVariant[] = [
     "applied",
@@ -269,11 +327,15 @@ export async function migrateGuestActivityToUser() {
       return { id: clean.id, variant: v, data: clean };
     });
 
+    const fixedGuest = payload.map((p) => p.data);
+
     const { error } = await supabase.from(TABLE).upsert(payload, { onConflict: "id" });
     if (error) {
       console.error("Guest → user activity migration failed:", error.message);
       continue;
     }
+
+    await writeUserCache(guestIdbKey(v), userId, fixedGuest);
 
     await clearGuest(v);
   }

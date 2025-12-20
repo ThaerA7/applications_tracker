@@ -38,22 +38,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <>
       <SignInGateDialog defaultOpen={false} />
 
-      <RouteTransition
-        triggerKey={pathname}
-        fadeOutMs={320}
-        fadeInMs={360}
-      >
-        <Sidebar collapsed={collapsed} />
-        <div className="min-h-screen pl-[var(--sidebar-width)] transition-[padding-left] duration-200">
-          <TopBar
-            collapsed={collapsed}
-            onToggleSidebar={() => setCollapsed((prev) => !prev)}
-          />
-          <main className="min-h-screen bg-white">
+      <Sidebar collapsed={collapsed} />
+      <div className="min-h-screen pl-[var(--sidebar-width)] transition-[padding-left] duration-200">
+        <TopBar
+          collapsed={collapsed}
+          onToggleSidebar={() => setCollapsed((prev) => !prev)}
+        />
+        <main className="min-h-screen bg-white">
+          <RouteTransition triggerKey={pathname} fadeOutMs={820} fadeInMs={760}>
             <div className="w-full px-5 py-5">{children}</div>
-          </main>
-        </div>
-      </RouteTransition>
+          </RouteTransition>
+        </main>
+      </div>
     </>
   );
 }

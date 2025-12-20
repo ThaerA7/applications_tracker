@@ -3,6 +3,13 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { idbGet, idbSet, idbDel } from "./indexedDb";
 import { getModeCached } from "../supabase/sessionCache";
+import {
+  getActiveUserId,
+  getFallbackUserId,
+  readUserCache,
+  updateUserCacheList,
+  writeUserCache,
+} from "./userCache";
 
 export type WishlistItem = {
   id: string; // UUID for Supabase.
@@ -186,22 +193,54 @@ export async function loadWishlist(): Promise<{
   items: WishlistItem[];
 }> {
   const mode = await detectWishlistMode();
-  const items =
-    mode === "user" ? await loadUserWishlist() : await loadGuestWishlist();
+  if (mode === "user") {
+    const items = await loadUserWishlist();
+    const userId = await getActiveUserId();
+    if (userId) await writeUserCache(GUEST_IDB_KEY, userId, items);
+    return { mode, items };
+  }
+
+  const items = await loadGuestWishlist();
+  if (items.length > 0) return { mode, items };
+
+  const lastUserId = getFallbackUserId();
+  if (lastUserId) {
+    const cached = await readUserCache<WishlistItem[]>(GUEST_IDB_KEY, lastUserId);
+    const fallback = safeParseList(cached ?? []);
+    const { next, changed } = normalizeWishlist(fallback);
+    if (changed) await writeUserCache(GUEST_IDB_KEY, lastUserId, next);
+    if (next.length > 0) return { mode, items: next };
+  }
+
   return { mode, items };
 }
 
 export async function upsertWishlistItem(
   item: WishlistItem,
-  mode: WishlistStorageMode
+  _mode: WishlistStorageMode
 ) {
+  void _mode;
   if (!UUID_RE.test(item.id)) {
     // hard guard
     item = { ...item, id: makeUuid() };
   }
 
-  if (mode === "user") {
+  const actualMode = await detectWishlistMode();
+
+  if (actualMode === "user") {
     await upsertUserWishlistItem(item);
+    const userId = await getActiveUserId();
+    if (userId) {
+      await updateUserCacheList<WishlistItem>(
+        GUEST_IDB_KEY,
+        userId,
+        safeParseList,
+        (prev) => {
+          const idx = prev.findIndex((x) => x.id === item.id);
+          return idx === -1 ? [item, ...prev] : prev.map((x) => (x.id === item.id ? item : x));
+        }
+      );
+    }
   } else {
     const prev = await loadGuestWishlist();
     const idx = prev.findIndex((x) => x.id === item.id);
@@ -215,8 +254,22 @@ export async function upsertWishlistItem(
   notifyCountsChanged();
 }
 
-export async function deleteWishlistItem(id: string, mode: WishlistStorageMode) {
-  if (mode === "user") await deleteUserWishlistItem(id);
+export async function deleteWishlistItem(id: string, _mode: WishlistStorageMode) {
+  void _mode;
+  const actualMode = await detectWishlistMode();
+
+  if (actualMode === "user") {
+    await deleteUserWishlistItem(id);
+    const userId = await getActiveUserId();
+    if (userId) {
+      await updateUserCacheList<WishlistItem>(
+        GUEST_IDB_KEY,
+        userId,
+        safeParseList,
+        (prev) => prev.filter((x) => x.id !== id)
+      );
+    }
+  }
   else {
     const prev = await loadGuestWishlist();
     const next = prev.filter((x) => x.id !== id);
@@ -235,6 +288,8 @@ export async function migrateGuestWishlistToUser() {
   const { data } = await supabase.auth.getSession();
   if (!data.session?.user) return;
 
+  const userId = data.session.user.id;
+
   const guest = await loadGuestWishlist();
   if (guest.length === 0) return;
 
@@ -252,6 +307,8 @@ export async function migrateGuestWishlistToUser() {
     console.error("Guest → user wishlist migration failed:", error.message);
     return;
   }
+
+  await writeUserCache(GUEST_IDB_KEY, userId, guest);
 
   await clearGuestWishlist();
   notifyCountsChanged();

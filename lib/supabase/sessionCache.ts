@@ -6,8 +6,35 @@ import { getSupabaseClient } from "./client";
 let cachedSession: Session | null | undefined = undefined;
 let inFlight: Promise<Session | null> | null = null;
 
+const LAST_USER_ID_KEY = "job-tracker:last-user-id";
+let lastKnownUserId: string | null = null;
+
 export function setCachedSession(session: Session | null) {
   cachedSession = session;
+
+  const userId = session?.user?.id ?? null;
+  if (userId) {
+    lastKnownUserId = userId;
+    try {
+      window.localStorage?.setItem(LAST_USER_ID_KEY, userId);
+    } catch {
+      // ignore
+    }
+  }
+}
+
+export function getLastKnownUserId(): string | null {
+  if (lastKnownUserId) return lastKnownUserId;
+  try {
+    const v = window.localStorage?.getItem(LAST_USER_ID_KEY);
+    if (v && typeof v === "string") {
+      lastKnownUserId = v;
+      return v;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
 }
 
 export async function getSessionCached(): Promise<Session | null> {
@@ -46,4 +73,9 @@ export async function getSessionCached(): Promise<Session | null> {
 export async function getModeCached(): Promise<"guest" | "user"> {
   const s = await getSessionCached();
   return s?.user ? "user" : "guest";
+}
+
+export async function getUserIdCached(): Promise<string | null> {
+  const s = await getSessionCached();
+  return s?.user?.id ?? null;
 }

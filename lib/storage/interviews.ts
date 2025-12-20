@@ -3,6 +3,13 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { idbGet, idbSet, idbDel } from "./indexedDb";
 import { getModeCached } from "../supabase/sessionCache";
+import {
+  getActiveUserId,
+  getFallbackUserId,
+  readUserCache,
+  updateUserCacheList,
+  writeUserCache,
+} from "./userCache";
 
 export type StoredInterview = {
   id: string;
@@ -125,16 +132,49 @@ export async function loadInterviews(): Promise<{
   items: StoredInterview[];
 }> {
   const mode = await detectInterviewsMode();
-  const items = mode === "user" ? await loadUserInterviews() : await loadGuestInterviews();
+  if (mode === "user") {
+    const items = await loadUserInterviews();
+    const userId = await getActiveUserId();
+    if (userId) await writeUserCache(GUEST_IDB_KEY, userId, items);
+    return { mode, items };
+  }
+
+  const items = await loadGuestInterviews();
+  if (items.length > 0) return { mode, items };
+
+  const lastUserId = getFallbackUserId();
+  if (lastUserId) {
+    const cached = await readUserCache<StoredInterview[]>(GUEST_IDB_KEY, lastUserId);
+    const fallback = safeParseList(cached ?? []);
+    if (fallback.length > 0) return { mode, items: fallback };
+  }
+
   return { mode, items };
 }
 
 export async function upsertInterview(
   interview: StoredInterview,
-  mode: InterviewsStorageMode
+  _mode: InterviewsStorageMode
 ) {
-  if (mode === "user") {
+  void _mode;
+  const actualMode = await detectInterviewsMode();
+
+  if (actualMode === "user") {
     await upsertUserInterview(interview);
+    const userId = await getActiveUserId();
+    if (userId) {
+      await updateUserCacheList<StoredInterview>(
+        GUEST_IDB_KEY,
+        userId,
+        safeParseList,
+        (prev) => {
+          const idx = prev.findIndex((x) => x.id === interview.id);
+          return idx === -1
+            ? [interview, ...prev]
+            : prev.map((x) => (x.id === interview.id ? interview : x));
+        }
+      );
+    }
   } else {
     const prev = await loadGuestInterviews();
     const idx = prev.findIndex((x) => x.id === interview.id);
@@ -149,9 +189,21 @@ export async function upsertInterview(
   notifyCountsChanged();
 }
 
-export async function deleteInterview(id: string, mode: InterviewsStorageMode) {
-  if (mode === "user") {
+export async function deleteInterview(id: string, _mode: InterviewsStorageMode) {
+  void _mode;
+  const actualMode = await detectInterviewsMode();
+
+  if (actualMode === "user") {
     await deleteUserInterview(id);
+    const userId = await getActiveUserId();
+    if (userId) {
+      await updateUserCacheList<StoredInterview>(
+        GUEST_IDB_KEY,
+        userId,
+        safeParseList,
+        (prev) => prev.filter((x) => x.id !== id)
+      );
+    }
   } else {
     const prev = await loadGuestInterviews();
     const next = prev.filter((x) => x.id !== id);
@@ -170,6 +222,8 @@ export async function migrateGuestInterviewsToUser() {
   const { data } = await supabase.auth.getSession();
   if (!data.session?.user) return;
 
+  const userId = data.session.user.id;
+
   const guest = await loadGuestInterviews();
   if (guest.length === 0) return;
 
@@ -187,6 +241,8 @@ export async function migrateGuestInterviewsToUser() {
     console.error("Guest → user interviews migration failed:", error.message);
     return;
   }
+
+  await writeUserCache(GUEST_IDB_KEY, userId, guest);
 
   await clearGuestInterviews();
   notifyCountsChanged();

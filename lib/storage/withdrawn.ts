@@ -4,6 +4,13 @@ import { getSupabaseClient } from "@/lib/supabase/client";
 import { idbGet, idbSet, idbDel } from "./indexedDb";
 import type { WithdrawnRecord } from "@/app/withdrawn/WithdrawnCard";
 import { getModeCached } from "../supabase/sessionCache";
+import {
+  getActiveUserId,
+  getFallbackUserId,
+  readUserCache,
+  updateUserCacheList,
+  writeUserCache,
+} from "./userCache";
 
 export type WithdrawnApplication = WithdrawnRecord;
 export type WithdrawnStorageMode = "guest" | "user";
@@ -119,13 +126,44 @@ export async function loadWithdrawn(): Promise<{
   items: WithdrawnApplication[];
 }> {
   const mode = await detectWithdrawnMode();
-  const items = mode === "user" ? await loadUserWithdrawn() : await loadGuestWithdrawn();
+  if (mode === "user") {
+    const items = await loadUserWithdrawn();
+    const userId = await getActiveUserId();
+    if (userId) await writeUserCache(GUEST_IDB_KEY, userId, items);
+    return { mode, items };
+  }
+
+  const items = await loadGuestWithdrawn();
+  if (items.length > 0) return { mode, items };
+
+  const lastUserId = getFallbackUserId();
+  if (lastUserId) {
+    const cached = await readUserCache<WithdrawnApplication[]>(GUEST_IDB_KEY, lastUserId);
+    const fallback = safeParseList(cached ?? []);
+    if (fallback.length > 0) return { mode, items: fallback };
+  }
+
   return { mode, items };
 }
 
-export async function upsertWithdrawn(app: WithdrawnApplication, mode: WithdrawnStorageMode) {
-  if (mode === "user") {
+export async function upsertWithdrawn(app: WithdrawnApplication, _mode: WithdrawnStorageMode) {
+  void _mode;
+  const actualMode = await detectWithdrawnMode();
+
+  if (actualMode === "user") {
     await upsertUserWithdrawn(app);
+    const userId = await getActiveUserId();
+    if (userId) {
+      await updateUserCacheList<WithdrawnApplication>(
+        GUEST_IDB_KEY,
+        userId,
+        safeParseList,
+        (prev) => {
+          const idx = prev.findIndex((x) => x.id === app.id);
+          return idx === -1 ? [app, ...prev] : prev.map((x) => (x.id === app.id ? app : x));
+        }
+      );
+    }
   } else {
     const prev = await loadGuestWithdrawn();
     const idx = prev.findIndex((x) => x.id === app.id);
@@ -136,9 +174,21 @@ export async function upsertWithdrawn(app: WithdrawnApplication, mode: Withdrawn
   notifyCountsChanged();
 }
 
-export async function deleteWithdrawn(id: string, mode: WithdrawnStorageMode) {
-  if (mode === "user") {
+export async function deleteWithdrawn(id: string, _mode: WithdrawnStorageMode) {
+  void _mode;
+  const actualMode = await detectWithdrawnMode();
+
+  if (actualMode === "user") {
     await deleteUserWithdrawn(id);
+    const userId = await getActiveUserId();
+    if (userId) {
+      await updateUserCacheList<WithdrawnApplication>(
+        GUEST_IDB_KEY,
+        userId,
+        safeParseList,
+        (prev) => prev.filter((x) => x.id !== id)
+      );
+    }
   } else {
     const prev = await loadGuestWithdrawn();
     const next = prev.filter((x) => x.id !== id);
@@ -157,6 +207,8 @@ export async function migrateGuestWithdrawnToUser() {
   const { data } = await supabase.auth.getSession();
   if (!data.session?.user) return;
 
+  const userId = data.session.user.id;
+
   const guest = await loadGuestWithdrawn();
   if (guest.length === 0) return;
 
@@ -172,6 +224,8 @@ export async function migrateGuestWithdrawnToUser() {
     console.error("Guest → user withdrawn migration failed:", error.message);
     return;
   }
+
+  await writeUserCache(GUEST_IDB_KEY, userId, guest);
 
   await clearGuestWithdrawn();
   notifyCountsChanged();
