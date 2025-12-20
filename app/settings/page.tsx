@@ -11,6 +11,7 @@ import {
   Database,
   Download,
   HardDrive,
+  Lightbulb,
   LogOut,
   ShieldCheck,
   Sparkles,
@@ -671,7 +672,14 @@ export default function SettingsPage() {
         "border-amber-200 bg-amber-50 text-amber-800 shadow-[0_1px_2px_rgba(251,191,36,0.18)]",
     };
 
+  const headerTip = signedIn
+    ? "Tip: Export a JSON backup occasionally."
+    : "Tip: Sign in to sync across devices.";
+
   const visibleCounts = dataCounts ? dataCounts[dataSummaryRange] : null;
+  const visibleTotal = visibleCounts
+    ? Object.values(visibleCounts).reduce((sum, n) => sum + n, 0)
+    : null;
 
   return (
     <section
@@ -685,395 +693,476 @@ export default function SettingsPage() {
       <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-slate-400/15 blur-3xl" />
 
       <div className="relative">
-        <div className="flex items-center gap-2">
-          <Image
-            src="/icons/settings.png"
-            alt=""
-            width={37}
-            height={37}
-            aria-hidden="true"
-            className="shrink-0"
-          />
-          <h1 className="text-2xl font-semibold text-neutral-900">Settings</h1>
-          <span
-            className={[
-              "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold",
-              badge.className,
-            ].join(" ")}
-          >
-            {badge.text}
-          </span>
-        </div>
-        <p className="text-neutral-700 mt-2">
-          Personalize the tracker, manage sync, and tune notifications.
-        </p>
-      </div>
-
-      <div className="relative mt-6 grid gap-4 lg:grid-cols-[1.25fr_1fr]">
-        <div className="space-y-4">
-          <article className="relative overflow-hidden rounded-xl border border-sky-100/80 bg-white/95 p-5 pl-6 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/70 before:absolute before:inset-y-0 before:left-0 before:w-2 before:rounded-l-xl before:bg-gradient-to-b before:from-indigo-600 before:to-sky-600 before:content-['']">
-            <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-neutral-200/50 blur-3xl" />
-
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                  Account & sync
-                </p>
-                <div className="mt-1 flex items-center gap-4">
-                  <div className="grid h-12 w-12 place-items-center rounded-full bg-white ring-1 ring-neutral-100 text-sm font-semibold text-neutral-900 shadow-sm">
-                    {signedIn ? (
-                      accountLabel[0]?.toUpperCase() || "U"
-                    ) : (
-                      <UserRound className="h-5 w-5 text-neutral-700" aria-hidden="true" />
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-base font-semibold text-neutral-900">
-                      {accountLabel}
-                    </p>
-                    <p className="text-sm text-neutral-600">
-                      {signedIn
-                        ? session?.user?.email ?? "Signed in"
-                        : "Data stored in your browser (IndexedDB)"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                {!signedIn && (
-                  <button
-                    type="button"
-                    onClick={openSignInGate}
-                    className="inline-flex items-center gap-2 rounded-full bg-neutral-900 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:bg-neutral-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300"
-                  >
-                    <Sparkles className="h-4 w-4" aria-hidden="true" />
-                    Sign in to sync
-                  </button>
-                )}
-                {signedIn && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDangerResult(null);
-                        setDeleteAccountDialogOpen(true);
-                      }}
-                      disabled={authBusy || dangerBusy}
-                      className={[
-                        "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold shadow-sm transition",
-                        "border-rose-700 bg-rose-600 text-white hover:bg-rose-500",
-                        "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-rose-300",
-                        authBusy || dangerBusy ? "opacity-70" : "",
-                      ].join(" ")}
-                    >
-                      <AlertTriangle className="h-4 w-4 text-white" aria-hidden="true" />
-                      Delete account
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleLogout}
-                      disabled={authBusy || dangerBusy}
-                      className={[
-                        "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold shadow-sm transition",
-                        "border-neutral-200 bg-white text-neutral-800 hover:bg-neutral-50",
-                        "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300",
-                        authBusy || dangerBusy ? "opacity-70" : "",
-                      ].join(" ")}
-                    >
-                      <LogOut className="h-4 w-4" aria-hidden="true" />
-                      {authBusy ? "Signing out…" : "Sign out"}
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <div className="rounded-2xl border border-sky-100 bg-white/95 p-4 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 text-sm font-semibold text-neutral-900">
-                    <Cloud className="h-5 w-5 text-sky-600" aria-hidden="true" />
-                    <span>Sync & Privacy</span>
-                  </div>
-                  <div className="text-xs text-neutral-500">
-                    {storageMode === "user" ? "Synced" : "Guest"}
-                  </div>
-                </div>
-                <p className="mt-2 text-sm text-neutral-600">
-                  {storageMode === "user"
-                    ? "Your data is saved to your account and kept locally for offline use and faster loads."
-                    : "Your data is stored in this browser (IndexedDB). Sign in to sync across devices and enable backups."}
-                </p>
-              </div>
-            </div>
-          </article>
-
-          <article className="relative overflow-hidden rounded-xl border border-sky-100/80 bg-white/95 p-5 pl-6 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/70 before:absolute before:inset-y-0 before:left-0 before:w-2 before:rounded-l-xl before:bg-gradient-to-b before:from-emerald-500 before:to-teal-400 before:content-['']">
-            <div className="pointer-events-none absolute -left-16 -top-12 h-32 w-32 rounded-full bg-slate-200/50 blur-3xl" />
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                  Preferences
-                </p>
-                <p className="text-sm text-neutral-700">
-                  Saved locally and applied instantly.
-                </p>
-              </div>
-              <span className="inline-flex items-center text-neutral-500">
-                <HardDrive className="h-4 w-4" aria-hidden="true" />
-                <span className="sr-only">Local-only</span>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <Image
+                src="/icons/settings.png"
+                alt=""
+                width={37}
+                height={37}
+                aria-hidden="true"
+                className="shrink-0"
+              />
+              <h1 className="text-2xl font-semibold text-neutral-900">Settings</h1>
+              <span
+                className={[
+                  "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold",
+                  badge.className,
+                ].join(" ")}
+              >
+                {badge.text}
               </span>
             </div>
+            <p className="text-neutral-700 mt-2">
+              Personalize the tracker, manage sync, and tune notifications.
+            </p>
+          </div>
 
-            <div className="mt-4 space-y-2.5">
-              <ToggleRow
-                title="Interview reminders"
-                description="Highlight interviews and nudge you a day before."
-                value={prefs.reminders}
-                onChange={(next) => setPrefs((p) => ({ ...p, reminders: next }))}
-                badge="recommended"
-              />
-              <ToggleRow
-                title="Email notifications"
-                description="Send reminders and digests to your email address."
-                value={prefs.emailNotifications}
-                badge={signedIn ? undefined : "requires sign-in"}
-                onChange={(next) => {
-                  if (!signedIn) {
-                    openSignInGate();
-                    return;
-                  }
-                  setPrefs((p) => ({ ...p, emailNotifications: next }));
-                }}
-              />
-              <ToggleRow
-                title="Weekly digest"
-                description="Show a Monday summary of new activity and pending tasks."
-                value={prefs.digest}
-                onChange={(next) => setPrefs((p) => ({ ...p, digest: next }))}
-              />
-              <ToggleRow
-                title="Always keep sidebar collapsed"
-                description="Prevent expanding the sidebar to keep more room for content."
-                value={sidebarAlwaysCollapsed}
-                onChange={setSidebarAlwaysCollapsedEverywhere}
-              />
+          <div className="hidden sm:flex">
+            <span className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white/70 px-3 py-1 text-xs font-semibold text-neutral-700 shadow-sm">
+              <Lightbulb className="h-4 w-4 text-amber-600" aria-hidden="true" />
+              <span className="text-neutral-700">{headerTip}</span>
+            </span>
+          </div>
+        </div>
+      </div>
 
-              <div className="flex items-center justify-between gap-3 rounded-lg border border-neutral-200/80 bg-white/70 px-3 py-2.5 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/60">
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-neutral-900">
-                    Reset preferences
+      <div className="relative mt-6 grid gap-4 lg:grid-cols-[1.25fr_1fr] lg:items-stretch">
+        <article className="flex flex-col relative overflow-hidden rounded-xl border border-sky-100/80 bg-white/95 p-5 pl-6 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/70 before:absolute before:inset-y-0 before:left-0 before:w-2 before:rounded-l-xl before:bg-gradient-to-b before:from-indigo-600 before:to-sky-600 before:content-[''] lg:col-start-1 lg:row-start-1">
+          <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-neutral-200/50 blur-3xl" />
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                Account & sync
+              </p>
+              <div className="mt-1 flex items-center gap-4">
+                <div className="grid h-12 w-12 place-items-center rounded-full bg-white ring-1 ring-neutral-100 text-sm font-semibold text-neutral-900 shadow-sm">
+                  {signedIn ? (
+                    accountLabel[0]?.toUpperCase() || "U"
+                  ) : (
+                    <UserRound className="h-5 w-5 text-neutral-700" aria-hidden="true" />
+                  )}
+                </div>
+                <div>
+                  <p className="text-base font-semibold text-neutral-900">
+                    {accountLabel}
                   </p>
-                  <p className="text-xs text-neutral-600">
-                    Restore Settings toggles to their defaults.
+                  <p className="text-sm text-neutral-600">
+                    {signedIn
+                      ? session?.user?.email ?? "Signed in"
+                      : "Data stored in your browser (IndexedDB)"}
                   </p>
                 </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {!signedIn && (
                 <button
                   type="button"
-                  onClick={resetPreferences}
-                  className="inline-flex h-8 w-24 items-center justify-center rounded-lg border border-neutral-200 bg-white px-3 py-1 text-sm font-medium text-neutral-800 shadow-sm hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300"
+                  onClick={openSignInGate}
+                  className="inline-flex items-center gap-2 rounded-full bg-neutral-900 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:bg-neutral-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300"
                 >
-                  Reset
+                  <Sparkles className="h-4 w-4" aria-hidden="true" />
+                  Sign in to sync
                 </button>
+              )}
+              {signedIn && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDangerResult(null);
+                      setDeleteAccountDialogOpen(true);
+                    }}
+                    disabled={authBusy || dangerBusy}
+                    className={[
+                      "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold shadow-sm transition",
+                      "border-rose-700 bg-rose-600 text-white hover:bg-rose-500",
+                      "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-rose-300",
+                      authBusy || dangerBusy ? "opacity-70" : "",
+                    ].join(" ")}
+                  >
+                    <AlertTriangle className="h-4 w-4 text-white" aria-hidden="true" />
+                    Delete account
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    disabled={authBusy || dangerBusy}
+                    className={[
+                      "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold shadow-sm transition",
+                      "border-neutral-200 bg-white text-neutral-800 hover:bg-neutral-50",
+                      "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300",
+                      authBusy || dangerBusy ? "opacity-70" : "",
+                    ].join(" ")}
+                  >
+                    <LogOut className="h-4 w-4" aria-hidden="true" />
+                    {authBusy ? "Signing out…" : "Sign out"}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-4 flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col rounded-2xl border border-sky-100 bg-white/95 p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3 text-sm font-semibold text-neutral-900">
+                  <Cloud className="h-5 w-5 text-sky-600" aria-hidden="true" />
+                  <span>Your Data at a Glance</span>
+                </div>
+                <span className={[
+                  "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
+                  signedIn
+                    ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
+                    : "bg-amber-50 text-amber-700 ring-1 ring-amber-200",
+                ].join(" ")}>
+                  <span className={[
+                    "h-1.5 w-1.5 rounded-full",
+                    signedIn ? "bg-emerald-500 animate-pulse" : "bg-amber-500",
+                  ].join(" ")} />
+                  {signedIn ? "Synced" : "Local only"}
+                </span>
+              </div>
+
+              {dataCounts ? (
+                <>
+                  <div className="mt-3 grid grid-cols-4 gap-2">
+                    <div className="text-center rounded-lg bg-gradient-to-br from-indigo-50 to-sky-50 px-2 py-2.5 ring-1 ring-indigo-100/50">
+                      <p className="text-lg font-bold text-indigo-600">{dataCounts.all.applied}</p>
+                      <p className="text-[10px] font-medium text-indigo-600/70 uppercase tracking-wide">Applied</p>
+                    </div>
+                    <div className="text-center rounded-lg bg-gradient-to-br from-violet-50 to-purple-50 px-2 py-2.5 ring-1 ring-violet-100/50">
+                      <p className="text-lg font-bold text-violet-600">{dataCounts.all.wishlist}</p>
+                      <p className="text-[10px] font-medium text-violet-600/70 uppercase tracking-wide">Wishlist</p>
+                    </div>
+                    <div className="text-center rounded-lg bg-gradient-to-br from-sky-50 to-cyan-50 px-2 py-2.5 ring-1 ring-sky-100/50">
+                      <p className="text-lg font-bold text-sky-600">{dataCounts.all.interviews}</p>
+                      <p className="text-[10px] font-medium text-sky-600/70 uppercase tracking-wide">Interviews</p>
+                    </div>
+                    <div className="text-center rounded-lg bg-gradient-to-br from-emerald-50 to-teal-50 px-2 py-2.5 ring-1 ring-emerald-100/50">
+                      <p className="text-lg font-bold text-emerald-600">{dataCounts.all.offers}</p>
+                      <p className="text-[10px] font-medium text-emerald-600/70 uppercase tracking-wide">Offers</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between rounded-lg bg-neutral-50/80 px-3 py-2 ring-1 ring-neutral-100">
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-full bg-rose-400" />
+                        <span className="text-xs text-neutral-600">{dataCounts.all.rejected} rejected</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-full bg-neutral-400" />
+                        <span className="text-xs text-neutral-600">{dataCounts.all.withdrawn} withdrawn</span>
+                      </div>
+                    </div>
+                    <div className="text-xs font-medium text-neutral-500">
+                      {dataCounts.all.notes} notes
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="mt-3 flex-1 flex items-center justify-center">
+                  <p className="text-sm text-neutral-400">Loading your data...</p>
+                </div>
+              )}
+
+              <div className="mt-auto pt-3 border-t border-sky-100 flex items-center justify-between">
+                <p className="text-xs text-neutral-500">
+                  {signedIn ? "End-to-end encrypted & synced" : "Stored in browser only"}
+                </p>
+                <p className="text-xs font-medium text-neutral-600">
+                  {dataCounts
+                    ? `${dataCounts.all.applied + dataCounts.all.wishlist + dataCounts.all.interviews + dataCounts.all.offers + dataCounts.all.rejected + dataCounts.all.withdrawn} total items`
+                    : "–"}
+                </p>
               </div>
             </div>
-          </article>
-        </div>
+          </div>
 
-        <div className="space-y-4">
-          <article className="relative overflow-hidden rounded-xl border border-neutral-200/80 bg-white/80 p-5 pl-6 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/70 before:absolute before:inset-y-0 before:left-0 before:w-2 before:rounded-l-xl before:bg-gradient-to-b before:from-amber-500 before:to-orange-400 before:content-['']">
-            <div className="pointer-events-none absolute -right-14 -bottom-10 h-32 w-32 rounded-full bg-neutral-200/50 blur-3xl" />
 
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                  Data & backups
+        </article>
+
+        <article className="relative overflow-hidden rounded-xl border border-sky-100/80 bg-white/95 p-5 pl-6 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/70 before:absolute before:inset-y-0 before:left-0 before:w-2 before:rounded-l-xl before:bg-gradient-to-b before:from-emerald-500 before:to-teal-400 before:content-[''] lg:col-start-1 lg:row-start-2">
+          <div className="pointer-events-none absolute -left-16 -top-12 h-32 w-32 rounded-full bg-slate-200/50 blur-3xl" />
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                Preferences
+              </p>
+              <p className="text-sm text-neutral-700">
+                Saved locally and applied instantly.
+              </p>
+            </div>
+            <span className="inline-flex items-center text-neutral-500">
+              <HardDrive className="h-4 w-4" aria-hidden="true" />
+              <span className="sr-only">Local-only</span>
+            </span>
+          </div>
+
+          <div className="mt-4 space-y-2.5">
+            <ToggleRow
+              title="Interview reminders"
+              description="Highlight interviews and nudge you a day before."
+              value={prefs.reminders}
+              onChange={(next) => setPrefs((p) => ({ ...p, reminders: next }))}
+              badge="recommended"
+            />
+            <ToggleRow
+              title="Email notifications"
+              description="Send reminders and digests to your email address."
+              value={prefs.emailNotifications}
+              badge={signedIn ? undefined : "requires sign-in"}
+              onChange={(next) => {
+                if (!signedIn) {
+                  openSignInGate();
+                  return;
+                }
+                setPrefs((p) => ({ ...p, emailNotifications: next }));
+              }}
+            />
+            <ToggleRow
+              title="Weekly digest"
+              description="Show a Monday summary of new activity and pending tasks."
+              value={prefs.digest}
+              onChange={(next) => setPrefs((p) => ({ ...p, digest: next }))}
+            />
+            <ToggleRow
+              title="Always keep sidebar collapsed"
+              description="Prevent expanding the sidebar to keep more room for content."
+              value={sidebarAlwaysCollapsed}
+              onChange={setSidebarAlwaysCollapsedEverywhere}
+            />
+
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-neutral-200/80 bg-white/70 px-3 py-2.5 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/60">
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-neutral-900">
+                  Reset preferences
                 </p>
-                <p className="text-sm text-neutral-700">
-                  Export or review where your lists live.
+                <p className="text-xs text-neutral-600">
+                  Restore Settings toggles to their defaults.
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="text-sm font-semibold text-neutral-700">
-                  {storageMode === "user" ? "Cloud + Local" : "Local only"}
-                </div>
-                <Database className="h-5 w-5 text-neutral-400" aria-hidden="true" />
+              <button
+                type="button"
+                onClick={resetPreferences}
+                className="inline-flex h-8 w-24 items-center justify-center rounded-lg border border-neutral-200 bg-white px-3 py-1 text-sm font-medium text-neutral-800 shadow-sm hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300"
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+        </article>
+
+        <article className="relative overflow-hidden rounded-xl border border-neutral-200/80 bg-white/80 p-5 pl-6 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/70 before:absolute before:inset-y-0 before:left-0 before:w-2 before:rounded-l-xl before:bg-gradient-to-b before:from-amber-500 before:to-orange-400 before:content-[''] lg:col-start-2 lg:row-start-2">
+          <div className="pointer-events-none absolute -right-14 -bottom-10 h-32 w-32 rounded-full bg-neutral-200/50 blur-3xl" />
+
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                Data & backups
+              </p>
+              <p className="text-sm text-neutral-700">
+                Back up, restore, or delete your lists.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="text-sm font-semibold text-neutral-700">
+                {storageMode === "user" ? "Cloud + Local" : "Local only"}
+              </div>
+              <Database className="h-5 w-5 text-neutral-400" aria-hidden="true" />
+            </div>
+          </div>
+
+          <div className="mt-4 space-y-3">
+            <div className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-white/70 p-3 shadow-sm">
+              <ShieldCheck className="h-7 w-7 text-emerald-600" aria-hidden="true" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-neutral-900">Privacy first</p>
+                <p className="text-xs text-neutral-600">
+                  We never sell your data. In Guest mode, your data stays on this
+                  device and can be deleted anytime from Settings.
+                </p>
               </div>
             </div>
 
-            <div className="mt-3 space-y-3">
-              <div className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-white/70 p-3 shadow-sm">
-                <ShieldCheck className="h-7 w-7 text-emerald-600" aria-hidden="true" />
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-neutral-900">Privacy first</p>
-                  <p className="text-xs text-neutral-600">
-                    We never sell your data. You can clear guest data anytime by
-                    signing in and migrating.
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-start justify-between gap-3 rounded-lg border border-dashed border-neutral-300 bg-white/60 p-3">
-                  <div>
-                    <p className="text-sm font-semibold text-neutral-900">Import copy</p>
-                    <p className="text-xs text-neutral-600">Upload a JSON backup to restore lists into this browser.</p>
-                    {importResult && (
-                      <p
-                        className={[
-                          "mt-2 text-xs",
-                          importResult.type === "success"
-                            ? "text-emerald-700"
-                            : "text-rose-600",
-                        ].join(" ")}
-                      >
-                        {importResult.message}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      ref={importInputRef}
-                      type="file"
-                      accept="application/json"
-                      className="hidden"
-                      onChange={handleImportFile}
-                    />
-                    <button
-                      type="button"
-                      onClick={handleImportClick}
-                      className="inline-flex h-8 w-24 items-center justify-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-1 text-sm font-medium text-neutral-800 shadow-sm hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300"
-                    >
-                      <Cloud className="h-4 w-4" aria-hidden="true" />
-                      Import
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-start justify-between gap-3 rounded-lg border border-dashed border-rose-200 bg-white/60 p-3">
-                  <div>
-                    <p className="text-sm font-semibold text-neutral-900">Delete all data</p>
-                    <p className="text-xs text-neutral-600">
-                      Permanently remove all your lists and activity {storageMode === "user" ? "(local + sync)" : "from this browser"}.
-                    </p>
-                    {dangerResult && (
-                      <p
-                        className={[
-                          "mt-2 text-xs",
-                          dangerResult.type === "success"
-                            ? "text-emerald-700"
-                            : "text-rose-600",
-                        ].join(" ")}
-                      >
-                        {dangerResult.message}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDangerResult(null);
-                        setDeleteDataDialogOpen(true);
-                      }}
-                      disabled={dangerBusy}
+            <div className="space-y-3">
+              <div className="flex items-start justify-between gap-3 rounded-lg border border-dashed border-neutral-300 bg-white/60 p-3">
+                <div>
+                  <p className="text-sm font-semibold text-neutral-900">Import copy</p>
+                  <p className="text-xs text-neutral-600">Upload a JSON backup to restore lists into this browser.</p>
+                  {importResult && (
+                    <p
                       className={[
-                        "inline-flex h-8 w-24 items-center justify-center gap-2 rounded-lg border border-rose-200 bg-white px-3 py-1 text-sm font-medium text-rose-700 shadow-sm hover:bg-rose-50",
-                        "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-rose-300",
-                        dangerBusy ? "opacity-70" : "",
+                        "mt-2 text-xs",
+                        importResult.type === "success"
+                          ? "text-emerald-700"
+                          : "text-rose-600",
                       ].join(" ")}
                     >
-                      <AlertTriangle className="h-4 w-4" aria-hidden="true" />
-                      Delete
-                    </button>
-                  </div>
+                      {importResult.message}
+                    </p>
+                  )}
                 </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={importInputRef}
+                    type="file"
+                    accept="application/json"
+                    className="hidden"
+                    onChange={handleImportFile}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleImportClick}
+                    className="inline-flex h-8 w-24 items-center justify-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-1 text-sm font-medium text-neutral-800 shadow-sm hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300"
+                  >
+                    <Cloud className="h-4 w-4" aria-hidden="true" />
+                    Import
+                  </button>
+                </div>
+              </div>
 
-                <div className="flex items-start justify-between gap-3 rounded-lg border border-dashed border-neutral-300 bg-white/60 p-3">
-                  <div>
-                    <p className="text-sm font-semibold text-neutral-900">Export copy</p>
-                    <p className="text-xs text-neutral-600">Download a JSON backup of your lists for safekeeping.</p>
-                  </div>
-                  <div>
-                    <button
-                      type="button"
-                      className="inline-flex h-8 w-24 items-center justify-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-1 text-sm font-medium text-neutral-800 shadow-sm hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300"
-                      onClick={handleExport}
+              <div className="flex items-start justify-between gap-3 rounded-lg border border-dashed border-rose-200 bg-white/60 p-3">
+                <div>
+                  <p className="text-sm font-semibold text-neutral-900">Delete all data</p>
+                  <p className="text-xs text-neutral-600">
+                    Permanently remove all your lists and activity {storageMode === "user" ? "(local + sync)" : "from this browser"}.
+                  </p>
+                  {dangerResult && (
+                    <p
+                      className={[
+                        "mt-2 text-xs",
+                        dangerResult.type === "success"
+                          ? "text-emerald-700"
+                          : "text-rose-600",
+                      ].join(" ")}
                     >
-                      <Download className="h-4 w-4" aria-hidden="true" />
-                      Export
-                    </button>
-                  </div>
+                      {dangerResult.message}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDangerResult(null);
+                      setDeleteDataDialogOpen(true);
+                    }}
+                    disabled={dangerBusy}
+                    className={[
+                      "inline-flex h-8 w-24 items-center justify-center gap-2 rounded-lg border border-rose-200 bg-white px-3 py-1 text-sm font-medium text-rose-700 shadow-sm hover:bg-rose-50",
+                      "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-rose-300",
+                      dangerBusy ? "opacity-70" : "",
+                    ].join(" ")}
+                  >
+                    <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+                    Delete
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-start justify-between gap-3 rounded-lg border border-dashed border-neutral-300 bg-white/60 p-3">
+                <div>
+                  <p className="text-sm font-semibold text-neutral-900">Export copy</p>
+                  <p className="text-xs text-neutral-600">Download a JSON backup of your lists for safekeeping.</p>
+                </div>
+                <div>
+                  <button
+                    type="button"
+                    className="inline-flex h-8 w-24 items-center justify-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-1 text-sm font-medium text-neutral-800 shadow-sm hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300"
+                    onClick={handleExport}
+                  >
+                    <Download className="h-4 w-4" aria-hidden="true" />
+                    Export
+                  </button>
                 </div>
               </div>
             </div>
-          </article>
+          </div>
+        </article>
 
-          <article className="relative overflow-hidden rounded-xl border border-neutral-200/80 bg-white/80 p-5 pl-6 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/70 before:absolute before:inset-y-0 before:left-0 before:w-2 before:rounded-l-xl before:bg-gradient-to-b before:from-emerald-500 before:to-teal-400 before:content-['']">
+        <article className="relative overflow-hidden rounded-xl border border-neutral-200/80 bg-white/80 p-5 pl-6 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/70 before:absolute before:inset-y-0 before:left-0 before:w-2 before:rounded-l-xl before:bg-gradient-to-b before:from-emerald-500 before:to-teal-400 before:content-[''] lg:col-start-2 lg:row-start-1 flex flex-col">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                Data summary
+              </p>
+              <p className="text-sm text-neutral-700">
+                Items currently stored ({storageMode === "user" ? "cloud + local" : "local"}).
+              </p>
+            </div>
+            <BarChart3 className="h-5 w-5 text-neutral-400" aria-hidden="true" />
+          </div>
+
+          <div className="mt-2">
+            <div className="flex w-full overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm">
+              <button
+                type="button"
+                onClick={() => setDataSummaryRange("all")}
+                className={[
+                  "flex-1 px-3 py-1 text-center text-xs font-semibold",
+                  dataSummaryRange === "all"
+                    ? "bg-neutral-900 text-white"
+                    : "bg-white text-neutral-700 hover:bg-neutral-50",
+                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300",
+                ].join(" ")}
+              >
+                All time
+              </button>
+              <button
+                type="button"
+                onClick={() => setDataSummaryRange("lastMonth")}
+                className={[
+                  "flex-1 px-3 py-1 text-center text-xs font-semibold border-l border-neutral-200",
+                  dataSummaryRange === "lastMonth"
+                    ? "bg-neutral-900 text-white"
+                    : "bg-white text-neutral-700 hover:bg-neutral-50",
+                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300",
+                ].join(" ")}
+              >
+                Last month
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-2 rounded-lg border border-neutral-200 bg-white/80 p-4 shadow-sm flex-1">
+            {countsBusy && <p className="text-xs text-neutral-600">Loading…</p>}
+            {!countsBusy && visibleCounts && (
+              <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                <div className="flex items-center justify-between gap-2"><span className="text-neutral-700">Applied</span><span className="font-semibold text-neutral-900">{visibleCounts.applied}</span></div>
+                <div className="flex items-center justify-between gap-2"><span className="text-neutral-700">Wishlist</span><span className="font-semibold text-neutral-900">{visibleCounts.wishlist}</span></div>
+                <div className="flex items-center justify-between gap-2"><span className="text-neutral-700">Interviews</span><span className="font-semibold text-neutral-900">{visibleCounts.interviews}</span></div>
+                <div className="flex items-center justify-between gap-2"><span className="text-neutral-700">Offers</span><span className="font-semibold text-neutral-900">{visibleCounts.offers}</span></div>
+                <div className="flex items-center justify-between gap-2"><span className="text-neutral-700">Rejected</span><span className="font-semibold text-neutral-900">{visibleCounts.rejected}</span></div>
+                <div className="flex items-center justify-between gap-2"><span className="text-neutral-700">Withdrawn</span><span className="font-semibold text-neutral-900">{visibleCounts.withdrawn}</span></div>
+                <div className="flex items-center justify-between gap-2"><span className="text-neutral-700">Notes</span><span className="font-semibold text-neutral-900">{visibleCounts.notes}</span></div>
+              </div>
+            )}
+            {!countsBusy && !visibleCounts && (
+              <p className="text-xs text-neutral-600">Couldn’t load counts right now.</p>
+            )}
+          </div>
+
+          <div className="mt-3 rounded-lg border border-neutral-200 bg-white/70 p-3 text-xs text-neutral-600 shadow-sm">
             <div className="flex items-center justify-between gap-2">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                  Data summary
-                </p>
-                <p className="text-sm text-neutral-700">
-                  Items currently stored ({storageMode === "user" ? "cloud + local" : "local"}).
-                </p>
-              </div>
-              <BarChart3 className="h-5 w-5 text-neutral-400" aria-hidden="true" />
+              <span className="font-semibold text-neutral-700">Total items shown</span>
+              <span className="font-semibold text-neutral-900">
+                {visibleTotal ?? "—"}
+              </span>
             </div>
-
-            <div className="mt-2">
-              <div className="flex w-full overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => setDataSummaryRange("all")}
-                  className={[
-                    "flex-1 px-3 py-1 text-center text-xs font-semibold",
-                    dataSummaryRange === "all"
-                      ? "bg-neutral-900 text-white"
-                      : "bg-white text-neutral-700 hover:bg-neutral-50",
-                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300",
-                  ].join(" ")}
-                >
-                  All time
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDataSummaryRange("lastMonth")}
-                  className={[
-                    "flex-1 px-3 py-1 text-center text-xs font-semibold border-l border-neutral-200",
-                    dataSummaryRange === "lastMonth"
-                      ? "bg-neutral-900 text-white"
-                      : "bg-white text-neutral-700 hover:bg-neutral-50",
-                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300",
-                  ].join(" ")}
-                >
-                  Last month
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-2 rounded-lg border border-neutral-200 bg-white/80 p-4 shadow-sm">
-              {countsBusy && <p className="text-xs text-neutral-600">Loading…</p>}
-              {!countsBusy && visibleCounts && (
-                <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
-                  <div className="flex items-center justify-between gap-2"><span className="text-neutral-700">Applied</span><span className="font-semibold text-neutral-900">{visibleCounts.applied}</span></div>
-                  <div className="flex items-center justify-between gap-2"><span className="text-neutral-700">Wishlist</span><span className="font-semibold text-neutral-900">{visibleCounts.wishlist}</span></div>
-                  <div className="flex items-center justify-between gap-2"><span className="text-neutral-700">Interviews</span><span className="font-semibold text-neutral-900">{visibleCounts.interviews}</span></div>
-                  <div className="flex items-center justify-between gap-2"><span className="text-neutral-700">Offers</span><span className="font-semibold text-neutral-900">{visibleCounts.offers}</span></div>
-                  <div className="flex items-center justify-between gap-2"><span className="text-neutral-700">Rejected</span><span className="font-semibold text-neutral-900">{visibleCounts.rejected}</span></div>
-                  <div className="flex items-center justify-between gap-2"><span className="text-neutral-700">Withdrawn</span><span className="font-semibold text-neutral-900">{visibleCounts.withdrawn}</span></div>
-                  <div className="flex items-center justify-between gap-2"><span className="text-neutral-700">Notes</span><span className="font-semibold text-neutral-900">{visibleCounts.notes}</span></div>
-                </div>
-              )}
-              {!countsBusy && !visibleCounts && (
-                <p className="text-xs text-neutral-600">Couldn’t load counts right now.</p>
-              )}
-            </div>
-          </article>
-        </div>
+            <p className="mt-1">
+              {dataSummaryRange === "all"
+                ? "All time counts reflect your current lists."
+                : "Last month counts use the last 30 days of activity dates."}
+            </p>
+          </div>
+        </article>
       </div>
       {importDialogOpen && (
         <ImportConfirmDialog
