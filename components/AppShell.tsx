@@ -10,11 +10,28 @@ import RouteTransition from "@/components/RouteTransition";
 const STORAGE_KEY = "job-tracker:sidebar-collapsed";
 const ALWAYS_COLLAPSED_KEY = "job-tracker:sidebar-always-collapsed";
 const ALWAYS_COLLAPSED_EVENT = "job-tracker:set-sidebar-always-collapsed";
+const SIGNIN_GATE_SHOWN_KEY = "job-tracker:signin-gate-shown";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [alwaysCollapsed, setAlwaysCollapsed] = useState(false);
+  const [signInGateDefaultOpen, setSignInGateDefaultOpen] = useState(false);
   const pathname = usePathname();
+
+  // Show the sign-in gate once on a user's first visit (per browser).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    try {
+      const alreadyShown = window.localStorage.getItem(SIGNIN_GATE_SHOWN_KEY);
+      if (alreadyShown === "1") return;
+
+      window.localStorage.setItem(SIGNIN_GATE_SHOWN_KEY, "1");
+      setSignInGateDefaultOpen(true);
+    } catch {
+      // If storage is blocked, fall back to not auto-opening.
+    }
+  }, []);
 
   // Load persisted state
   useEffect(() => {
@@ -63,7 +80,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      <SignInGateDialog defaultOpen={false} />
+      <SignInGateDialog defaultOpen={signInGateDefaultOpen} />
 
       <Sidebar collapsed={collapsed} />
       <div className="min-h-screen pl-[var(--sidebar-width)] transition-[padding-left] duration-200">
