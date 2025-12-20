@@ -7,6 +7,8 @@ import type { Session, AuthChangeEvent } from "@supabase/supabase-js";
 import {
   AlertTriangle,
   BarChart3,
+  ChevronLeft,
+  ChevronRight,
   Cloud,
   Database,
   Download,
@@ -51,7 +53,7 @@ type DataCounts = {
 
 type DataCountsBundle = {
   all: DataCounts;
-  lastMonth: DataCounts;
+  byMonth: Record<string, DataCounts>; // key: "YYYY-MM"
 };
 
 const PREFS_KEY = "job-tracker:settings-preferences";
@@ -63,14 +65,6 @@ const DEFAULT_PREFS: Preferences = {
 
 const SIDEBAR_ALWAYS_COLLAPSED_KEY = "job-tracker:sidebar-always-collapsed";
 const SIDEBAR_ALWAYS_COLLAPSED_EVENT = "job-tracker:set-sidebar-always-collapsed";
-
-function toTimestamp(value?: string | null): number | null {
-  if (!value) return null;
-  const d = new Date(value);
-  const t = d.getTime();
-  if (!Number.isFinite(t)) return null;
-  return t;
-}
 
 function ToggleRow({
   title,
@@ -131,9 +125,10 @@ export default function SettingsPage() {
   const [sidebarAlwaysCollapsed, setSidebarAlwaysCollapsed] = useState(false);
   const [dataCounts, setDataCounts] = useState<DataCountsBundle | null>(null);
   const [countsBusy, setCountsBusy] = useState(false);
-  const [dataSummaryRange, setDataSummaryRange] = useState<"all" | "lastMonth">(
-    "all"
-  );
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
 
   // Load auth + storage mode
   useEffect(() => {
@@ -218,13 +213,29 @@ export default function SettingsPage() {
 
         if (!active) return;
 
-        const cutoffMs = Date.now() - 30 * 24 * 60 * 60 * 1000;
-        const countSince = <T,>(items: T[], getDate: (item: T) => string | null | undefined) =>
-          items.reduce((acc, item) => {
-            const t = toTimestamp(getDate(item));
-            if (t !== null && t >= cutoffMs) return acc + 1;
-            return acc;
-          }, 0);
+        const getMonthKey = (dateStr: string | null | undefined): string | null => {
+          if (!dateStr) return null;
+          const d = new Date(dateStr);
+          if (isNaN(d.getTime())) return null;
+          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        };
+
+        const groupByMonth = <T,>(
+          items: T[],
+          getDate: (item: T) => string | null | undefined,
+          byMonth: Record<string, DataCounts>,
+          key: keyof DataCounts
+        ) => {
+          for (const item of items) {
+            const monthKey = getMonthKey(getDate(item));
+            if (monthKey) {
+              if (!byMonth[monthKey]) {
+                byMonth[monthKey] = { applied: 0, interviews: 0, notes: 0, offers: 0, rejected: 0, wishlist: 0, withdrawn: 0 };
+              }
+              byMonth[monthKey][key]++;
+            }
+          }
+        };
 
         const all: DataCounts = {
           applied: appliedRes.items.length,
@@ -236,17 +247,16 @@ export default function SettingsPage() {
           withdrawn: withdrawnRes.items.length,
         };
 
-        const lastMonth: DataCounts = {
-          applied: countSince(appliedRes.items as any[], (a: any) => a?.appliedOn),
-          interviews: countSince(interviewsRes.items as any[], (i: any) => i?.date),
-          notes: countSince(notesRes.items as any[], (n: any) => n?.updatedAt),
-          offers: countSince(offersRes.items as any[], (o: any) => o?.offerReceivedDate ?? o?.decisionDate ?? o?.offerAcceptedDate ?? o?.offerDeclinedDate ?? o?.appliedOn),
-          rejected: countSince(rejectedRes.items as any[], (r: any) => r?.decisionDate ?? r?.appliedDate),
-          wishlist: countSince(wishlistRes.items as any[], (w: any) => w?.startDate ?? null),
-          withdrawn: countSince(withdrawnRes.items as any[], (w: any) => w?.withdrawnDate ?? w?.interviewDate ?? w?.appliedOn),
-        };
+        const byMonth: Record<string, DataCounts> = {};
+        groupByMonth(appliedRes.items as any[], (a: any) => a?.appliedOn, byMonth, "applied");
+        groupByMonth(interviewsRes.items as any[], (i: any) => i?.date, byMonth, "interviews");
+        groupByMonth(notesRes.items as any[], (n: any) => n?.updatedAt, byMonth, "notes");
+        groupByMonth(offersRes.items as any[], (o: any) => o?.offerReceivedDate ?? o?.decisionDate ?? o?.offerAcceptedDate ?? o?.offerDeclinedDate ?? o?.appliedOn, byMonth, "offers");
+        groupByMonth(rejectedRes.items as any[], (r: any) => r?.decisionDate ?? r?.appliedDate, byMonth, "rejected");
+        groupByMonth(wishlistRes.items as any[], (w: any) => w?.startDate ?? null, byMonth, "wishlist");
+        groupByMonth(withdrawnRes.items as any[], (w: any) => w?.withdrawnDate ?? w?.interviewDate ?? w?.appliedOn, byMonth, "withdrawn");
 
-        setDataCounts({ all, lastMonth });
+        setDataCounts({ all, byMonth });
       } catch {
         if (active) setDataCounts(null);
       } finally {
@@ -676,10 +686,39 @@ export default function SettingsPage() {
     ? "Tip: Export a JSON backup occasionally."
     : "Tip: Sign in to sync across devices.";
 
-  const visibleCounts = dataCounts ? dataCounts[dataSummaryRange] : null;
+  const visibleCounts = dataCounts?.byMonth[selectedMonth] ?? null;
   const visibleTotal = visibleCounts
     ? Object.values(visibleCounts).reduce((sum, n) => sum + n, 0)
-    : null;
+    : 0;
+
+  const formatMonthLabel = (monthKey: string) => {
+    const [year, month] = monthKey.split("-").map(Number);
+    const date = new Date(year, month - 1);
+    return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  };
+
+  const goToPrevMonth = () => {
+    const [year, month] = selectedMonth.split("-").map(Number);
+    const prev = new Date(year, month - 2);
+    setSelectedMonth(`${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}`);
+  };
+
+  const goToNextMonth = () => {
+    const [year, month] = selectedMonth.split("-").map(Number);
+    const next = new Date(year, month);
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const nextMonth = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
+    if (nextMonth <= currentMonth) {
+      setSelectedMonth(nextMonth);
+    }
+  };
+
+  const isCurrentMonth = () => {
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    return selectedMonth === currentMonth;
+  };
 
   return (
     <section
@@ -1094,45 +1133,44 @@ export default function SettingsPage() {
                 Data summary
               </p>
               <p className="text-sm text-neutral-700">
-                Items currently stored ({storageMode === "user" ? "cloud + local" : "local"}).
+                Activity by month ({storageMode === "user" ? "cloud + local" : "local"}).
               </p>
             </div>
             <BarChart3 className="h-5 w-5 text-neutral-400" aria-hidden="true" />
           </div>
 
           <div className="mt-2">
-            <div className="flex w-full overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm">
+            <div className="flex w-full items-center justify-between rounded-lg border border-neutral-200 bg-white px-1 py-1 shadow-sm">
               <button
                 type="button"
-                onClick={() => setDataSummaryRange("all")}
-                className={[
-                  "flex-1 px-3 py-1 text-center text-xs font-semibold",
-                  dataSummaryRange === "all"
-                    ? "bg-neutral-900 text-white"
-                    : "bg-white text-neutral-700 hover:bg-neutral-50",
-                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300",
-                ].join(" ")}
+                onClick={goToPrevMonth}
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-neutral-600 hover:bg-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-neutral-300"
+                aria-label="Previous month"
               >
-                All time
+                <ChevronLeft className="h-4 w-4" />
               </button>
+              <span className="text-sm font-semibold text-neutral-900">
+                {formatMonthLabel(selectedMonth)}
+              </span>
               <button
                 type="button"
-                onClick={() => setDataSummaryRange("lastMonth")}
+                onClick={goToNextMonth}
+                disabled={isCurrentMonth()}
                 className={[
-                  "flex-1 px-3 py-1 text-center text-xs font-semibold border-l border-neutral-200",
-                  dataSummaryRange === "lastMonth"
-                    ? "bg-neutral-900 text-white"
-                    : "bg-white text-neutral-700 hover:bg-neutral-50",
-                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300",
+                  "inline-flex h-7 w-7 items-center justify-center rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-neutral-300",
+                  isCurrentMonth()
+                    ? "text-neutral-300 cursor-not-allowed"
+                    : "text-neutral-600 hover:bg-neutral-100",
                 ].join(" ")}
+                aria-label="Next month"
               >
-                Last month
+                <ChevronRight className="h-4 w-4" />
               </button>
             </div>
           </div>
 
-          <div className="mt-2 rounded-lg border border-neutral-200 bg-white/80 p-4 shadow-sm flex-1">
-            {countsBusy && <p className="text-xs text-neutral-600">Loading…</p>}
+          <div className="mt-2 rounded-lg border border-neutral-200 bg-white/80 p-4 shadow-sm h-[168px] flex flex-col justify-center">
+            {countsBusy && <p className="text-xs text-neutral-600 text-center">Loading…</p>}
             {!countsBusy && visibleCounts && (
               <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
                 <div className="flex items-center justify-between gap-2"><span className="text-neutral-700">Applied</span><span className="font-semibold text-neutral-900">{visibleCounts.applied}</span></div>
@@ -1145,21 +1183,21 @@ export default function SettingsPage() {
               </div>
             )}
             {!countsBusy && !visibleCounts && (
-              <p className="text-xs text-neutral-600">Couldn’t load counts right now.</p>
+              <p className="text-sm text-neutral-500 text-center">No activity this month</p>
             )}
           </div>
 
           <div className="mt-3 rounded-lg border border-neutral-200 bg-white/70 p-3 text-xs text-neutral-600 shadow-sm">
             <div className="flex items-center justify-between gap-2">
-              <span className="font-semibold text-neutral-700">Total items shown</span>
+              <span className="font-semibold text-neutral-700">Items in {formatMonthLabel(selectedMonth).split(" ")[0]}</span>
               <span className="font-semibold text-neutral-900">
-                {visibleTotal ?? "—"}
+                {visibleTotal}
               </span>
             </div>
             <p className="mt-1">
-              {dataSummaryRange === "all"
-                ? "All time counts reflect your current lists."
-                : "Last month counts use the last 30 days of activity dates."}
+              {dataCounts?.all
+                ? `${Object.values(dataCounts.all).reduce((s, n) => s + n, 0)} total items across all time.`
+                : "Loading total..."}
             </p>
           </div>
         </article>
