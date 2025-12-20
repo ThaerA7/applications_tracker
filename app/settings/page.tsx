@@ -6,8 +6,6 @@ import { useRouter } from "next/navigation";
 import type { Session, AuthChangeEvent } from "@supabase/supabase-js";
 import {
   AlertTriangle,
-  Bell,
-  CheckCircle2,
   Cloud,
   Database,
   Download,
@@ -35,17 +33,41 @@ import { clearAllData, clearAllLocalData } from "@/lib/storage/purge";
 type Preferences = {
   reminders: boolean;
   digest: boolean;
-  compactCards: boolean;
-  tips: boolean;
+  emailNotifications: boolean;
+};
+
+type DataCounts = {
+  applied: number;
+  interviews: number;
+  notes: number;
+  offers: number;
+  rejected: number;
+  wishlist: number;
+  withdrawn: number;
+};
+
+type DataCountsBundle = {
+  all: DataCounts;
+  lastMonth: DataCounts;
 };
 
 const PREFS_KEY = "job-tracker:settings-preferences";
 const DEFAULT_PREFS: Preferences = {
   reminders: true,
   digest: false,
-  compactCards: false,
-  tips: true,
+  emailNotifications: false,
 };
+
+const SIDEBAR_ALWAYS_COLLAPSED_KEY = "job-tracker:sidebar-always-collapsed";
+const SIDEBAR_ALWAYS_COLLAPSED_EVENT = "job-tracker:set-sidebar-always-collapsed";
+
+function toTimestamp(value?: string | null): number | null {
+  if (!value) return null;
+  const d = new Date(value);
+  const t = d.getTime();
+  if (!Number.isFinite(t)) return null;
+  return t;
+}
 
 function ToggleRow({
   title,
@@ -88,7 +110,7 @@ function ToggleRow({
         <span
           className={[
             "inline-block h-4 w-4 transform rounded-full bg-white shadow transition",
-            value ? "translate-x-5" : "translate-x-1",
+            value ? "translate-x-6" : "translate-x-1",
           ].join(" ")}
         />
       </button>
@@ -103,6 +125,12 @@ export default function SettingsPage() {
   const [storageMode, setStorageMode] = useState<"guest" | "user">("guest");
   const [prefs, setPrefs] = useState<Preferences>(DEFAULT_PREFS);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
+  const [sidebarAlwaysCollapsed, setSidebarAlwaysCollapsed] = useState(false);
+  const [dataCounts, setDataCounts] = useState<DataCountsBundle | null>(null);
+  const [countsBusy, setCountsBusy] = useState(false);
+  const [dataSummaryRange, setDataSummaryRange] = useState<"all" | "lastMonth">(
+    "all"
+  );
 
   // Load auth + storage mode
   useEffect(() => {
@@ -135,8 +163,19 @@ export default function SettingsPage() {
     try {
       const raw = window.localStorage.getItem(PREFS_KEY);
       if (raw) {
-        const parsed = JSON.parse(raw);
-        setPrefs({ ...DEFAULT_PREFS, ...(parsed as Preferences) });
+        const parsed = JSON.parse(raw) as Partial<Preferences> | null;
+        setPrefs({
+          reminders:
+            typeof parsed?.reminders === "boolean"
+              ? parsed.reminders
+              : DEFAULT_PREFS.reminders,
+          digest:
+            typeof parsed?.digest === "boolean" ? parsed.digest : DEFAULT_PREFS.digest,
+          emailNotifications:
+            typeof parsed?.emailNotifications === "boolean"
+              ? parsed.emailNotifications
+              : DEFAULT_PREFS.emailNotifications,
+        });
       }
     } catch {
       setPrefs(DEFAULT_PREFS);
@@ -144,6 +183,78 @@ export default function SettingsPage() {
       setPrefsLoaded(true);
     }
   }, []);
+
+  // Load sidebar "always collapsed" setting (shared with AppShell)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const stored = window.localStorage.getItem(SIDEBAR_ALWAYS_COLLAPSED_KEY);
+      setSidebarAlwaysCollapsed(stored === "1" || stored === "true");
+    } catch {
+      setSidebarAlwaysCollapsed(false);
+    }
+  }, []);
+
+  // Load a lightweight summary of stored list sizes
+  useEffect(() => {
+    let active = true;
+    setCountsBusy(true);
+    setDataCounts(null);
+
+    void (async () => {
+      try {
+        const [appliedRes, interviewsRes, notesRes, offersRes, rejectedRes, wishlistRes, withdrawnRes] = await Promise.all([
+          loadApplied(),
+          loadInterviews(),
+          loadNotes(),
+          loadOffers(),
+          loadRejected(),
+          loadWishlist(),
+          loadWithdrawn(),
+        ]);
+
+        if (!active) return;
+
+        const cutoffMs = Date.now() - 30 * 24 * 60 * 60 * 1000;
+        const countSince = <T,>(items: T[], getDate: (item: T) => string | null | undefined) =>
+          items.reduce((acc, item) => {
+            const t = toTimestamp(getDate(item));
+            if (t !== null && t >= cutoffMs) return acc + 1;
+            return acc;
+          }, 0);
+
+        const all: DataCounts = {
+          applied: appliedRes.items.length,
+          interviews: interviewsRes.items.length,
+          notes: notesRes.items.length,
+          offers: offersRes.items.length,
+          rejected: rejectedRes.items.length,
+          wishlist: wishlistRes.items.length,
+          withdrawn: withdrawnRes.items.length,
+        };
+
+        const lastMonth: DataCounts = {
+          applied: countSince(appliedRes.items as any[], (a: any) => a?.appliedOn),
+          interviews: countSince(interviewsRes.items as any[], (i: any) => i?.date),
+          notes: countSince(notesRes.items as any[], (n: any) => n?.updatedAt),
+          offers: countSince(offersRes.items as any[], (o: any) => o?.offerReceivedDate ?? o?.decisionDate ?? o?.offerAcceptedDate ?? o?.offerDeclinedDate ?? o?.appliedOn),
+          rejected: countSince(rejectedRes.items as any[], (r: any) => r?.decisionDate ?? r?.appliedDate),
+          wishlist: countSince(wishlistRes.items as any[], (w: any) => w?.startDate ?? null),
+          withdrawn: countSince(withdrawnRes.items as any[], (w: any) => w?.withdrawnDate ?? w?.interviewDate ?? w?.appliedOn),
+        };
+
+        setDataCounts({ all, lastMonth });
+      } catch {
+        if (active) setDataCounts(null);
+      } finally {
+        if (active) setCountsBusy(false);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [storageMode]);
 
   // Persist preferences
   useEffect(() => {
@@ -156,6 +267,33 @@ export default function SettingsPage() {
   }, [prefs, prefsLoaded]);
 
   const signedIn = !!session?.user;
+
+  const setSidebarAlwaysCollapsedEverywhere = useCallback((next: boolean) => {
+    setSidebarAlwaysCollapsed(next);
+    try {
+      window.localStorage.setItem(SIDEBAR_ALWAYS_COLLAPSED_KEY, next ? "1" : "0");
+    } catch {
+      // ignore
+    }
+    try {
+      window.dispatchEvent(
+        new CustomEvent(SIDEBAR_ALWAYS_COLLAPSED_EVENT, {
+          detail: { alwaysCollapsed: next },
+        })
+      );
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const resetPreferences = useCallback(() => {
+    setPrefs(DEFAULT_PREFS);
+    try {
+      window.localStorage.removeItem(PREFS_KEY);
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const accountLabel = useMemo(() => {
     if (!session?.user) return "Guest";
@@ -531,6 +669,8 @@ export default function SettingsPage() {
         "border-amber-200 bg-amber-50 text-amber-800 shadow-[0_1px_2px_rgba(251,191,36,0.18)]",
     };
 
+  const visibleCounts = dataCounts ? dataCounts[dataSummaryRange] : null;
+
   return (
     <section
       className={[
@@ -579,7 +719,9 @@ export default function SettingsPage() {
                 </p>
                 <div className="mt-1 flex items-center gap-4">
                   <div className="grid h-12 w-12 place-items-center rounded-full bg-white ring-1 ring-neutral-100 text-sm font-semibold text-neutral-900 shadow-sm">
-                    {signedIn ? accountLabel[0]?.toUpperCase() || "U" : (
+                    {signedIn ? (
+                      accountLabel[0]?.toUpperCase() || "U"
+                    ) : (
                       <UserRound className="h-5 w-5 text-neutral-700" aria-hidden="true" />
                     )}
                   </div>
@@ -653,7 +795,9 @@ export default function SettingsPage() {
                     <Cloud className="h-5 w-5 text-sky-600" aria-hidden="true" />
                     <span>Sync & Privacy</span>
                   </div>
-                  <div className="text-xs text-neutral-500">{storageMode === 'user' ? 'Synced' : 'Guest'}</div>
+                  <div className="text-xs text-neutral-500">
+                    {storageMode === "user" ? "Synced" : "Guest"}
+                  </div>
                 </div>
                 <p className="mt-2 text-sm text-neutral-600">
                   {storageMode === "user"
@@ -689,25 +833,48 @@ export default function SettingsPage() {
                 badge="recommended"
               />
               <ToggleRow
+                title="Email notifications"
+                description="Send reminders and digests to your email address."
+                value={prefs.emailNotifications}
+                badge={signedIn ? undefined : "requires sign-in"}
+                onChange={(next) => {
+                  if (!signedIn) {
+                    openSignInGate();
+                    return;
+                  }
+                  setPrefs((p) => ({ ...p, emailNotifications: next }));
+                }}
+              />
+              <ToggleRow
                 title="Weekly digest"
                 description="Show a Monday summary of new activity and pending tasks."
                 value={prefs.digest}
                 onChange={(next) => setPrefs((p) => ({ ...p, digest: next }))}
               />
               <ToggleRow
-                title="Compact cards"
-                description="Tighten spacing for dense lists on desktop."
-                value={prefs.compactCards}
-                onChange={(next) =>
-                  setPrefs((p) => ({ ...p, compactCards: next }))
-                }
+                title="Always keep sidebar collapsed"
+                description="Prevent expanding the sidebar to keep more room for content."
+                value={sidebarAlwaysCollapsed}
+                onChange={setSidebarAlwaysCollapsedEverywhere}
               />
-              <ToggleRow
-                title="Tips & guidance"
-                description="Keep lightweight tips visible across pages."
-                value={prefs.tips}
-                onChange={(next) => setPrefs((p) => ({ ...p, tips: next }))}
-              />
+
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-neutral-200/80 bg-white/70 px-3 py-2.5 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/60">
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-neutral-900">
+                    Reset preferences
+                  </p>
+                  <p className="text-xs text-neutral-600">
+                    Restore Settings toggles to their defaults.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={resetPreferences}
+                  className="inline-flex h-8 w-24 items-center justify-center rounded-lg border border-neutral-200 bg-white px-3 py-1 text-sm font-medium text-neutral-800 shadow-sm hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300"
+                >
+                  Reset
+                </button>
+              </div>
             </div>
           </article>
         </div>
@@ -734,14 +901,10 @@ export default function SettingsPage() {
             </div>
 
             <div className="mt-4 space-y-3">
-
-
               <div className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-white/70 p-3 shadow-sm">
                 <ShieldCheck className="h-7 w-7 text-emerald-600" aria-hidden="true" />
                 <div className="flex-1">
-                  <p className="text-sm font-semibold text-neutral-900">
-                    Privacy first
-                  </p>
+                  <p className="text-sm font-semibold text-neutral-900">Privacy first</p>
                   <p className="text-xs text-neutral-600">
                     We never sell your data. You can clear guest data anytime by
                     signing in and migrating.
@@ -778,7 +941,7 @@ export default function SettingsPage() {
                     <button
                       type="button"
                       onClick={handleImportClick}
-                      className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-sm font-medium text-neutral-800 shadow-sm hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300"
+                      className="inline-flex h-8 w-24 items-center justify-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-1 text-sm font-medium text-neutral-800 shadow-sm hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300"
                     >
                       <Cloud className="h-4 w-4" aria-hidden="true" />
                       Import
@@ -814,7 +977,7 @@ export default function SettingsPage() {
                       }}
                       disabled={dangerBusy}
                       className={[
-                        "inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-sm font-medium text-rose-700 shadow-sm hover:bg-rose-50",
+                        "inline-flex h-8 w-24 items-center justify-center gap-2 rounded-lg border border-rose-200 bg-white px-3 py-1 text-sm font-medium text-rose-700 shadow-sm hover:bg-rose-50",
                         "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-rose-300",
                         dangerBusy ? "opacity-70" : "",
                       ].join(" ")}
@@ -833,7 +996,7 @@ export default function SettingsPage() {
                   <div>
                     <button
                       type="button"
-                      className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-sm font-medium text-neutral-800 shadow-sm hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300"
+                      className="inline-flex h-8 w-24 items-center justify-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-1 text-sm font-medium text-neutral-800 shadow-sm hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300"
                       onClick={handleExport}
                     >
                       <Download className="h-4 w-4" aria-hidden="true" />
@@ -845,47 +1008,66 @@ export default function SettingsPage() {
             </div>
           </article>
 
-          <article className="relative overflow-hidden rounded-xl border border-neutral-200/80 bg-white/80 p-5 pl-6 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/70 before:absolute before:inset-y-0 before:left-0 before:w-2 before:rounded-l-xl before:bg-gradient-to-b before:from-fuchsia-500 before:to-violet-400 before:content-['']">
+          <article className="relative overflow-hidden rounded-xl border border-neutral-200/80 bg-white/80 p-5 pl-6 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/70 before:absolute before:inset-y-0 before:left-0 before:w-2 before:rounded-l-xl before:bg-gradient-to-b before:from-emerald-500 before:to-teal-400 before:content-['']">
             <div className="flex items-center justify-between gap-2">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                  Notification preview
+                  Data summary
                 </p>
                 <p className="text-sm text-neutral-700">
-                  See what reminders will look like.
+                  Items currently stored ({storageMode === "user" ? "cloud + local" : "local"}).
                 </p>
               </div>
-              <Bell className="h-5 w-5 text-neutral-400" aria-hidden="true" />
+              <Database className="h-5 w-5 text-neutral-400" aria-hidden="true" />
             </div>
 
-            <div className="mt-4 space-y-3">
-              <div className="rounded-lg border border-neutral-200 bg-white/80 p-4 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2
-                    className="h-5 w-5 text-emerald-600"
-                    aria-hidden="true"
-                  />
-                  <p className="text-sm font-semibold text-neutral-900">
-                    Interview tomorrow at 10:00
-                  </p>
-                </div>
-                <p className="mt-1 text-xs text-neutral-600">
-                  We will remind you 24h before and on the day, respecting your
-                  preferences above.
-                </p>
+            <div className="mt-3 flex justify-end">
+              <div className="inline-flex overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setDataSummaryRange("all")}
+                  className={[
+                    "px-3 py-1 text-xs font-semibold",
+                    dataSummaryRange === "all"
+                      ? "bg-neutral-900 text-white"
+                      : "bg-white text-neutral-700 hover:bg-neutral-50",
+                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300",
+                  ].join(" ")}
+                >
+                  All time
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDataSummaryRange("lastMonth")}
+                  className={[
+                    "px-3 py-1 text-xs font-semibold border-l border-neutral-200",
+                    dataSummaryRange === "lastMonth"
+                      ? "bg-neutral-900 text-white"
+                      : "bg-white text-neutral-700 hover:bg-neutral-50",
+                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300",
+                  ].join(" ")}
+                >
+                  Last month
+                </button>
               </div>
-              <div className="rounded-lg border border-neutral-200 bg-white/80 p-4 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-indigo-600" aria-hidden="true" />
-                  <p className="text-sm font-semibold text-neutral-900">
-                    Weekly digest
-                  </p>
+            </div>
+
+            <div className="mt-4 rounded-lg border border-neutral-200 bg-white/80 p-4 shadow-sm">
+              {countsBusy && <p className="text-xs text-neutral-600">Loading…</p>}
+              {!countsBusy && visibleCounts && (
+                <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                  <div className="flex items-center justify-between gap-2"><span className="text-neutral-700">Applied</span><span className="font-semibold text-neutral-900">{visibleCounts.applied}</span></div>
+                  <div className="flex items-center justify-between gap-2"><span className="text-neutral-700">Wishlist</span><span className="font-semibold text-neutral-900">{visibleCounts.wishlist}</span></div>
+                  <div className="flex items-center justify-between gap-2"><span className="text-neutral-700">Interviews</span><span className="font-semibold text-neutral-900">{visibleCounts.interviews}</span></div>
+                  <div className="flex items-center justify-between gap-2"><span className="text-neutral-700">Offers</span><span className="font-semibold text-neutral-900">{visibleCounts.offers}</span></div>
+                  <div className="flex items-center justify-between gap-2"><span className="text-neutral-700">Rejected</span><span className="font-semibold text-neutral-900">{visibleCounts.rejected}</span></div>
+                  <div className="flex items-center justify-between gap-2"><span className="text-neutral-700">Withdrawn</span><span className="font-semibold text-neutral-900">{visibleCounts.withdrawn}</span></div>
+                  <div className="flex items-center justify-between gap-2"><span className="text-neutral-700">Notes</span><span className="font-semibold text-neutral-900">{visibleCounts.notes}</span></div>
                 </div>
-                <p className="mt-1 text-xs text-neutral-600">
-                  Monday overview of new applications, interviews, and notes.
-                  Toggle anytime.
-                </p>
-              </div>
+              )}
+              {!countsBusy && !visibleCounts && (
+                <p className="text-xs text-neutral-600">Couldn’t load counts right now.</p>
+              )}
             </div>
           </article>
         </div>
