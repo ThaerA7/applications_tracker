@@ -903,7 +903,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="mt-4 space-y-3">
+            <div className="mt-3 space-y-3">
               <div className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-white/70 p-3 shadow-sm">
                 <ShieldCheck className="h-7 w-7 text-emerald-600" aria-hidden="true" />
                 <div className="flex-1">
