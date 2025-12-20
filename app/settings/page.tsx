@@ -6,9 +6,11 @@ import { useRouter } from "next/navigation";
 import type { Session, AuthChangeEvent } from "@supabase/supabase-js";
 import {
   AlertTriangle,
+  BarChart3,
   Cloud,
   Database,
   Download,
+  HardDrive,
   LogOut,
   ShieldCheck,
   Sparkles,
@@ -819,8 +821,9 @@ export default function SettingsPage() {
                   Saved locally and applied instantly.
                 </p>
               </div>
-              <span className="rounded-full border border-neutral-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-neutral-700">
-                Local-only
+              <span className="inline-flex items-center text-neutral-500">
+                <HardDrive className="h-4 w-4" aria-hidden="true" />
+                <span className="sr-only">Local-only</span>
               </span>
             </div>
 
@@ -1018,16 +1021,16 @@ export default function SettingsPage() {
                   Items currently stored ({storageMode === "user" ? "cloud + local" : "local"}).
                 </p>
               </div>
-              <Database className="h-5 w-5 text-neutral-400" aria-hidden="true" />
+              <BarChart3 className="h-5 w-5 text-neutral-400" aria-hidden="true" />
             </div>
 
-            <div className="mt-3 flex justify-end">
-              <div className="inline-flex overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm">
+            <div className="mt-2">
+              <div className="flex w-full overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm">
                 <button
                   type="button"
                   onClick={() => setDataSummaryRange("all")}
                   className={[
-                    "px-3 py-1 text-xs font-semibold",
+                    "flex-1 px-3 py-1 text-center text-xs font-semibold",
                     dataSummaryRange === "all"
                       ? "bg-neutral-900 text-white"
                       : "bg-white text-neutral-700 hover:bg-neutral-50",
@@ -1040,7 +1043,7 @@ export default function SettingsPage() {
                   type="button"
                   onClick={() => setDataSummaryRange("lastMonth")}
                   className={[
-                    "px-3 py-1 text-xs font-semibold border-l border-neutral-200",
+                    "flex-1 px-3 py-1 text-center text-xs font-semibold border-l border-neutral-200",
                     dataSummaryRange === "lastMonth"
                       ? "bg-neutral-900 text-white"
                       : "bg-white text-neutral-700 hover:bg-neutral-50",
@@ -1052,7 +1055,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="mt-4 rounded-lg border border-neutral-200 bg-white/80 p-4 shadow-sm">
+            <div className="mt-2 rounded-lg border border-neutral-200 bg-white/80 p-4 shadow-sm">
               {countsBusy && <p className="text-xs text-neutral-600">Loading…</p>}
               {!countsBusy && visibleCounts && (
                 <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
