@@ -64,9 +64,7 @@ function safeParseList(raw: any): WishlistItem[] {
   return raw
     .filter(
       (x) =>
-        isObject(x) &&
-        typeof x.company === "string" &&
-        typeof x.id === "string"
+        isObject(x) && typeof x.company === "string" && typeof x.id === "string"
     )
     .map((x) => x as WishlistItem);
 }
@@ -151,7 +149,9 @@ async function loadUserWishlist(): Promise<WishlistItem[]> {
     id: row.id,
   }));
 
-  const parsed = safeParseList(mapped.map((m: any) => ({ ...m, id: String(m.id) })));
+  const parsed = safeParseList(
+    mapped.map((m: any) => ({ ...m, id: String(m.id) }))
+  );
   return parsed;
 }
 
@@ -205,7 +205,10 @@ export async function loadWishlist(): Promise<{
 
   const lastUserId = getFallbackUserId();
   if (lastUserId) {
-    const cached = await readUserCache<WishlistItem[]>(GUEST_IDB_KEY, lastUserId);
+    const cached = await readUserCache<WishlistItem[]>(
+      GUEST_IDB_KEY,
+      lastUserId
+    );
     const fallback = safeParseList(cached ?? []);
     const { next, changed } = normalizeWishlist(fallback);
     if (changed) await writeUserCache(GUEST_IDB_KEY, lastUserId, next);
@@ -237,7 +240,9 @@ export async function upsertWishlistItem(
         safeParseList,
         (prev) => {
           const idx = prev.findIndex((x) => x.id === item.id);
-          return idx === -1 ? [item, ...prev] : prev.map((x) => (x.id === item.id ? item : x));
+          return idx === -1
+            ? [item, ...prev]
+            : prev.map((x) => (x.id === item.id ? item : x));
         }
       );
     }
@@ -254,7 +259,10 @@ export async function upsertWishlistItem(
   notifyCountsChanged();
 }
 
-export async function deleteWishlistItem(id: string, _mode: WishlistStorageMode) {
+export async function deleteWishlistItem(
+  id: string,
+  _mode: WishlistStorageMode
+) {
   void _mode;
   const actualMode = await detectWishlistMode();
 
@@ -269,8 +277,7 @@ export async function deleteWishlistItem(id: string, _mode: WishlistStorageMode)
         (prev) => prev.filter((x) => x.id !== id)
       );
     }
-  }
-  else {
+  } else {
     const prev = await loadGuestWishlist();
     const next = prev.filter((x) => x.id !== id);
     await saveGuestWishlist(next);

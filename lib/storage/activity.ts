@@ -85,10 +85,10 @@ function makeUuidV4() {
   buf[8] = (buf[8] & 0x3f) | 0x80;
 
   const hex = [...buf].map((b) => b.toString(16).padStart(2, "0")).join("");
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(
-    16,
-    20
-  )}-${hex.slice(20)}`;
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(
+    12,
+    16
+  )}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 function normalizeItem(item: ActivityItem): ActivityItem {
@@ -105,7 +105,10 @@ function isObject(v: any) {
 function safeParseList(raw: any): ActivityItem[] {
   if (!Array.isArray(raw)) return [];
   return raw
-    .filter((x) => isObject(x) && typeof x.id === "string" && typeof x.appId === "string")
+    .filter(
+      (x) =>
+        isObject(x) && typeof x.id === "string" && typeof x.appId === "string"
+    )
     .map((x) => x as ActivityItem);
 }
 
@@ -152,7 +155,10 @@ async function loadUser(variant: ActivityVariant): Promise<ActivityItem[]> {
     return [];
   }
 
-  const mapped = (data ?? []).map((row: any) => ({ ...(row.data ?? {}), id: row.id }));
+  const mapped = (data ?? []).map((row: any) => ({
+    ...(row.data ?? {}),
+    id: row.id,
+  }));
   return safeParseList(mapped);
 }
 
@@ -246,7 +252,8 @@ export async function appendActivity(
         guestIdbKey(variant),
         userId,
         safeParseList,
-        (prev) => [clean, ...prev.filter((x) => x.id !== clean.id)].slice(0, MAX_ITEMS)
+        (prev) =>
+          [clean, ...prev.filter((x) => x.id !== clean.id)].slice(0, MAX_ITEMS)
       );
     }
   } else {
@@ -280,13 +287,19 @@ export async function deleteActivity(
     }
   } else {
     const prev = await loadGuest(variant);
-    await saveGuest(variant, prev.filter((x) => x.id !== id));
+    await saveGuest(
+      variant,
+      prev.filter((x) => x.id !== id)
+    );
   }
 
   notifyCountsChanged();
 }
 
-export async function clearActivity(variant: ActivityVariant, _mode: ActivityStorageMode) {
+export async function clearActivity(
+  variant: ActivityVariant,
+  _mode: ActivityStorageMode
+) {
   void _mode;
   const actualMode = await detectActivityMode();
 
@@ -329,7 +342,9 @@ export async function migrateGuestActivityToUser() {
 
     const fixedGuest = payload.map((p) => p.data);
 
-    const { error } = await supabase.from(TABLE).upsert(payload, { onConflict: "id" });
+    const { error } = await supabase
+      .from(TABLE)
+      .upsert(payload, { onConflict: "id" });
     if (error) {
       console.error("Guest → user activity migration failed:", error.message);
       continue;

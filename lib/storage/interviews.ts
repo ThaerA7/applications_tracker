@@ -19,7 +19,6 @@ export type StoredInterview = {
 
 export type InterviewsStorageMode = "guest" | "user";
 
-
 const GUEST_IDB_KEY = "interviews";
 
 const TABLE = "applications";
@@ -39,7 +38,9 @@ function isObject(v: any) {
 
 function safeParseList(raw: any): StoredInterview[] {
   if (!Array.isArray(raw)) return [];
-  return raw.filter((x) => isObject(x) && typeof x.id === "string") as StoredInterview[];
+  return raw.filter(
+    (x) => isObject(x) && typeof x.id === "string"
+  ) as StoredInterview[];
 }
 
 // ---------- guest storage ----------
@@ -50,9 +51,7 @@ async function loadGuestInterviews(): Promise<StoredInterview[]> {
     return safeParseList(idb ?? []);
   } catch {}
 
-  
-    return [];
-  
+  return [];
 }
 
 async function saveGuestInterviews(list: StoredInterview[]) {
@@ -83,7 +82,10 @@ async function loadUserInterviews(): Promise<StoredInterview[]> {
     return [];
   }
 
-  const mapped = (data ?? []).map((row: any) => ({ ...(row.data ?? {}), id: row.id }));
+  const mapped = (data ?? []).map((row: any) => ({
+    ...(row.data ?? {}),
+    id: row.id,
+  }));
 
   return safeParseList(mapped);
 }
@@ -144,7 +146,10 @@ export async function loadInterviews(): Promise<{
 
   const lastUserId = getFallbackUserId();
   if (lastUserId) {
-    const cached = await readUserCache<StoredInterview[]>(GUEST_IDB_KEY, lastUserId);
+    const cached = await readUserCache<StoredInterview[]>(
+      GUEST_IDB_KEY,
+      lastUserId
+    );
     const fallback = safeParseList(cached ?? []);
     if (fallback.length > 0) return { mode, items: fallback };
   }
@@ -189,7 +194,10 @@ export async function upsertInterview(
   notifyCountsChanged();
 }
 
-export async function deleteInterview(id: string, _mode: InterviewsStorageMode) {
+export async function deleteInterview(
+  id: string,
+  _mode: InterviewsStorageMode
+) {
   void _mode;
   const actualMode = await detectInterviewsMode();
 

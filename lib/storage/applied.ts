@@ -38,7 +38,9 @@ function isObject(v: any) {
 
 function safeParseList(raw: any): AppliedApplication[] {
   if (!Array.isArray(raw)) return [];
-  return raw.filter((x) => isObject(x) && typeof x.id === "string") as AppliedApplication[];
+  return raw.filter(
+    (x) => isObject(x) && typeof x.id === "string"
+  ) as AppliedApplication[];
 }
 
 // ---------- guest storage ----------
@@ -80,7 +82,10 @@ async function loadUserApplied(): Promise<AppliedApplication[]> {
     return [];
   }
 
-  const mapped = (data ?? []).map((row: any) => ({ ...(row.data ?? {}), id: row.id }));
+  const mapped = (data ?? []).map((row: any) => ({
+    ...(row.data ?? {}),
+    id: row.id,
+  }));
 
   return safeParseList(mapped);
 }
@@ -88,16 +93,14 @@ async function loadUserApplied(): Promise<AppliedApplication[]> {
 async function upsertUserApplied(app: AppliedApplication) {
   const supabase = getSupabaseClient();
 
-  const { error } = await supabase
-    .from(TABLE)
-    .upsert(
-      {
-        id: app.id,
-        bucket: BUCKET,
-        data: app,
-      },
-      { onConflict: "id" }
-    );
+  const { error } = await supabase.from(TABLE).upsert(
+    {
+      id: app.id,
+      bucket: BUCKET,
+      data: app,
+    },
+    { onConflict: "id" }
+  );
 
   if (error) {
     console.error("Failed to upsert applied in Supabase:", error.message);
@@ -143,7 +146,10 @@ export async function loadApplied(): Promise<{
 
   const lastUserId = getFallbackUserId();
   if (lastUserId) {
-    const cached = await readUserCache<AppliedApplication[]>(GUEST_IDB_KEY, lastUserId);
+    const cached = await readUserCache<AppliedApplication[]>(
+      GUEST_IDB_KEY,
+      lastUserId
+    );
     const fallback = safeParseList(cached ?? []);
     if (fallback.length > 0) return { mode, items: fallback };
   }
@@ -168,7 +174,9 @@ export async function upsertApplied(
         safeParseList,
         (prev) => {
           const idx = prev.findIndex((x) => x.id === app.id);
-          return idx === -1 ? [app, ...prev] : prev.map((x) => (x.id === app.id ? app : x));
+          return idx === -1
+            ? [app, ...prev]
+            : prev.map((x) => (x.id === app.id ? app : x));
         }
       );
     }
@@ -186,10 +194,7 @@ export async function upsertApplied(
   notifyCountsChanged();
 }
 
-export async function deleteApplied(
-  id: string,
-  _mode: AppliedStorageMode
-) {
+export async function deleteApplied(id: string, _mode: AppliedStorageMode) {
   void _mode;
   const actualMode = await detectAppliedMode();
 

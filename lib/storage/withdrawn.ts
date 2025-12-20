@@ -34,7 +34,9 @@ function isObject(v: any) {
 
 function safeParseList(raw: any): WithdrawnApplication[] {
   if (!Array.isArray(raw)) return [];
-  return raw.filter((x) => isObject(x) && typeof x.id === "string") as WithdrawnApplication[];
+  return raw.filter(
+    (x) => isObject(x) && typeof x.id === "string"
+  ) as WithdrawnApplication[];
 }
 
 // ---------- guest storage (IndexedDB ONLY) ----------
@@ -87,16 +89,14 @@ async function loadUserWithdrawn(): Promise<WithdrawnApplication[]> {
 async function upsertUserWithdrawn(app: WithdrawnApplication) {
   const supabase = getSupabaseClient();
 
-  const { error } = await supabase
-    .from(TABLE)
-    .upsert(
-      {
-        id: app.id,
-        bucket: BUCKET,
-        data: app,
-      },
-      { onConflict: "id" }
-    );
+  const { error } = await supabase.from(TABLE).upsert(
+    {
+      id: app.id,
+      bucket: BUCKET,
+      data: app,
+    },
+    { onConflict: "id" }
+  );
 
   if (error) {
     console.error("Failed to upsert withdrawn in Supabase:", error.message);
@@ -106,7 +106,11 @@ async function upsertUserWithdrawn(app: WithdrawnApplication) {
 async function deleteUserWithdrawn(id: string) {
   const supabase = getSupabaseClient();
 
-  const { error } = await supabase.from(TABLE).delete().eq("id", id).eq("bucket", BUCKET);
+  const { error } = await supabase
+    .from(TABLE)
+    .delete()
+    .eq("id", id)
+    .eq("bucket", BUCKET);
 
   if (error) {
     console.error("Failed to delete withdrawn in Supabase:", error.message);
@@ -138,7 +142,10 @@ export async function loadWithdrawn(): Promise<{
 
   const lastUserId = getFallbackUserId();
   if (lastUserId) {
-    const cached = await readUserCache<WithdrawnApplication[]>(GUEST_IDB_KEY, lastUserId);
+    const cached = await readUserCache<WithdrawnApplication[]>(
+      GUEST_IDB_KEY,
+      lastUserId
+    );
     const fallback = safeParseList(cached ?? []);
     if (fallback.length > 0) return { mode, items: fallback };
   }
@@ -146,7 +153,10 @@ export async function loadWithdrawn(): Promise<{
   return { mode, items };
 }
 
-export async function upsertWithdrawn(app: WithdrawnApplication, _mode: WithdrawnStorageMode) {
+export async function upsertWithdrawn(
+  app: WithdrawnApplication,
+  _mode: WithdrawnStorageMode
+) {
   void _mode;
   const actualMode = await detectWithdrawnMode();
 
@@ -160,14 +170,19 @@ export async function upsertWithdrawn(app: WithdrawnApplication, _mode: Withdraw
         safeParseList,
         (prev) => {
           const idx = prev.findIndex((x) => x.id === app.id);
-          return idx === -1 ? [app, ...prev] : prev.map((x) => (x.id === app.id ? app : x));
+          return idx === -1
+            ? [app, ...prev]
+            : prev.map((x) => (x.id === app.id ? app : x));
         }
       );
     }
   } else {
     const prev = await loadGuestWithdrawn();
     const idx = prev.findIndex((x) => x.id === app.id);
-    const next = idx === -1 ? [app, ...prev] : prev.map((x) => (x.id === app.id ? app : x));
+    const next =
+      idx === -1
+        ? [app, ...prev]
+        : prev.map((x) => (x.id === app.id ? app : x));
     await saveGuestWithdrawn(next);
   }
 
@@ -218,7 +233,9 @@ export async function migrateGuestWithdrawnToUser() {
     data: app,
   }));
 
-  const { error } = await supabase.from(TABLE).upsert(payload, { onConflict: "id" });
+  const { error } = await supabase
+    .from(TABLE)
+    .upsert(payload, { onConflict: "id" });
 
   if (error) {
     console.error("Guest → user withdrawn migration failed:", error.message);

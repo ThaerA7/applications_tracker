@@ -42,29 +42,24 @@ function safeParseList(raw: any): RejectedApplication[] {
 // ---------- guest storage ----------
 
 async function loadGuestRejected(): Promise<RejectedApplication[]> {
-  
   try {
     const idb = await idbGet<RejectedApplication[]>(GUEST_IDB_KEY);
     if (idb) return safeParseList(idb);
   } catch {}
 
- 
-    return [];
-
+  return [];
 }
 
 async function saveGuestRejected(list: RejectedApplication[]) {
   try {
     await idbSet(GUEST_IDB_KEY, list);
   } catch {}
-
 }
 
 async function clearGuestRejected() {
   try {
     await idbDel(GUEST_IDB_KEY);
   } catch {}
- 
 }
 
 // ---------- user storage (Supabase) ----------
@@ -83,7 +78,10 @@ async function loadUserRejected(): Promise<RejectedApplication[]> {
     return [];
   }
 
-  const mapped = (data ?? []).map((row: any) => ({ ...(row.data ?? {}), id: row.id }));
+  const mapped = (data ?? []).map((row: any) => ({
+    ...(row.data ?? {}),
+    id: row.id,
+  }));
 
   return safeParseList(mapped);
 }
@@ -91,16 +89,14 @@ async function loadUserRejected(): Promise<RejectedApplication[]> {
 async function upsertUserRejected(app: RejectedApplication) {
   const supabase = getSupabaseClient();
 
-  const { error } = await supabase
-    .from(TABLE)
-    .upsert(
-      {
-        id: app.id,
-        bucket: BUCKET,
-        data: app,
-      },
-      { onConflict: "id" }
-    );
+  const { error } = await supabase.from(TABLE).upsert(
+    {
+      id: app.id,
+      bucket: BUCKET,
+      data: app,
+    },
+    { onConflict: "id" }
+  );
 
   if (error) {
     console.error("Failed to upsert rejected in Supabase:", error.message);
@@ -146,7 +142,10 @@ export async function loadRejected(): Promise<{
 
   const lastUserId = getFallbackUserId();
   if (lastUserId) {
-    const cached = await readUserCache<RejectedApplication[]>(GUEST_IDB_KEY, lastUserId);
+    const cached = await readUserCache<RejectedApplication[]>(
+      GUEST_IDB_KEY,
+      lastUserId
+    );
     const fallback = safeParseList(cached ?? []);
     if (fallback.length > 0) return { mode, items: fallback };
   }
@@ -171,7 +170,9 @@ export async function upsertRejected(
         safeParseList,
         (prev) => {
           const idx = prev.findIndex((x) => x.id === app.id);
-          return idx === -1 ? [app, ...prev] : prev.map((x) => (x.id === app.id ? app : x));
+          return idx === -1
+            ? [app, ...prev]
+            : prev.map((x) => (x.id === app.id ? app : x));
         }
       );
     }
@@ -189,10 +190,7 @@ export async function upsertRejected(
   notifyCountsChanged();
 }
 
-export async function deleteRejected(
-  id: string,
-  _mode: RejectedStorageMode
-) {
+export async function deleteRejected(id: string, _mode: RejectedStorageMode) {
   void _mode;
   const actualMode = await detectRejectedMode();
 
@@ -241,10 +239,7 @@ export async function migrateGuestRejectedToUser() {
   });
 
   if (error) {
-    console.error(
-      "Guest → user rejected migration failed:",
-      error.message
-    );
+    console.error("Guest → user rejected migration failed:", error.message);
     return;
   }
 

@@ -58,7 +58,9 @@ function isObject(v: any) {
 
 function safeParseList(raw: any): StoredNote[] {
   if (!Array.isArray(raw)) return [];
-  return raw.filter((x) => isObject(x) && typeof x.id === "string") as StoredNote[];
+  return raw.filter(
+    (x) => isObject(x) && typeof x.id === "string"
+  ) as StoredNote[];
 }
 
 function isUuid(v: string) {
@@ -142,10 +144,10 @@ async function loadUserNotes(): Promise<StoredNote[]> {
       typeof base.updatedAt === "string"
         ? base.updatedAt
         : typeof row.updated_at === "string"
-          ? row.updated_at
-          : typeof row.created_at === "string"
-            ? row.created_at
-            : new Date().toISOString();
+        ? row.updated_at
+        : typeof row.created_at === "string"
+        ? row.created_at
+        : new Date().toISOString();
 
     // IMPORTANT: spread base first, then override id from row.id
     return {
@@ -261,7 +263,9 @@ export async function upsertNote(note: StoredNote, mode?: NotesStorageMode) {
     const prev = await loadGuestNotes();
     const idx = prev.findIndex((x) => x.id === note.id);
     const next =
-      idx === -1 ? [note, ...prev] : prev.map((x) => (x.id === note.id ? note : x));
+      idx === -1
+        ? [note, ...prev]
+        : prev.map((x) => (x.id === note.id ? note : x));
     await saveGuestNotes(next);
   }
 

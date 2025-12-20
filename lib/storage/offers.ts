@@ -100,7 +100,10 @@ async function loadUserOffers(): Promise<OfferReceivedJob[]> {
     return [];
   }
 
-  const mapped = (data ?? []).map((row: any) => ({ ...(row.data ?? {}), id: row.id }));
+  const mapped = (data ?? []).map((row: any) => ({
+    ...(row.data ?? {}),
+    id: row.id,
+  }));
 
   return safeParseList(mapped);
 }
@@ -161,7 +164,10 @@ export async function loadOffers(): Promise<{
 
   const lastUserId = getFallbackUserId();
   if (lastUserId) {
-    const cached = await readUserCache<OfferReceivedJob[]>(GUEST_IDB_KEY, lastUserId);
+    const cached = await readUserCache<OfferReceivedJob[]>(
+      GUEST_IDB_KEY,
+      lastUserId
+    );
     const fallback = safeParseList(cached ?? []);
     if (fallback.length > 0) return { mode, items: fallback };
   }
@@ -186,7 +192,9 @@ export async function upsertOffer(
         safeParseList,
         (prev) => {
           const idx = prev.findIndex((x) => x.id === offer.id);
-          return idx === -1 ? [offer, ...prev] : prev.map((x) => (x.id === offer.id ? offer : x));
+          return idx === -1
+            ? [offer, ...prev]
+            : prev.map((x) => (x.id === offer.id ? offer : x));
         }
       );
     }

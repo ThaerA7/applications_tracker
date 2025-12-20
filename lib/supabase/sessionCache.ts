@@ -43,8 +43,7 @@ export async function getSessionCached(): Promise<Session | null> {
   if (!inFlight) {
     const supabase = getSupabaseClient();
 
-    const p = supabase
-      .auth
+    const p = supabase.auth
       .getSession()
       .then(({ data }) => {
         cachedSession = data.session ?? null;
