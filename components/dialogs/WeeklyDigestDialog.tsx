@@ -200,7 +200,7 @@ export default function WeeklyDigestDialog({
                                         <span className="font-semibold text-amber-600">
                                             No activity last week.
                                         </span>{" "}
-                                        This week is a fresh start – let's make it count! 💪
+                                        This week is a fresh start – let&apos;s make it count! 💪
                                     </p>
                                 )}
                             </div>

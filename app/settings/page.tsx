@@ -34,6 +34,7 @@ import {
   requestNotificationPermission,
   areNotificationsEnabled,
 } from "@/lib/services/notifications";
+import { saveEmailPreferences } from "@/lib/services/emailPreferences";
 import ImportConfirmDialog from "@/components/dialogs/ImportConfirmDialog";
 import DeleteAllDataConfirmDialog from "@/components/dialogs/DeleteAllDataConfirmDialog";
 import DeleteAccountConfirmDialog from "@/components/dialogs/DeleteAccountConfirmDialog";
@@ -970,12 +971,14 @@ export default function SettingsPage() {
               description="Send reminders and digests to your email address."
               value={prefs.emailNotifications}
               badge={signedIn ? undefined : "requires sign-in"}
-              onChange={(next) => {
+              onChange={async (next) => {
                 if (!signedIn) {
                   openSignInGate();
                   return;
                 }
                 setPrefs((p) => ({ ...p, emailNotifications: next }));
+                // Sync to Supabase so Edge Function knows user preference
+                await saveEmailPreferences({ emailRemindersEnabled: next });
               }}
             />
             <ToggleRow
@@ -990,6 +993,74 @@ export default function SettingsPage() {
               value={sidebarAlwaysCollapsed}
               onChange={setSidebarAlwaysCollapsedEverywhere}
             />
+
+            {/* Test buttons for email functions - DEV ONLY */}
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-200/80 bg-amber-50/70 px-3 py-2.5 shadow-sm backdrop-blur">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-neutral-900">
+                    Test email functions
+                  </p>
+                  <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
+                    dev only
+                  </span>
+                </div>
+                <p className="text-xs text-neutral-600">
+                  Manually trigger email Edge Functions for testing.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const res = await fetch(
+                        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-interview-reminders`,
+                        {
+                          method: "POST",
+                          headers: {
+                            "Content-Type": "application/json",
+                            Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+                          },
+                          body: JSON.stringify({ testMode: true }),
+                        }
+                      );
+                      const data = await res.json();
+                      alert("Interview Reminders:\n" + JSON.stringify(data, null, 2));
+                    } catch (err) {
+                      alert("Error: " + String(err));
+                    }
+                  }}
+                  className="inline-flex h-8 items-center justify-center rounded-lg border border-amber-300 bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800 shadow-sm hover:bg-amber-200"
+                >
+                  Reminders
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const res = await fetch(
+                        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-monthly-digest`,
+                        {
+                          method: "POST",
+                          headers: {
+                            "Content-Type": "application/json",
+                            Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+                          },
+                        }
+                      );
+                      const data = await res.json();
+                      alert("Monthly Digest:\n" + JSON.stringify(data, null, 2));
+                    } catch (err) {
+                      alert("Error: " + String(err));
+                    }
+                  }}
+                  className="inline-flex h-8 items-center justify-center rounded-lg border border-purple-300 bg-purple-100 px-3 py-1 text-xs font-medium text-purple-800 shadow-sm hover:bg-purple-200"
+                >
+                  Digest
+                </button>
+              </div>
+            </div>
 
             <div className="flex items-center justify-between gap-3 rounded-lg border border-neutral-200/80 bg-white/70 px-3 py-2.5 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/60">
               <div className="flex-1">
