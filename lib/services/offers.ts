@@ -2,7 +2,7 @@
 
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { idbGet, idbSet, idbDel } from "./indexedDb";
-import type { OfferReceivedJob } from "@/app/offers-received/OffersReceivedCards";
+import type { OfferReceivedJob } from "@/components/cards/OfferCard";
 import { getModeCached } from "../supabase/sessionCache";
 import {
   getActiveUserId,

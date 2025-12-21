@@ -2,7 +2,7 @@
 
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { idbGet, idbSet, idbDel } from "./indexedDb";
-import type { WithdrawnRecord } from "@/app/withdrawn/WithdrawnCard";
+import type { Rejection } from "@/components/cards/RejectedCard";
 import { getModeCached } from "../supabase/sessionCache";
 import {
   getActiveUserId,
@@ -12,13 +12,13 @@ import {
   writeUserCache,
 } from "./userCache";
 
-export type WithdrawnApplication = WithdrawnRecord;
-export type WithdrawnStorageMode = "guest" | "user";
+export type RejectedApplication = Rejection;
+export type RejectedStorageMode = "guest" | "user";
 
-const GUEST_IDB_KEY = "withdrawn";
+const GUEST_IDB_KEY = "rejected";
 
 const TABLE = "applications";
-const BUCKET = "withdrawn";
+const BUCKET = "rejected";
 const COUNTS_EVENT = "job-tracker:refresh-counts";
 
 function notifyCountsChanged() {
@@ -32,31 +32,31 @@ function isObject(v: any) {
   return v && typeof v === "object" && !Array.isArray(v);
 }
 
-function safeParseList(raw: any): WithdrawnApplication[] {
+function safeParseList(raw: any): RejectedApplication[] {
   if (!Array.isArray(raw)) return [];
   return raw.filter(
     (x) => isObject(x) && typeof x.id === "string"
-  ) as WithdrawnApplication[];
+  ) as RejectedApplication[];
 }
 
-// ---------- guest storage (IndexedDB ONLY) ----------
+// ---------- guest storage ----------
 
-async function loadGuestWithdrawn(): Promise<WithdrawnApplication[]> {
+async function loadGuestRejected(): Promise<RejectedApplication[]> {
   try {
-    const idb = await idbGet<WithdrawnApplication[]>(GUEST_IDB_KEY);
-    return safeParseList(idb ?? []);
-  } catch {
-    return [];
-  }
+    const idb = await idbGet<RejectedApplication[]>(GUEST_IDB_KEY);
+    if (idb) return safeParseList(idb);
+  } catch {}
+
+  return [];
 }
 
-async function saveGuestWithdrawn(list: WithdrawnApplication[]) {
+async function saveGuestRejected(list: RejectedApplication[]) {
   try {
     await idbSet(GUEST_IDB_KEY, list);
   } catch {}
 }
 
-async function clearGuestWithdrawn() {
+async function clearGuestRejected() {
   try {
     await idbDel(GUEST_IDB_KEY);
   } catch {}
@@ -64,7 +64,7 @@ async function clearGuestWithdrawn() {
 
 // ---------- user storage (Supabase) ----------
 
-async function loadUserWithdrawn(): Promise<WithdrawnApplication[]> {
+async function loadUserRejected(): Promise<RejectedApplication[]> {
   const supabase = getSupabaseClient();
 
   const { data, error } = await supabase
@@ -74,7 +74,7 @@ async function loadUserWithdrawn(): Promise<WithdrawnApplication[]> {
     .order("created_at", { ascending: false });
 
   if (error) {
-    console.error("Failed to load withdrawn from Supabase:", error.message);
+    console.error("Failed to load rejected from Supabase:", error.message);
     return [];
   }
 
@@ -86,7 +86,7 @@ async function loadUserWithdrawn(): Promise<WithdrawnApplication[]> {
   return safeParseList(mapped);
 }
 
-async function upsertUserWithdrawn(app: WithdrawnApplication) {
+async function upsertUserRejected(app: RejectedApplication) {
   const supabase = getSupabaseClient();
 
   const { error } = await supabase.from(TABLE).upsert(
@@ -99,11 +99,11 @@ async function upsertUserWithdrawn(app: WithdrawnApplication) {
   );
 
   if (error) {
-    console.error("Failed to upsert withdrawn in Supabase:", error.message);
+    console.error("Failed to upsert rejected in Supabase:", error.message);
   }
 }
 
-async function deleteUserWithdrawn(id: string) {
+async function deleteUserRejected(id: string) {
   const supabase = getSupabaseClient();
 
   const { error } = await supabase
@@ -113,36 +113,36 @@ async function deleteUserWithdrawn(id: string) {
     .eq("bucket", BUCKET);
 
   if (error) {
-    console.error("Failed to delete withdrawn in Supabase:", error.message);
+    console.error("Failed to delete rejected in Supabase:", error.message);
   }
 }
 
 // ---------- mode detection ----------
 
-export async function detectWithdrawnMode(): Promise<WithdrawnStorageMode> {
+export async function detectRejectedMode(): Promise<RejectedStorageMode> {
   return getModeCached();
 }
 
 // ---------- public API ----------
 
-export async function loadWithdrawn(): Promise<{
-  mode: WithdrawnStorageMode;
-  items: WithdrawnApplication[];
+export async function loadRejected(): Promise<{
+  mode: RejectedStorageMode;
+  items: RejectedApplication[];
 }> {
-  const mode = await detectWithdrawnMode();
+  const mode = await detectRejectedMode();
   if (mode === "user") {
-    const items = await loadUserWithdrawn();
+    const items = await loadUserRejected();
     const userId = await getActiveUserId();
     if (userId) await writeUserCache(GUEST_IDB_KEY, userId, items);
     return { mode, items };
   }
 
-  const items = await loadGuestWithdrawn();
+  const items = await loadGuestRejected();
   if (items.length > 0) return { mode, items };
 
   const lastUserId = getFallbackUserId();
   if (lastUserId) {
-    const cached = await readUserCache<WithdrawnApplication[]>(
+    const cached = await readUserCache<RejectedApplication[]>(
       GUEST_IDB_KEY,
       lastUserId
     );
@@ -153,18 +153,18 @@ export async function loadWithdrawn(): Promise<{
   return { mode, items };
 }
 
-export async function upsertWithdrawn(
-  app: WithdrawnApplication,
-  _mode: WithdrawnStorageMode
+export async function upsertRejected(
+  app: RejectedApplication,
+  _mode: RejectedStorageMode
 ) {
   void _mode;
-  const actualMode = await detectWithdrawnMode();
+  const actualMode = await detectRejectedMode();
 
   if (actualMode === "user") {
-    await upsertUserWithdrawn(app);
+    await upsertUserRejected(app);
     const userId = await getActiveUserId();
     if (userId) {
-      await updateUserCacheList<WithdrawnApplication>(
+      await updateUserCacheList<RejectedApplication>(
         GUEST_IDB_KEY,
         userId,
         safeParseList,
@@ -177,27 +177,28 @@ export async function upsertWithdrawn(
       );
     }
   } else {
-    const prev = await loadGuestWithdrawn();
+    const prev = await loadGuestRejected();
     const idx = prev.findIndex((x) => x.id === app.id);
     const next =
       idx === -1
         ? [app, ...prev]
         : prev.map((x) => (x.id === app.id ? app : x));
-    await saveGuestWithdrawn(next);
+
+    await saveGuestRejected(next);
   }
 
   notifyCountsChanged();
 }
 
-export async function deleteWithdrawn(id: string, _mode: WithdrawnStorageMode) {
+export async function deleteRejected(id: string, _mode: RejectedStorageMode) {
   void _mode;
-  const actualMode = await detectWithdrawnMode();
+  const actualMode = await detectRejectedMode();
 
   if (actualMode === "user") {
-    await deleteUserWithdrawn(id);
+    await deleteUserRejected(id);
     const userId = await getActiveUserId();
     if (userId) {
-      await updateUserCacheList<WithdrawnApplication>(
+      await updateUserCacheList<RejectedApplication>(
         GUEST_IDB_KEY,
         userId,
         safeParseList,
@@ -205,26 +206,26 @@ export async function deleteWithdrawn(id: string, _mode: WithdrawnStorageMode) {
       );
     }
   } else {
-    const prev = await loadGuestWithdrawn();
+    const prev = await loadGuestRejected();
     const next = prev.filter((x) => x.id !== id);
-    await saveGuestWithdrawn(next);
+    await saveGuestRejected(next);
   }
 
   notifyCountsChanged();
 }
 
 /**
- * When a user signs in, move guest Withdrawn data into Supabase.
- * Guest source is IndexedDB ONLY.
+ * When a user signs in, move guest Rejected data into Supabase.
+ * This prevents data loss while keeping server as source of truth.
  */
-export async function migrateGuestWithdrawnToUser() {
+export async function migrateGuestRejectedToUser() {
   const supabase = getSupabaseClient();
   const { data } = await supabase.auth.getSession();
   if (!data.session?.user) return;
 
   const userId = data.session.user.id;
 
-  const guest = await loadGuestWithdrawn();
+  const guest = await loadGuestRejected();
   if (guest.length === 0) return;
 
   const payload = guest.map((app) => ({
@@ -233,17 +234,17 @@ export async function migrateGuestWithdrawnToUser() {
     data: app,
   }));
 
-  const { error } = await supabase
-    .from(TABLE)
-    .upsert(payload, { onConflict: "id" });
+  const { error } = await supabase.from(TABLE).upsert(payload, {
+    onConflict: "id",
+  });
 
   if (error) {
-    console.error("Guest → user withdrawn migration failed:", error.message);
+    console.error("Guest → user rejected migration failed:", error.message);
     return;
   }
 
   await writeUserCache(GUEST_IDB_KEY, userId, guest);
 
-  await clearGuestWithdrawn();
+  await clearGuestRejected();
   notifyCountsChanged();
 }

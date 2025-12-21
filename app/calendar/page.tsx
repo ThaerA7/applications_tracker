@@ -25,11 +25,11 @@ import {
   normalizeDate,
   toIsoDate,
 } from "./calendarUtils";
-import { loadApplied } from "@/lib/storage/applied";
-import { loadInterviews } from "@/lib/storage/interviews";
-import { loadRejected } from "@/lib/storage/rejected";
-import { loadWithdrawn } from "@/lib/storage/withdrawn";
-import { loadOffers } from "@/lib/storage/offers";
+import { loadApplied } from "@/lib/services/applied";
+import { loadInterviews } from "@/lib/services/interviews";
+import { loadRejected } from "@/lib/services/rejected";
+import { loadWithdrawn } from "@/lib/services/withdrawn";
+import { loadOffers } from "@/lib/services/offers";
 
 const COUNTS_EVENT = "job-tracker:refresh-counts";
 
@@ -169,9 +169,8 @@ export default function CalendarPage() {
         if (interviewDateOnly) {
           const time = extractTime(item.interviewDate);
           addEvent({
-            id: `interview-from-withdrawn-${
-              item.id ?? item.interviewDate ?? interviewDateOnly
-            }`,
+            id: `interview-from-withdrawn-${item.id ?? item.interviewDate ?? interviewDateOnly
+              }`,
             date: interviewDateOnly,
             kind: "interview",
             title: item.company || "Interview",
@@ -217,8 +216,8 @@ export default function CalendarPage() {
         const statusSuffix = accepted
           ? " · Accepted"
           : declined
-          ? " · Declined"
-          : "";
+            ? " · Declined"
+            : "";
 
         const subtitleBase = item.role ?? "Offer";
         const subtitle = `${subtitleBase}${statusSuffix}`;
@@ -237,9 +236,8 @@ export default function CalendarPage() {
       // Deduplicate by (kind, date, title, subtitle, time)
       const map = new Map<string, CalendarEvent>();
       for (const ev of collected) {
-        const key = `${ev.kind}-${ev.date}-${ev.title}-${ev.subtitle ?? ""}-${
-          ev.time ?? ""
-        }`;
+        const key = `${ev.kind}-${ev.date}-${ev.title}-${ev.subtitle ?? ""}-${ev.time ?? ""
+          }`;
         if (!map.has(key)) {
           map.set(key, ev);
         }
@@ -436,77 +434,77 @@ export default function CalendarPage() {
                 {/* Legend + month navigation in SAME ROW */}
                 <div className="mb-4 flex items-center justify-between gap-3">
                   {/* 5 tags (chips) */}
-<div className="flex flex-wrap items-center gap-2 text-[11px]">
-  {/* Applied */}
-  <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white px-2.5 py-1 shadow-sm">
-    <Image
-      src="/icons/checklist.png"
-      alt="Applied icon"
-      width={16}
-      height={16}
-      className="h-3.5 w-3.5"
-    />
-    <span className="font-medium text-neutral-900">
-      {KIND_META.applied.label}
-    </span>
-  </div>
+                  <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                    {/* Applied */}
+                    <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white px-2.5 py-1 shadow-sm">
+                      <Image
+                        src="/icons/checklist.png"
+                        alt="Applied icon"
+                        width={16}
+                        height={16}
+                        className="h-3.5 w-3.5"
+                      />
+                      <span className="font-medium text-neutral-900">
+                        {KIND_META.applied.label}
+                      </span>
+                    </div>
 
-  {/* Interview */}
-  <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white px-2.5 py-1 shadow-sm">
-    <Image
-      src="/icons/interview.png"
-      alt="Interview icon"
-      width={16}
-      height={16}
-      className="h-3.5 w-3.5"
-    />
-    <span className="font-medium text-neutral-900">
-      {KIND_META.interview.label}
-    </span>
-  </div>
+                    {/* Interview */}
+                    <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white px-2.5 py-1 shadow-sm">
+                      <Image
+                        src="/icons/interview.png"
+                        alt="Interview icon"
+                        width={16}
+                        height={16}
+                        className="h-3.5 w-3.5"
+                      />
+                      <span className="font-medium text-neutral-900">
+                        {KIND_META.interview.label}
+                      </span>
+                    </div>
 
-  {/* Rejected */}
-  <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white px-2.5 py-1 shadow-sm">
-    <Image
-      src="/icons/cancel.png"
-      alt="Rejected icon"
-      width={16}
-      height={16}
-      className="h-3.5 w-3.5"
-    />
-    <span className="font-medium text-neutral-900">
-      {KIND_META.rejected.label}
-    </span>
-  </div>
+                    {/* Rejected */}
+                    <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white px-2.5 py-1 shadow-sm">
+                      <Image
+                        src="/icons/cancel.png"
+                        alt="Rejected icon"
+                        width={16}
+                        height={16}
+                        className="h-3.5 w-3.5"
+                      />
+                      <span className="font-medium text-neutral-900">
+                        {KIND_META.rejected.label}
+                      </span>
+                    </div>
 
-  {/* Withdrawn */}
-  <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white px-2.5 py-1 shadow-sm">
-    <Image
-      src="/icons/withdrawn.png"
-      alt="Withdrawn icon"
-      width={16}
-      height={16}
-      className="h-3.5 w-3.5"
-    />
-    <span className="font-medium text-neutral-900">
-      {KIND_META.withdrawn.label}
-    </span>
-  </div>
+                    {/* Withdrawn */}
+                    <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white px-2.5 py-1 shadow-sm">
+                      <Image
+                        src="/icons/withdrawn.png"
+                        alt="Withdrawn icon"
+                        width={16}
+                        height={16}
+                        className="h-3.5 w-3.5"
+                      />
+                      <span className="font-medium text-neutral-900">
+                        {KIND_META.withdrawn.label}
+                      </span>
+                    </div>
 
-  {/* Offer */}
-  <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white px-2.5 py-1 shadow-sm">
-    <Image
-      src="/icons/accepted.png"
-      alt="Offer icon"
-      width={16}
-      height={16}
-      className="h-3.5 w-3.5"
-    />
-    <span className="font-medium text-neutral-900">
-      {KIND_META.offer.label}
-    </span>
-  </div>
-</div>
+                    {/* Offer */}
+                    <div className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white px-2.5 py-1 shadow-sm">
+                      <Image
+                        src="/icons/accepted.png"
+                        alt="Offer icon"
+                        width={16}
+                        height={16}
+                        className="h-3.5 w-3.5"
+                      />
+                      <span className="font-medium text-neutral-900">
+                        {KIND_META.offer.label}
+                      </span>
+                    </div>
+                  </div>
 
 
                   {/* Compact month switcher + Today on the same row (top right of calendar) */}

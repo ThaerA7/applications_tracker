@@ -8,7 +8,7 @@ import {
   loadActivity,
   type ActivityItem,
   type ActivityVariant,
-} from "@/lib/storage/activity";
+} from "@/lib/services/activity";
 
 const MS_MIN = 60_000;
 const MS_HOUR = 60 * MS_MIN;
@@ -350,12 +350,12 @@ export default function RecentActivityCard() {
                 item.category === "applied"
                   ? "bg-sky-500"
                   : item.category === "interview"
-                  ? "bg-emerald-500"
-                  : item.category === "rejected"
-                  ? "bg-rose-500"
-                  : item.category === "withdrawn"
-                  ? "bg-amber-500"
-                  : "bg-lime-500"; // offer
+                    ? "bg-emerald-500"
+                    : item.category === "rejected"
+                      ? "bg-rose-500"
+                      : item.category === "withdrawn"
+                        ? "bg-amber-500"
+                        : "bg-lime-500"; // offer
 
               return (
                 <li

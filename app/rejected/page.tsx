@@ -6,11 +6,11 @@ import { useEffect, useMemo, useState } from "react";
 import MoveToRejectedDialog, {
   type RejectionDetails,
 } from "@/components/dialogs/MoveToRejectedDialog";
-import RejectedCard, { type Rejection } from "./RejectedCard";
+import RejectedCard, { type Rejection } from "@/components/cards/RejectedCard";
 import { Search, Plus, History } from "lucide-react";
 import { animateCardExit } from "@/components/dialogs/cardExitAnimation";
-import ActivityLogSidebar, { type ActivityItem } from "@/components/ActivityLogSidebar";
-import ThreeBounceSpinner from "@/components/ThreeBounceSpinner";
+import ActivityLogSidebar, { type ActivityItem } from "@/components/ui/ActivityLogSidebar";
+import ThreeBounceSpinner from "@/components/ui/ThreeBounceSpinner";
 
 import RejectedFilter, {
   DEFAULT_REJECTED_FILTERS,
@@ -26,7 +26,7 @@ import {
   deleteRejected,
   migrateGuestRejectedToUser,
   type RejectedStorageMode,
-} from "@/lib/storage/rejected";
+} from "@/lib/services/rejected";
 
 // Persistent activity storage (guest + Supabase user).
 import {
@@ -34,7 +34,7 @@ import {
   appendActivity as appendActivityToStorage,
   migrateGuestActivityToUser,
   type ActivityStorageMode,
-} from "@/lib/storage/activity";
+} from "@/lib/services/activity";
 
 type ApplicationLike =
   React.ComponentProps<typeof MoveToRejectedDialog>["application"];

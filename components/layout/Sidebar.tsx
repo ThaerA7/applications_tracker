@@ -5,13 +5,13 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { getSupabaseClient } from "@/lib/supabase/client";
-import { loadApplied } from "@/lib/storage/applied";
-import { loadInterviews } from "@/lib/storage/interviews";
-import { loadWithdrawn } from "@/lib/storage/withdrawn";
-import { loadRejected } from "@/lib/storage/rejected";
-import { loadOffers } from "@/lib/storage/offers";
-import { loadWishlist } from "@/lib/storage/wishlist";
-import { loadNotes } from "@/lib/storage/notes";
+import { loadApplied } from "@/lib/services/applied";
+import { loadInterviews } from "@/lib/services/interviews";
+import { loadWithdrawn } from "@/lib/services/withdrawn";
+import { loadRejected } from "@/lib/services/rejected";
+import { loadOffers } from "@/lib/services/offers";
+import { loadWishlist } from "@/lib/services/wishlist";
+import { loadNotes } from "@/lib/services/notes";
 
 type Item = {
   href: string;

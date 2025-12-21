@@ -20,7 +20,7 @@ import {
   History,
   CheckCircle2,
 } from "lucide-react";
-import type { Interview } from "../../components/dialogs/ScheduleInterviewDialog";
+import type { Interview } from "@/components/dialogs/ScheduleInterviewDialog";
 
 type InterviewStage = "upcoming" | "past" | "done";
 

@@ -32,7 +32,7 @@ import WishlistFilter, {
   type WishlistFilters,
 } from "@/components/filters/WishlistFilter";
 
-import ThreeBounceSpinner from "@/components/ThreeBounceSpinner";
+import ThreeBounceSpinner from "@/components/ui/ThreeBounceSpinner";
 
 import {
   loadWishlist,
@@ -40,7 +40,7 @@ import {
   deleteWishlistItem,
   type WishlistItem,
   type WishlistStorageMode,
-} from "@/lib/storage/wishlist";
+} from "@/lib/services/wishlist";
 
 /** sidebar refresh event name used across the app */
 const COUNTS_EVENT = "job-tracker:refresh-counts";
@@ -703,116 +703,116 @@ export default function WishlistPage() {
                   "before:opacity-90",
                 ].join(" ")}
               >
-              {/* logo square */}
-              <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-neutral-200 bg-white ring-1 ring-white/60">
-                <div className="absolute left-1 top-1 rounded-md bg-neutral-900/80 px-1.5 py-0.5 text-[11px] font-semibold text-white">
-                  {idx}
-                </div>
-                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-yellow-50 via-amber-50 to-orange-50">
-                  <Icon className="h-7 w-7 text-yellow-700" aria-hidden="true" />
-                </div>
-                {item.logoUrl && (
-                  <img
-                    src={item.logoUrl}
-                    alt={`${item.company} logo`}
-                    className="absolute inset-0 h-full w-full object-contain p-1.5"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).style.display =
-                        "none";
-                    }}
-                  />
-                )}
-              </div>
-
-              {/* Company + details */}
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-base font-semibold text-neutral-900">
-                    {item.company}
-                  </h2>
-                  {item.role && (
-                    <span className="text-sm text-neutral-600">
-                      • {item.role}
-                    </span>
-                  )}
-                  {item.priority && (
-                    <span
-                      className={[
-                        "ml-2 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
-                        priorityClasses(item.priority),
-                      ].join(" ")}
-                    >
-                      <Star
-                        className="mr-1 h-3.5 w-3.5 text-yellow-500"
-                        aria-hidden="true"
-                      />
-                      {item.priority}
-                    </span>
+                {/* logo square */}
+                <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-neutral-200 bg-white ring-1 ring-white/60">
+                  <div className="absolute left-1 top-1 rounded-md bg-neutral-900/80 px-1.5 py-0.5 text-[11px] font-semibold text-white">
+                    {idx}
+                  </div>
+                  <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-yellow-50 via-amber-50 to-orange-50">
+                    <Icon className="h-7 w-7 text-yellow-700" aria-hidden="true" />
+                  </div>
+                  {item.logoUrl && (
+                    <img
+                      src={item.logoUrl}
+                      alt={`${item.company} logo`}
+                      className="absolute inset-0 h-full w-full object-contain p-1.5"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).style.display =
+                          "none";
+                      }}
+                    />
                   )}
                 </div>
 
-                <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-neutral-700">
-                  {item.location && (
-                    <span className="inline-flex items-center gap-1.5">
-                      <MapPin
-                        className="h-4 w-4 text-neutral-400"
-                        aria-hidden="true"
-                      />
-                      {item.location}
-                    </span>
-                  )}
+                {/* Company + details */}
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-base font-semibold text-neutral-900">
+                      {item.company}
+                    </h2>
+                    {item.role && (
+                      <span className="text-sm text-neutral-600">
+                        • {item.role}
+                      </span>
+                    )}
+                    {item.priority && (
+                      <span
+                        className={[
+                          "ml-2 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+                          priorityClasses(item.priority),
+                        ].join(" ")}
+                      >
+                        <Star
+                          className="mr-1 h-3.5 w-3.5 text-yellow-500"
+                          aria-hidden="true"
+                        />
+                        {item.priority}
+                      </span>
+                    )}
+                  </div>
 
-                  {startLabel && (
-                    <span className="inline-flex items-center gap-1.5">
-                      <CalendarDays
-                        className="h-4 w-4 text-neutral-400"
-                        aria-hidden="true"
-                      />
-                      {startLabel}
-                    </span>
-                  )}
+                  <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-neutral-700">
+                    {item.location && (
+                      <span className="inline-flex items-center gap-1.5">
+                        <MapPin
+                          className="h-4 w-4 text-neutral-400"
+                          aria-hidden="true"
+                        />
+                        {item.location}
+                      </span>
+                    )}
 
-                  {offerLabel && (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-yellow-200 bg-yellow-50 px-2 py-0.5 text-yellow-800">
-                      <Tag className="h-3.5 w-3.5" aria-hidden="true" />
-                      {offerLabel}
-                    </span>
-                  )}
+                    {startLabel && (
+                      <span className="inline-flex items-center gap-1.5">
+                        <CalendarDays
+                          className="h-4 w-4 text-neutral-400"
+                          aria-hidden="true"
+                        />
+                        {startLabel}
+                      </span>
+                    )}
+
+                    {offerLabel && (
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-yellow-200 bg-yellow-50 px-2 py-0.5 text-yellow-800">
+                        <Tag className="h-3.5 w-3.5" aria-hidden="true" />
+                        {offerLabel}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              {/* Right side: STAR (delete) + View */}
-              <div className="flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleDelete(item.id)}
-                  aria-label="Remove from wishlist"
-                  className={[
-                    "inline-flex items-center justify-center",
-                    "text-sm rounded-full",
-                    "bg-transparent border-0 p-0",
-                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-300",
-                  ].join(" ")}
-                >
-                  <Star
-                    className="h-5 w-5 transition-colors text-amber-500 fill-amber-400 hover:text-amber-600 hover:fill-amber-500"
-                    aria-hidden="true"
-                  />
-                </button>
-
-                {item.website && (
-                  <a
-                    href={item.website}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white/70 px-2.5 py-1.5 text-sm text-neutral-800 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-300"
+                {/* Right side: STAR (delete) + View */}
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(item.id)}
+                    aria-label="Remove from wishlist"
+                    className={[
+                      "inline-flex items-center justify-center",
+                      "text-sm rounded-full",
+                      "bg-transparent border-0 p-0",
+                      "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-300",
+                    ].join(" ")}
                   >
-                    <ExternalLink className="h-4 w-4" aria-hidden="true" />
-                    View
-                  </a>
-                )}
-              </div>
-            </article>
+                    <Star
+                      className="h-5 w-5 transition-colors text-amber-500 fill-amber-400 hover:text-amber-600 hover:fill-amber-500"
+                      aria-hidden="true"
+                    />
+                  </button>
+
+                  {item.website && (
+                    <a
+                      href={item.website}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white/70 px-2.5 py-1.5 text-sm text-neutral-800 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-300"
+                    >
+                      <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                      View
+                    </a>
+                  )}
+                </div>
+              </article>
             );
           })
         )}

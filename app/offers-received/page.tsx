@@ -14,23 +14,23 @@ import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 
 import MoveToAcceptedDialog, {
   type AcceptedDetails,
-} from "../../components/dialogs/MoveToAcceptedDialog";
+} from "@/components/dialogs/MoveToAcceptedDialog";
 import OfferAcceptanceTagDialog, {
   type OfferAcceptanceTagDetails,
   type OfferDecisionStatus,
-} from "../../components/dialogs/OfferAcceptanceTagDialog";
+} from "@/components/dialogs/OfferAcceptanceTagDialog";
 
-import OffersReceivedCards, {
+import OfferCard, {
   type OfferReceivedJob,
   type OffersReceivedView,
   isAcceptedOffer,
   isDeclinedOffer,
   isPendingOffer,
-} from "./OffersReceivedCards";
+} from "@/components/cards/OfferCard";
 
-import ThreeBounceSpinner from "@/components/ThreeBounceSpinner";
+import ThreeBounceSpinner from "@/components/ui/ThreeBounceSpinner";
 
-import ActivityLogSidebar from "@/components/ActivityLogSidebar";
+import ActivityLogSidebar from "@/components/ui/ActivityLogSidebar";
 
 import { getSupabaseClient } from "@/lib/supabase/client";
 
@@ -40,7 +40,7 @@ import {
   deleteOffer,
   migrateGuestOffersToUser,
   type OffersStorageMode,
-} from "@/lib/storage/offers";
+} from "@/lib/services/offers";
 
 // Persistent activity storage (guest + Supabase user).
 import {
@@ -50,7 +50,7 @@ import {
   type ActivityItem,
   type ActivityVariant,
   type ActivityStorageMode,
-} from "@/lib/storage/activity";
+} from "@/lib/services/activity";
 
 const VIEW_FILTERS: {
   id: OffersReceivedView;
@@ -519,11 +519,11 @@ export default function OffersReceivedPage() {
 
   const countsPerView = useMemo(
     () =>
-      ({
-        received: items.filter(isPendingOffer).length,
-        declined: items.filter(isDeclinedOffer).length,
-        accepted: items.filter(isAcceptedOffer).length,
-      } as Record<OffersReceivedView, number>),
+    ({
+      received: items.filter(isPendingOffer).length,
+      declined: items.filter(isDeclinedOffer).length,
+      accepted: items.filter(isAcceptedOffer).length,
+    } as Record<OffersReceivedView, number>),
     [items]
   );
 
@@ -536,21 +536,21 @@ export default function OffersReceivedPage() {
         application={
           editingItem
             ? {
-                id: editingItem.id,
-                company: editingItem.company,
-                role: editingItem.role,
-                location: editingItem.location,
-                status: "Offer",
-                appliedOn: editingItem.appliedOn,
-                employmentType: editingItem.employmentType,
-                offerUrl: editingItem.url,
-                logoUrl: editingItem.logoUrl,
-                notes: editingItem.notes,
-                decisionDate: editingItem.decisionDate,
-                offerReceivedDate:
-                  editingItem.offerReceivedDate ?? editingItem.decisionDate,
-                offerAcceptedDate: editingItem.offerAcceptedDate,
-              }
+              id: editingItem.id,
+              company: editingItem.company,
+              role: editingItem.role,
+              location: editingItem.location,
+              status: "Offer",
+              appliedOn: editingItem.appliedOn,
+              employmentType: editingItem.employmentType,
+              offerUrl: editingItem.url,
+              logoUrl: editingItem.logoUrl,
+              notes: editingItem.notes,
+              decisionDate: editingItem.decisionDate,
+              offerReceivedDate:
+                editingItem.offerReceivedDate ?? editingItem.decisionDate,
+              offerAcceptedDate: editingItem.offerAcceptedDate,
+            }
             : null
         }
         onAcceptedCreated={handleOfferCreated}
@@ -829,7 +829,7 @@ export default function OffersReceivedPage() {
             <ThreeBounceSpinner label="Loading offers" />
           </div>
         ) : (
-          <OffersReceivedCards
+          <OfferCard
             items={filteredItems}
             view={view}
             onTagStatus={openTagDialog}

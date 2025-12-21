@@ -3,14 +3,14 @@
 import { useEffect } from "react";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { setCachedSession } from "@/lib/supabase/sessionCache";
-import { migrateGuestAppliedToUser } from "@/lib/storage/applied";
-import { migrateGuestInterviewsToUser } from "@/lib/storage/interviews";
-import { migrateGuestRejectedToUser } from "@/lib/storage/rejected";
-import { migrateGuestWithdrawnToUser } from "@/lib/storage/withdrawn";
-import { migrateGuestOffersToUser } from "@/lib/storage/offers";
-import { migrateGuestWishlistToUser } from "@/lib/storage/wishlist";
-import { migrateGuestNotesToUser } from "@/lib/storage/notes";
-import { migrateGuestActivityToUser } from "@/lib/storage/activity";
+import { migrateGuestAppliedToUser } from "@/lib/services/applied";
+import { migrateGuestInterviewsToUser } from "@/lib/services/interviews";
+import { migrateGuestRejectedToUser } from "@/lib/services/rejected";
+import { migrateGuestWithdrawnToUser } from "@/lib/services/withdrawn";
+import { migrateGuestOffersToUser } from "@/lib/services/offers";
+import { migrateGuestWishlistToUser } from "@/lib/services/wishlist";
+import { migrateGuestNotesToUser } from "@/lib/services/notes";
+import { migrateGuestActivityToUser } from "@/lib/services/activity";
 
 const COUNTS_EVENT = "job-tracker:refresh-counts";
 const NOTES_EVENT = "job-tracker:refresh-notes";

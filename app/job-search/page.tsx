@@ -42,7 +42,7 @@ import {
   deleteWishlistItem,
   type WishlistItem,
   type WishlistStorageMode,
-} from "@/lib/storage/wishlist";
+} from "@/lib/services/wishlist";
 
 /** sidebar refresh event name used across the app */
 const COUNTS_EVENT = "job-tracker:refresh-counts";

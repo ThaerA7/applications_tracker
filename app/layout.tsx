@@ -1,7 +1,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import { Merriweather } from "next/font/google";
-import AppShell from "@/components/AppShell";
+import AppShell from "@/components/layout/AppShell";
 import AuthProvider from "@/app/providers/AuthProvider";
 
 export const metadata: Metadata = {

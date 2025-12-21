@@ -7,12 +7,12 @@ import GoalSettingsDialog, {
   type GoalSettingsMode,
   type SingleGoalValues,
   type OverviewGoalValues,
-} from "../dialogs/GoalSettingsDialog";
+} from "@/components/dialogs/GoalSettingsDialog";
 
 // Storage helpers (guest: IndexedDB mirror, user: Supabase via storage modules).
-import { loadInterviews } from "@/lib/storage/interviews";
-import { loadOffers } from "@/lib/storage/offers";
-import { idbGet, idbSet } from "@/lib/storage/indexedDb";
+import { loadInterviews } from "@/lib/services/interviews";
+import { loadOffers } from "@/lib/services/offers";
+import { idbGet, idbSet } from "@/lib/services/indexedDb";
 
 /**
  * Global refresh event emitted by storage modules
@@ -296,9 +296,8 @@ export default function GoalsCard() {
     1
   );
 
-  const streakBadge = `Nice! You scheduled ${weeklyCount} interview${
-    weeklyCount === 1 ? "" : "s"
-  } this week 🎉`;
+  const streakBadge = `Nice! You scheduled ${weeklyCount} interview${weeklyCount === 1 ? "" : "s"
+    } this week 🎉`;
 
   return (
     <>
@@ -310,8 +309,8 @@ export default function GoalsCard() {
           settingsMode === "overview"
             ? "Set weekly & monthly goals"
             : settingsKey === "offers"
-            ? "Set offers goal"
-            : "Set interviews goal"
+              ? "Set offers goal"
+              : "Set interviews goal"
         }
         description={
           settingsMode === "overview"
@@ -321,15 +320,15 @@ export default function GoalsCard() {
         initialValues={
           settingsMode === "overview"
             ? {
-                weeklyTarget: settings.overview.weeklyTarget,
-                monthlyTarget: settings.overview.monthlyTarget,
-              }
+              weeklyTarget: settings.overview.weeklyTarget,
+              monthlyTarget: settings.overview.monthlyTarget,
+            }
             : settingsKey === "offers"
-            ? {
+              ? {
                 target: settings.offers.target,
                 periodDays: settings.offers.periodDays,
               }
-            : {
+              : {
                 target: settings.interviews.target,
                 periodDays: settings.interviews.periodDays,
               }

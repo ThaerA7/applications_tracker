@@ -22,18 +22,22 @@ import {
 
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { getModeCached } from "@/lib/supabase/sessionCache";
-import { loadApplied, upsertApplied } from "@/lib/storage/applied";
-import { loadInterviews, upsertInterview } from "@/lib/storage/interviews";
-import { loadNotes, upsertNote } from "@/lib/storage/notes";
-import { loadOffers, upsertOffer } from "@/lib/storage/offers";
-import { loadRejected, upsertRejected } from "@/lib/storage/rejected";
-import { loadWishlist, upsertWishlistItem } from "@/lib/storage/wishlist";
-import { loadWithdrawn, upsertWithdrawn } from "@/lib/storage/withdrawn";
-import { loadActivity, appendActivity } from "@/lib/storage/activity";
+import { loadApplied, upsertApplied } from "@/lib/services/applied";
+import { loadInterviews, upsertInterview } from "@/lib/services/interviews";
+import { loadNotes, upsertNote } from "@/lib/services/notes";
+import { loadOffers, upsertOffer } from "@/lib/services/offers";
+import { loadRejected, upsertRejected } from "@/lib/services/rejected";
+import { loadWishlist, upsertWishlistItem } from "@/lib/services/wishlist";
+import { loadWithdrawn, upsertWithdrawn } from "@/lib/services/withdrawn";
+import { loadActivity, appendActivity } from "@/lib/services/activity";
+import {
+  requestNotificationPermission,
+  areNotificationsEnabled,
+} from "@/lib/services/notifications";
 import ImportConfirmDialog from "@/components/dialogs/ImportConfirmDialog";
 import DeleteAllDataConfirmDialog from "@/components/dialogs/DeleteAllDataConfirmDialog";
 import DeleteAccountConfirmDialog from "@/components/dialogs/DeleteAccountConfirmDialog";
-import { clearAllData, clearAllLocalData } from "@/lib/storage/purge";
+import { clearAllData, clearAllLocalData } from "@/lib/services/purge";
 
 type Preferences = {
   reminders: boolean;
@@ -687,9 +691,10 @@ export default function SettingsPage() {
     : "Tip: Sign in to sync across devices.";
 
   const visibleCounts = dataCounts?.byMonth[selectedMonth] ?? null;
-  const visibleTotal = visibleCounts
-    ? Object.values(visibleCounts).reduce((sum, n) => sum + n, 0)
+  const visibleItemsCount = visibleCounts
+    ? visibleCounts.applied + visibleCounts.interviews + visibleCounts.offers + visibleCounts.rejected + visibleCounts.wishlist + visibleCounts.withdrawn
     : 0;
+  const visibleNotesCount = visibleCounts?.notes ?? 0;
 
   const formatMonthLabel = (monthKey: string) => {
     const [year, month] = monthKey.split("-").map(Number);
@@ -947,9 +952,17 @@ export default function SettingsPage() {
           <div className="mt-4 space-y-2.5">
             <ToggleRow
               title="Interview reminders"
-              description="Highlight interviews and nudge you a day before."
+              description="Browser notification 24 hours before upcoming interviews."
               value={prefs.reminders}
-              onChange={(next) => setPrefs((p) => ({ ...p, reminders: next }))}
+              onChange={async (next) => {
+                if (next && !areNotificationsEnabled()) {
+                  const permission = await requestNotificationPermission();
+                  if (permission !== "granted") {
+                    return; // Don't enable if permission denied
+                  }
+                }
+                setPrefs((p) => ({ ...p, reminders: next }));
+              }}
               badge="recommended"
             />
             <ToggleRow
@@ -967,7 +980,7 @@ export default function SettingsPage() {
             />
             <ToggleRow
               title="Weekly digest"
-              description="Show a Monday summary of new activity and pending tasks."
+              description="Show a summary dialog on your first visit each Monday."
               value={prefs.digest}
               onChange={(next) => setPrefs((p) => ({ ...p, digest: next }))}
             />
@@ -1191,12 +1204,16 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between gap-2">
               <span className="font-semibold text-neutral-700">Items in {formatMonthLabel(selectedMonth).split(" ")[0]}</span>
               <span className="font-semibold text-neutral-900">
-                {visibleTotal}
+                {visibleItemsCount} item{visibleItemsCount !== 1 ? "s" : ""}{visibleNotesCount > 0 ? ` & ${visibleNotesCount} note${visibleNotesCount !== 1 ? "s" : ""}` : ""}
               </span>
             </div>
             <p className="mt-1">
               {dataCounts?.all
-                ? `${Object.values(dataCounts.all).reduce((s, n) => s + n, 0)} total items across all time.`
+                ? (() => {
+                  const totalItems = dataCounts.all.applied + dataCounts.all.interviews + dataCounts.all.offers + dataCounts.all.rejected + dataCounts.all.wishlist + dataCounts.all.withdrawn;
+                  const totalNotes = dataCounts.all.notes;
+                  return `${totalItems} item${totalItems !== 1 ? "s" : ""}${totalNotes > 0 ? ` & ${totalNotes} note${totalNotes !== 1 ? "s" : ""}` : ""} across all time.`;
+                })()
                 : "Loading total..."}
             </p>
           </div>

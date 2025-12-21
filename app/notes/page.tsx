@@ -18,7 +18,7 @@ import {
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 
-import ThreeBounceSpinner from "@/components/ThreeBounceSpinner";
+import ThreeBounceSpinner from "@/components/ui/ThreeBounceSpinner";
 
 import {
   loadNotes,
@@ -28,7 +28,7 @@ import {
   type Note,
   type ColorKey,
   type NotesStorageMode,
-} from "@/lib/storage/notes";
+} from "@/lib/services/notes";
 
 const COUNTS_EVENT = "job-tracker:refresh-counts";
 const NOTES_EVENT = "job-tracker:refresh-notes";

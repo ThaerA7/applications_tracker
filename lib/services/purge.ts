@@ -1,9 +1,9 @@
 "use client";
 
-import { idbDel } from "@/lib/storage/indexedDb";
+import { idbDel } from "@/lib/services/indexedDb";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { getLastKnownUserId } from "@/lib/supabase/sessionCache";
-import { userCacheKey } from "@/lib/storage/userCache";
+import { userCacheKey } from "@/lib/services/userCache";
 
 const COUNTS_EVENT = "job-tracker:refresh-counts";
 const NOTES_EVENT = "job-tracker:refresh-notes";

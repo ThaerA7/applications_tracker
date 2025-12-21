@@ -41,41 +41,41 @@ import {
   upsertApplied,
   type AppliedApplication,
   type AppliedStorageMode,
-} from "@/lib/storage/applied";
+} from "@/lib/services/applied";
 
 import {
   loadInterviews,
   upsertInterview,
   type StoredInterview,
   type InterviewsStorageMode,
-} from "@/lib/storage/interviews";
+} from "@/lib/services/interviews";
 
 import {
   loadRejected,
   upsertRejected,
   type RejectedApplication,
   type RejectedStorageMode,
-} from "@/lib/storage/rejected";
+} from "@/lib/services/rejected";
 
 import {
   loadWithdrawn,
   upsertWithdrawn,
   type WithdrawnApplication,
   type WithdrawnStorageMode,
-} from "@/lib/storage/withdrawn";
+} from "@/lib/services/withdrawn";
 
 import {
   loadOffers,
   upsertOffer,
   type OffersStorageMode,
-} from "@/lib/storage/offers";
+} from "@/lib/services/offers";
 
 import {
   upsertNote,
   type Note,
   type ColorKey,
   type NotesStorageMode,
-} from "@/lib/storage/notes";
+} from "@/lib/services/notes";
 
 // Activity (used by RecentActivityCard)
 import {
@@ -85,7 +85,7 @@ import {
   type ActivityVariant,
   type ActivityType,
   type ActivityStorageMode,
-} from "@/lib/storage/activity";
+} from "@/lib/services/activity";
 
 /**
  * Global refresh event emitted by storage modules

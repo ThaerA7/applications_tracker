@@ -4,14 +4,14 @@ import type React from "react";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { Search, Filter, Plus, History } from "lucide-react";
 import Image from "next/image";
-import WithdrawnCard, { type WithdrawnRecord } from "./WithdrawnCard";
+import WithdrawnCard, { type WithdrawnRecord } from "@/components/cards/WithdrawnCard";
 import type { InterviewType } from "@/components/dialogs/ScheduleInterviewDialog";
 import MoveToWithdrawnDialog, {
   type WithdrawnDetails,
 } from "@/components/dialogs/MoveToWithdrawnDialog";
 import { animateCardExit } from "@/components/dialogs/cardExitAnimation";
-import ActivityLogSidebar, { type ActivityItem } from "@/components/ActivityLogSidebar";
-import ThreeBounceSpinner from "@/components/ThreeBounceSpinner";
+import ActivityLogSidebar, { type ActivityItem } from "@/components/ui/ActivityLogSidebar";
+import ThreeBounceSpinner from "@/components/ui/ThreeBounceSpinner";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 
 import { getSupabaseClient } from "@/lib/supabase/client";
@@ -21,7 +21,7 @@ import {
   deleteWithdrawn,
   migrateGuestWithdrawnToUser,
   type WithdrawnStorageMode,
-} from "@/lib/storage/withdrawn";
+} from "@/lib/services/withdrawn";
 
 // Persistent activity storage (guest + Supabase user).
 import {
@@ -29,7 +29,7 @@ import {
   appendActivity as appendActivityToStorage,
   migrateGuestActivityToUser,
   type ActivityStorageMode,
-} from "@/lib/storage/activity";
+} from "@/lib/services/activity";
 
 const INTERVIEW_TYPE_LABEL: Record<InterviewType, string> = {
   phone: "Phone screening",

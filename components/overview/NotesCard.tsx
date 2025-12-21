@@ -10,7 +10,7 @@ import {
   type Note,
   type ColorKey,
   type NotesStorageMode,
-} from "@/lib/storage/notes";
+} from "@/lib/services/notes";
 
 export type NoteItem = Note;
 
@@ -80,7 +80,7 @@ function makeId(): string {
     if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
       return crypto.randomUUID();
     }
-  } catch {}
+  } catch { }
   return `note-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
@@ -218,13 +218,11 @@ export function AddNoteDialog(props: {
                     onClick={() => setDialogColor(c)}
                     aria-label={`Set note color: ${c}`}
                     aria-pressed={selected}
-                    className={`h-7 w-7 rounded-full border transition ${
-                      selected ? `ring-2 ${COLOR_STYLES[c].ring}` : "ring-0"
-                    } ${
-                      c === "yellow" || c === "gray"
+                    className={`h-7 w-7 rounded-full border transition ${selected ? `ring-2 ${COLOR_STYLES[c].ring}` : "ring-0"
+                      } ${c === "yellow" || c === "gray"
                         ? "border-neutral-300"
                         : "border-transparent"
-                    }`}
+                      }`}
                     style={{ background: getColorHex(c) }}
                     title={c}
                   />
@@ -328,7 +326,7 @@ export default function NotesOverviewCard() {
 
     (async () => {
       try {
-        await migrateGuestNotesToUser().catch(() => {});
+        await migrateGuestNotesToUser().catch(() => { });
         if (!aliveRef.current) return;
         await refreshNotes();
       } finally {

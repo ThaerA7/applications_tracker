@@ -22,20 +22,20 @@ import Image from "next/image";
 import ScheduleInterviewDialog, {
   type Interview,
   type InterviewType,
-} from "../../components/dialogs/ScheduleInterviewDialog";
-import MoveApplicationDialog from "../../components/dialogs/MoveApplicationDialog";
-import type { RejectionDetails } from "../../components/dialogs/MoveToRejectedDialog";
-import type { WithdrawnDetails } from "../../components/dialogs/MoveToWithdrawnDialog";
-import type { AcceptedDetails } from "../../components/dialogs/MoveToAcceptedDialog";
+} from "@/components/dialogs/ScheduleInterviewDialog";
+import MoveApplicationDialog from "@/components/dialogs/MoveApplicationDialog";
+import type { RejectionDetails } from "@/components/dialogs/MoveToRejectedDialog";
+import type { WithdrawnDetails } from "@/components/dialogs/MoveToWithdrawnDialog";
+import type { AcceptedDetails } from "@/components/dialogs/MoveToAcceptedDialog";
 
-import InterviewCard, { type InterviewWithStage } from "./InterviewCard";
-import { animateCardExit } from "../../components/dialogs/cardExitAnimation";
-import { upsertRejected, detectRejectedMode } from "@/lib/storage/rejected";
-import { upsertWithdrawn, detectWithdrawnMode } from "@/lib/storage/withdrawn";
-import { upsertOffer, detectOffersMode } from "@/lib/storage/offers";
+import InterviewCard, { type InterviewWithStage } from "@/components/cards/InterviewCard";
+import { animateCardExit } from "@/components/dialogs/cardExitAnimation";
+import { upsertRejected, detectRejectedMode } from "@/lib/services/rejected";
+import { upsertWithdrawn, detectWithdrawnMode } from "@/lib/services/withdrawn";
+import { upsertOffer, detectOffersMode } from "@/lib/services/offers";
 
-import ActivityLogSidebar from "@/components/ActivityLogSidebar";
-import ThreeBounceSpinner from "@/components/ThreeBounceSpinner";
+import ActivityLogSidebar from "@/components/ui/ActivityLogSidebar";
+import ThreeBounceSpinner from "@/components/ui/ThreeBounceSpinner";
 
 import InterviewsFilter, {
   DEFAULT_INTERVIEW_FILTERS,
@@ -51,7 +51,7 @@ import {
   deleteInterview,
   migrateGuestInterviewsToUser,
   type InterviewsStorageMode,
-} from "@/lib/storage/interviews";
+} from "@/lib/services/interviews";
 
 // Persistent activity storage (guest + Supabase user).
 import {
@@ -62,8 +62,8 @@ import {
   type ActivityType,
   type ActivityVariant,
   type ActivityStorageMode,
-} from "@/lib/storage/activity";
-import { OfferReceivedJob } from "../offers-received/OffersReceivedCards";
+} from "@/lib/services/activity";
+import { OfferReceivedJob } from "@/components/cards/OfferCard";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 
 type ApplicationLike = ComponentProps<typeof ScheduleInterviewDialog>["application"];

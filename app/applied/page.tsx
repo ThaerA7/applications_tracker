@@ -3,17 +3,17 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { Search, Plus, History, X } from 'lucide-react';
 import Image from 'next/image';
-import { animateCardExit } from '../../components/dialogs/cardExitAnimation';
+import { animateCardExit } from '@/components/dialogs/cardExitAnimation';
 
 import AddApplicationDialog, {
   type NewApplicationForm,
-} from '../../components/dialogs/AddApplicationDialog';
-import MoveApplicationDialog from '../../components/dialogs/MoveApplicationDialog';
-import type { RejectionDetails } from '../../components/dialogs/MoveToRejectedDialog';
-import type { WithdrawnDetails } from '../../components/dialogs/MoveToWithdrawnDialog';
-import type { Interview } from '../../components/dialogs/ScheduleInterviewDialog';
-import ApplicationCard, { type Application } from './ApplicationCard';
-import ActivityLogSidebar from '@/components/ActivityLogSidebar';
+} from '@/components/dialogs/AddApplicationDialog';
+import MoveApplicationDialog from '@/components/dialogs/MoveApplicationDialog';
+import type { RejectionDetails } from '@/components/dialogs/MoveToRejectedDialog';
+import type { WithdrawnDetails } from '@/components/dialogs/MoveToWithdrawnDialog';
+import type { Interview } from '@/components/dialogs/ScheduleInterviewDialog';
+import ApplicationCard, { type Application } from '@/components/cards/ApplicationCard';
+import ActivityLogSidebar from '@/components/ui/ActivityLogSidebar';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 
 import { getSupabaseClient } from '@/lib/supabase/client';
@@ -23,13 +23,13 @@ import {
   deleteApplied,
   migrateGuestAppliedToUser,
   type AppliedStorageMode,
-} from '@/lib/storage/applied';
+} from '@/lib/services/applied';
 import {
   upsertInterview,
   detectInterviewsMode,
-} from '@/lib/storage/interviews';
-import { upsertRejected, detectRejectedMode } from '@/lib/storage/rejected';
-import { upsertWithdrawn, detectWithdrawnMode } from '@/lib/storage/withdrawn';
+} from '@/lib/services/interviews';
+import { upsertRejected, detectRejectedMode } from '@/lib/services/rejected';
+import { upsertWithdrawn, detectWithdrawnMode } from '@/lib/services/withdrawn';
 
 import ApplicationsFilter, {
   DEFAULT_APPLICATION_FILTERS,
@@ -38,7 +38,7 @@ import ApplicationsFilter, {
   type ApplicationFilters,
 } from '@/components/filters/ApplicationsFilter';
 
-import ThreeBounceSpinner from '@/components/ThreeBounceSpinner';
+import ThreeBounceSpinner from '@/components/ui/ThreeBounceSpinner';
 
 // Persistent activity storage.
 import {
@@ -49,7 +49,7 @@ import {
   type ActivityType,
   type ActivityVariant,
   type ActivityStorageMode,
-} from '@/lib/storage/activity';
+} from '@/lib/services/activity';
 
 type StoredRejection = RejectionDetails & { id: string };
 

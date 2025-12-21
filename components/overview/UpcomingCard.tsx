@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PhoneCall, Plus } from "lucide-react";
 
-import ScheduleInterviewDialog from "../../components/dialogs/ScheduleInterviewDialog";
+import ScheduleInterviewDialog from "@/components/dialogs/ScheduleInterviewDialog";
 import {
   type CalendarEvent,
   MONTH_NAMES,
@@ -11,11 +11,11 @@ import {
   extractTime,
   formatHumanDateTime,
   getCountdownParts,
-} from "../../app/calendar/calendarUtils";
+} from "@/app/calendar/calendarUtils";
 
 // Storage helpers (guest: IndexedDB mirror, user: Supabase).
 import { getSupabaseClient } from "@/lib/supabase/client";
-import { loadInterviews } from "@/lib/storage/interviews";
+import { loadInterviews } from "@/lib/services/interviews";
 
 /**
  * Global refresh event emitted by storage modules
