@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Clock, ListTodo } from "lucide-react";
 
 import { getSupabaseClient } from "@/lib/supabase/client";
@@ -174,6 +175,7 @@ function mapVariantToSource(v: ActivityVariant): SourceBucket {
 export default function RecentActivityCard() {
   const [allItems, setAllItems] = useState<InternalActivityItem[]>([]);
   const [now, setNow] = useState(() => Date.now());
+  const [loaded, setLoaded] = useState(false);
 
   // Avoid setState after unmount and coalesce refresh storms.
   const aliveRef = useRef(true);
@@ -224,7 +226,10 @@ export default function RecentActivityCard() {
       const unique = Array.from(map.values());
       unique.sort((a, b) => toMs(b.timestamp) - toMs(a.timestamp));
 
-      if (aliveRef.current) setAllItems(unique);
+      if (aliveRef.current) {
+        setAllItems(unique);
+        setLoaded(true);
+      }
     } catch (e) {
       console.error("RecentActivityCard: failed to load activity", e);
       if (aliveRef.current) setAllItems([]);
@@ -308,84 +313,106 @@ export default function RecentActivityCard() {
         "relative overflow-hidden rounded-2xl border border-neutral-200/70",
         "bg-gradient-to-br from-slate-50 via-white to-indigo-50",
         "p-5 shadow-md",
+        "min-h-[200px]",
       ].join(" ")}
     >
       <div className="pointer-events-none absolute -bottom-20 -right-16 h-56 w-56 rounded-full bg-indigo-400/15 blur-3xl" />
 
-      <div className="relative z-10">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white/80 px-3 py-1 text-xs font-medium text-neutral-700 shadow-sm">
-              <ListTodo className="h-3.5 w-3.5" />
-              <span>Recent activity</span>
+      <AnimatePresence mode="wait">
+        {!loaded ? (
+          <motion.div
+            key="loading"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="relative z-10 flex min-h-[150px] items-center justify-center"
+          >
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600" />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="content"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, ease: "easeOut" }}
+            className="relative z-10"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white/80 px-3 py-1 text-xs font-medium text-neutral-700 shadow-sm">
+                  <ListTodo className="h-3.5 w-3.5" />
+                  <span>Recent activity</span>
+                </div>
+                <p className="mt-2 text-sm font-semibold text-neutral-900">
+                  What changed recently
+                </p>
+                <p className="mt-1 text-[11px] text-neutral-600">
+                  Pulled from your pipeline activity logs.
+                </p>
+              </div>
+              <span className="inline-flex items-center gap-1 rounded-full bg-neutral-50 px-2.5 py-0.5 text-[11px] font-medium text-neutral-600">
+                <Clock className="h-3.5 w-3.5" />
+                <span>Last {LAST_DAYS} days</span>
+              </span>
             </div>
-            <p className="mt-2 text-sm font-semibold text-neutral-900">
-              What changed recently
-            </p>
-            <p className="mt-1 text-[11px] text-neutral-600">
-              Pulled from your pipeline activity logs.
-            </p>
-          </div>
-          <span className="inline-flex items-center gap-1 rounded-full bg-neutral-50 px-2.5 py-0.5 text-[11px] font-medium text-neutral-600">
-            <Clock className="h-3.5 w-3.5" />
-            <span>Last {LAST_DAYS} days</span>
-          </span>
-        </div>
 
-        <ol className="mt-4 space-y-3 text-sm">
-          {empty && (
-            <li className="rounded-xl border border-dashed border-neutral-200 bg-white/80 p-4 text-center">
-              <p className="text-[12px] text-neutral-600">No recent activity yet.</p>
-              <p className="mt-1 text-[11px] text-neutral-500">
-                As you add, move, or update items, your timeline will appear here.
-              </p>
-            </li>
-          )}
-
-          {!empty &&
-            recent.map((item, index) => {
-              const isFirst = index === 0;
-
-              const dotClasses =
-                item.category === "applied"
-                  ? "bg-sky-500"
-                  : item.category === "interview"
-                    ? "bg-emerald-500"
-                    : item.category === "rejected"
-                      ? "bg-rose-500"
-                      : item.category === "withdrawn"
-                        ? "bg-amber-500"
-                        : "bg-lime-500"; // offer
-
-              return (
-                <li
-                  key={item.id}
-                  className="relative flex gap-3 rounded-xl border border-neutral-200 bg-white/95 p-3 shadow-sm"
-                >
-                  <div className="flex flex-col items-center">
-                    <span
-                      className={[
-                        "mt-1 h-2.5 w-2.5 rounded-full ring-2 ring-white",
-                        dotClasses,
-                        isFirst ? "scale-110" : "",
-                      ].join(" ")}
-                    />
-                    {index < recent.length - 1 && (
-                      <span className="mt-1 h-full w-px flex-1 bg-neutral-200" />
-                    )}
-                  </div>
-
-                  <div className="space-y-0.5">
-                    <p className="text-[13px] font-medium text-neutral-900">
-                      {item.label}
-                    </p>
-                    <p className="text-[11px] text-neutral-500">{item.time}</p>
-                  </div>
+            <ol className="mt-4 space-y-3 text-sm">
+              {empty && (
+                <li className="rounded-xl border border-dashed border-neutral-200 bg-white/80 p-4 text-center">
+                  <p className="text-[12px] text-neutral-600">No recent activity yet.</p>
+                  <p className="mt-1 text-[11px] text-neutral-500">
+                    As you add, move, or update items, your timeline will appear here.
+                  </p>
                 </li>
-              );
-            })}
-        </ol>
-      </div>
+              )}
+
+              {!empty &&
+                recent.map((item, index) => {
+                  const isFirst = index === 0;
+
+                  const dotClasses =
+                    item.category === "applied"
+                      ? "bg-sky-500"
+                      : item.category === "interview"
+                        ? "bg-emerald-500"
+                        : item.category === "rejected"
+                          ? "bg-rose-500"
+                          : item.category === "withdrawn"
+                            ? "bg-amber-500"
+                            : "bg-lime-500"; // offer
+
+                  return (
+                    <li
+                      key={item.id}
+                      className="relative flex gap-3 rounded-xl border border-neutral-200 bg-white/95 p-3 shadow-sm"
+                    >
+                      <div className="flex flex-col items-center">
+                        <span
+                          className={[
+                            "mt-1 h-2.5 w-2.5 rounded-full ring-2 ring-white",
+                            dotClasses,
+                            isFirst ? "scale-110" : "",
+                          ].join(" ")}
+                        />
+                        {index < recent.length - 1 && (
+                          <span className="mt-1 h-full w-px flex-1 bg-neutral-200" />
+                        )}
+                      </div>
+
+                      <div className="space-y-0.5">
+                        <p className="text-[13px] font-medium text-neutral-900">
+                          {item.label}
+                        </p>
+                        <p className="text-[11px] text-neutral-500">{item.time}</p>
+                      </div>
+                    </li>
+                  );
+                })}
+            </ol>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </section>
   );
 }

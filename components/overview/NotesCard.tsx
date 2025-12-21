@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { FileText, Palette, Plus, Tag, Save, X } from "lucide-react";
 
 import {
@@ -483,102 +484,117 @@ export default function NotesOverviewCard() {
           "relative overflow-hidden rounded-2xl border border-neutral-200/70",
           "bg-gradient-to-br from-indigo-50 via-white to-violet-50",
           "p-5 shadow-md",
+          "min-h-[200px]",
         ].join(" ")}
       >
         <div className="pointer-events-none absolute -top-16 -left-20 h-48 w-48 rounded-full bg-indigo-400/15 blur-3xl" />
 
-        <div className="relative z-10">
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-white/80 px-3 py-1 text-xs font-medium text-indigo-700 shadow-sm">
-                <FileText className="h-3.5 w-3.5" />
-                <span>Notes</span>
-              </div>
-              <p className="mt-2 text-sm font-semibold text-neutral-900">
-                Things to remember
-              </p>
-              <p className="mt-1 text-[11px] text-neutral-600">
-                Keep your key notes visible and easy to review while you apply
-                and prepare for interviews.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={openAddDialog}
-              className={[
-                "inline-flex items-center gap-1.5 rounded-full border border-emerald-100",
-                "bg-white/80 px-2.5 py-1 text-[11px] font-medium text-emerald-700 shadow-sm",
-                "hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300",
-              ].join(" ")}
+        <AnimatePresence mode="wait">
+          {loading ? (
+            <motion.div
+              key="loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="relative z-10 flex min-h-[150px] items-center justify-center"
             >
-              <Plus className="h-3 w-3" aria-hidden="true" />
-              <span>Add note</span>
-            </button>
-          </div>
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600" />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="content"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, ease: "easeOut" }}
+              className="relative z-10"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <div className="inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-white/80 px-3 py-1 text-xs font-medium text-indigo-700 shadow-sm">
+                    <FileText className="h-3.5 w-3.5" />
+                    <span>Notes</span>
+                  </div>
+                  <p className="mt-2 text-sm font-semibold text-neutral-900">
+                    Things to remember
+                  </p>
+                  <p className="mt-1 text-[11px] text-neutral-600">
+                    Keep your key notes visible and easy to review while you apply
+                    and prepare for interviews.
+                  </p>
+                </div>
 
-          <div className="mt-3 space-y-3">
-            {loading && (
-              <div className="rounded-xl border border-neutral-200/80 bg-white/70 p-4 text-[11px] text-neutral-600">
-                Loading notes…
+                <button
+                  type="button"
+                  onClick={openAddDialog}
+                  className={[
+                    "inline-flex items-center gap-1.5 rounded-full border border-emerald-100",
+                    "bg-white/80 px-2.5 py-1 text-[11px] font-medium text-emerald-700 shadow-sm",
+                    "hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300",
+                  ].join(" ")}
+                >
+                  <Plus className="h-3 w-3" aria-hidden="true" />
+                  <span>Add note</span>
+                </button>
               </div>
-            )}
 
-            {!loading &&
-              overviewNotes.map((note) => {
-                const color = (note.color ?? "gray") as ColorKey;
+              <div className="mt-3 space-y-3">
+                {overviewNotes.map((note) => {
+                  const color = (note.color ?? "gray") as ColorKey;
 
-                return (
-                  <article
-                    key={note.id}
-                    className={[
-                      "relative flex flex-col rounded-xl border p-3 text-sm shadow-sm transition-all",
-                      "bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90",
-                      "border-neutral-200/80 hover:-translate-y-0.5 hover:shadow-md",
-                      "before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl before:bg-gradient-to-b before:opacity-90",
-                      "cursor-pointer",
-                      COLOR_ACCENT[color],
-                    ].join(" ")}
-                    // Hold-press to edit (mouse + touch).
-                    onMouseDown={() => startLongPress(note)}
-                    onMouseUp={cancelLongPress}
-                    onMouseLeave={cancelLongPress}
-                    onTouchStart={() => startLongPress(note)}
-                    onTouchEnd={() => handleTouchEnd(note)}
-                    onTouchCancel={cancelLongPress}
-                    // Double-click to edit (desktop).
-                    onDoubleClick={() => {
-                      cancelLongPress();
-                      openEditDialog(note);
-                    }}
-                    title="Hold to edit (or double-click)"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-[13px] font-semibold text-neutral-900">
-                        {note.title ?? "Untitled note"}
-                      </p>
-                      <span className="inline-flex items-center gap-1 rounded-full bg-neutral-50 px-2 py-0.5 text-[10px] font-medium text-neutral-600">
-                        <Tag className="h-3 w-3" />
-                        <span>
-                          {(note.tags ?? ["Note"]).slice(0, 3).join(" · ")}
+                  return (
+                    <article
+                      key={note.id}
+                      className={[
+                        "relative flex flex-col rounded-xl border p-3 text-sm shadow-sm transition-all",
+                        "bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90",
+                        "border-neutral-200/80 hover:-translate-y-0.5 hover:shadow-md",
+                        "before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl before:bg-gradient-to-b before:opacity-90",
+                        "cursor-pointer",
+                        COLOR_ACCENT[color],
+                      ].join(" ")}
+                      // Hold-press to edit (mouse + touch).
+                      onMouseDown={() => startLongPress(note)}
+                      onMouseUp={cancelLongPress}
+                      onMouseLeave={cancelLongPress}
+                      onTouchStart={() => startLongPress(note)}
+                      onTouchEnd={() => handleTouchEnd(note)}
+                      onTouchCancel={cancelLongPress}
+                      // Double-click to edit (desktop).
+                      onDoubleClick={() => {
+                        cancelLongPress();
+                        openEditDialog(note);
+                      }}
+                      title="Hold to edit (or double-click)"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[13px] font-semibold text-neutral-900">
+                          {note.title ?? "Untitled note"}
+                        </p>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-neutral-50 px-2 py-0.5 text-[10px] font-medium text-neutral-600">
+                          <Tag className="h-3 w-3" />
+                          <span>
+                            {(note.tags ?? ["Note"]).slice(0, 3).join(" · ")}
+                          </span>
                         </span>
-                      </span>
-                    </div>
-                    <p className="mt-1 line-clamp-2 whitespace-pre-line text-[12px] text-neutral-600">
-                      {note.content ?? ""}
-                    </p>
-                  </article>
-                );
-              })}
+                      </div>
+                      <p className="mt-1 line-clamp-2 whitespace-pre-line text-[12px] text-neutral-600">
+                        {note.content ?? ""}
+                      </p>
+                    </article>
+                  );
+                })}
 
-            {!loading && overviewNotes.length === 0 && (
-              <div className="rounded-xl border border-dashed border-neutral-300 bg-white/70 p-4 text-center text-[11px] text-neutral-600">
-                No notes yet. Click <span className="font-medium">Add note</span>{" "}
-                to create your first one.
+                {overviewNotes.length === 0 && (
+                  <div className="rounded-xl border border-dashed border-neutral-300 bg-white/70 p-4 text-center text-[11px] text-neutral-600">
+                    No notes yet. Click <span className="font-medium">Add note</span>{" "}
+                    to create your first one.
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </section>
 
       <AddNoteDialog
