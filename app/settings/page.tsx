@@ -77,12 +77,14 @@ function ToggleRow({
   value,
   onChange,
   badge,
+  extra,
 }: {
   title: string;
   description: string;
   value: boolean;
   onChange: (next: boolean) => void;
   badge?: string;
+  extra?: React.ReactNode;
 }) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-lg border border-neutral-200/80 bg-white/70 px-3 py-2.5 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/60">
@@ -98,24 +100,27 @@ function ToggleRow({
         <p className="text-xs text-neutral-600">{description}</p>
       </div>
 
-      <button
-        type="button"
-        role="switch"
-        aria-checked={value}
-        onClick={() => onChange(!value)}
-        className={[
-          "relative inline-flex h-6 w-11 items-center rounded-full transition",
-          value ? "bg-neutral-900" : "bg-neutral-200",
-          "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300",
-        ].join(" ")}
-      >
-        <span
+      <div className="flex items-center gap-2">
+        {extra}
+        <button
+          type="button"
+          role="switch"
+          aria-checked={value}
+          onClick={() => onChange(!value)}
           className={[
-            "inline-block h-4 w-4 transform rounded-full bg-white shadow transition",
-            value ? "translate-x-6" : "translate-x-1",
+            "relative inline-flex h-6 w-11 items-center rounded-full transition",
+            value ? "bg-neutral-900" : "bg-neutral-200",
+            "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300",
           ].join(" ")}
-        />
-      </button>
+        >
+          <span
+            className={[
+              "inline-block h-4 w-4 transform rounded-full bg-white shadow transition",
+              value ? "translate-x-6" : "translate-x-1",
+            ].join(" ")}
+          />
+        </button>
+      </div>
     </div>
   );
 }
@@ -993,74 +998,6 @@ export default function SettingsPage() {
               value={sidebarAlwaysCollapsed}
               onChange={setSidebarAlwaysCollapsedEverywhere}
             />
-
-            {/* Test buttons for email functions - DEV ONLY */}
-            <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-200/80 bg-amber-50/70 px-3 py-2.5 shadow-sm backdrop-blur">
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-semibold text-neutral-900">
-                    Test email functions
-                  </p>
-                  <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
-                    dev only
-                  </span>
-                </div>
-                <p className="text-xs text-neutral-600">
-                  Manually trigger email Edge Functions for testing.
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      const res = await fetch(
-                        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-interview-reminders`,
-                        {
-                          method: "POST",
-                          headers: {
-                            "Content-Type": "application/json",
-                            Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
-                          },
-                          body: JSON.stringify({ testMode: true }),
-                        }
-                      );
-                      const data = await res.json();
-                      alert("Interview Reminders:\n" + JSON.stringify(data, null, 2));
-                    } catch (err) {
-                      alert("Error: " + String(err));
-                    }
-                  }}
-                  className="inline-flex h-8 items-center justify-center rounded-lg border border-amber-300 bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800 shadow-sm hover:bg-amber-200"
-                >
-                  Reminders
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      const res = await fetch(
-                        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-monthly-digest`,
-                        {
-                          method: "POST",
-                          headers: {
-                            "Content-Type": "application/json",
-                            Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
-                          },
-                        }
-                      );
-                      const data = await res.json();
-                      alert("Monthly Digest:\n" + JSON.stringify(data, null, 2));
-                    } catch (err) {
-                      alert("Error: " + String(err));
-                    }
-                  }}
-                  className="inline-flex h-8 items-center justify-center rounded-lg border border-purple-300 bg-purple-100 px-3 py-1 text-xs font-medium text-purple-800 shadow-sm hover:bg-purple-200"
-                >
-                  Digest
-                </button>
-              </div>
-            </div>
 
             <div className="flex items-center justify-between gap-3 rounded-lg border border-neutral-200/80 bg-white/70 px-3 py-2.5 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/60">
               <div className="flex-1">

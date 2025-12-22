@@ -31,7 +31,6 @@ interface MonthlyStats {
   rejected: number;
   withdrawn: number;
   wishlist: number;
-  topCompanies: string[];
   upcomingInterviews: Array<{
     company: string;
     role: string;
@@ -91,11 +90,11 @@ function generateDigestEmail(
   const greeting = userName ? `Hi ${userName},` : "Hi there,";
   
   const motivationalMessage = totalActivity === 0
-    ? "No activity this month – but every journey starts with a single step. Let's make next month count! 🚀"
+    ? "No activity last month – but every journey starts with a single step. Let's make this month count! 🚀"
     : totalActivity < 5
     ? "You're making progress! Keep the momentum going. 💪"
     : totalActivity < 15
-    ? "Great work this month! Your consistency is paying off. 🌟"
+    ? "Great work last month! Your consistency is paying off. 🌟"
     : "Incredible effort! You're really crushing your job search. 🎉";
 
   return `
@@ -112,7 +111,7 @@ function generateDigestEmail(
         
         <p style="color: #374151; margin-bottom: 24px; font-size: 15px; line-height: 1.6;">
           ${greeting}<br><br>
-          Here's a summary of your job search activity this month.
+          Here's a summary of your job search activity last month.
         </p>
 
         <!-- Stats Grid -->
@@ -153,14 +152,6 @@ function generateDigestEmail(
             </td>
           </tr>
         </table>
-
-        ${stats.topCompanies.length > 0 ? `
-        <!-- Top Companies -->
-        <div style="background-color: #f9fafb; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
-          <h3 style="color: #374151; margin: 0 0 12px 0; font-size: 14px; text-transform: uppercase;">Top Companies Applied To</h3>
-          <p style="color: #6b7280; margin: 0; font-size: 14px;">${stats.topCompanies.join(", ")}</p>
-        </div>
-        ` : ""}
 
         ${stats.upcomingInterviews.length > 0 ? `
         <!-- Upcoming Interviews -->
@@ -217,11 +208,11 @@ Deno.serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Calculate date range - use CURRENT month for testing, previous month in production
+    // Calculate date range - use LAST month for the digest summary
     const now = new Date();
-    // Current month (for testing with recent data)
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    // Last month's date range
+    const monthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
     const monthName = getMonthName(monthStart);
 
     // Fetch users who have monthly digest enabled
@@ -262,7 +253,14 @@ Deno.serve(async (req) => {
       const email = userData.user.email;
       const userName = userData.user.user_metadata?.full_name || userData.user.user_metadata?.name;
 
-      // Fetch ALL applications for this user (total overview)
+      // Helper function to check if a date falls within last month
+      const isInLastMonth = (dateStr?: string): boolean => {
+        if (!dateStr) return false;
+        const d = new Date(dateStr);
+        return d >= monthStart && d <= monthEnd;
+      };
+
+      // Fetch ALL applications for this user
       const { data: applications, error: appsError } = await supabase
         .from("applications")
         .select("id, bucket, data, created_at")
@@ -274,7 +272,7 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Calculate stats
+      // Calculate stats - only count items from last month
       const stats: MonthlyStats = {
         applied: 0,
         interviews: 0,
@@ -282,46 +280,52 @@ Deno.serve(async (req) => {
         rejected: 0,
         withdrawn: 0,
         wishlist: 0,
-        topCompanies: [],
         upcomingInterviews: [],
       };
 
-      const companyCount: Record<string, number> = {};
-
       for (const app of (applications || []) as ApplicationRow[]) {
+        // Check if this item was created or has a relevant date in last month
+        const data = app.data as Record<string, unknown>;
+        const appliedOn = data.appliedOn as string | undefined;
+        const interviewDate = data.date as string | undefined;
+        const offerDate = (data.offerReceivedDate || data.decisionDate) as string | undefined;
+        const rejectedDate = data.decisionDate as string | undefined;
+        const withdrawnDate = data.withdrawnDate as string | undefined;
+        const createdAt = app.created_at;
+
         switch (app.bucket) {
           case "applied":
-            stats.applied++;
+            if (isInLastMonth(appliedOn) || isInLastMonth(createdAt)) {
+              stats.applied++;
+            }
             break;
           case "interviews":
-            stats.interviews++;
+            if (isInLastMonth(interviewDate) || isInLastMonth(createdAt)) {
+              stats.interviews++;
+            }
             break;
           case "offers":
-            stats.offers++;
+            if (isInLastMonth(offerDate) || isInLastMonth(createdAt)) {
+              stats.offers++;
+            }
             break;
           case "rejected":
-            stats.rejected++;
+            if (isInLastMonth(rejectedDate) || isInLastMonth(createdAt)) {
+              stats.rejected++;
+            }
             break;
           case "withdrawn":
-            stats.withdrawn++;
+            if (isInLastMonth(withdrawnDate) || isInLastMonth(createdAt)) {
+              stats.withdrawn++;
+            }
             break;
           case "wishlist":
-            stats.wishlist++;
+            if (isInLastMonth(createdAt)) {
+              stats.wishlist++;
+            }
             break;
         }
-
-        // Track companies
-        const company = (app.data as { company?: string })?.company;
-        if (company) {
-          companyCount[company] = (companyCount[company] || 0) + 1;
-        }
       }
-
-      // Get top 5 companies
-      stats.topCompanies = Object.entries(companyCount)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([company]) => company);
 
       // Fetch upcoming interviews (next 30 days)
       const { data: upcomingInterviews } = await supabase

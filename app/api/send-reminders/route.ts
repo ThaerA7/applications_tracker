@@ -34,6 +34,13 @@ function generateReminderEmail(interview: InterviewData): string {
     day: "numeric",
   });
 
+  // Format the interview time - use provided time or extract from date
+  const formattedTime = interview.time || interviewDate.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+
   return `
     <!DOCTYPE html>
     <html>
@@ -50,7 +57,7 @@ function generateReminderEmail(interview: InterviewData): string {
           <h2 style="color: #111827; margin: 0 0 12px 0; font-size: 20px;">${interview.company}</h2>
           <p style="color: #4b5563; margin: 0 0 8px 0; font-size: 16px;"><strong>Role:</strong> ${interview.role}</p>
           <p style="color: #4b5563; margin: 0 0 8px 0; font-size: 16px;"><strong>Date:</strong> ${formattedDate}</p>
-          ${interview.time ? `<p style="color: #4b5563; margin: 0 0 8px 0; font-size: 16px;"><strong>Time:</strong> ${interview.time}</p>` : ""}
+          <p style="color: #4b5563; margin: 0 0 8px 0; font-size: 16px;"><strong>Time:</strong> ${formattedTime}</p>
           ${interview.type ? `<p style="color: #4b5563; margin: 0; font-size: 16px;"><strong>Type:</strong> ${interview.type}</p>` : ""}
         </div>
         
