@@ -9,8 +9,11 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import { Check, ChevronDown, Filter, X } from "lucide-react";
+import { Check, Filter, X } from "lucide-react";
 import type { WishlistItem } from "@/lib/services/wishlist";
+import { parseDateSafe, startOfDay, endOfDay, presetRange } from "@/lib/utils/dateUtils";
+import { toggleInArray, normalizeList } from "@/lib/utils/filterUtils";
+import MultiSelectDropdown from "./shared/MultiSelectDropdown";
 
 export type WishlistDatePreset = "any" | "last30" | "last90" | "thisYear" | "custom";
 
@@ -38,213 +41,12 @@ function getActiveFilterCount(filters: WishlistFilters): number {
   return c;
 }
 
-function parseDateSafe(value?: string | null) {
-  if (!value) return null;
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return null;
-  return d;
-}
-
-function startOfDay(d: Date) {
-  const copy = new Date(d);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
-}
-
-function endOfDay(d: Date) {
-  const copy = new Date(d);
-  copy.setHours(23, 59, 59, 999);
-  return copy;
-}
-
-function presetRange(preset: WishlistDatePreset) {
-  const now = new Date();
-  const todayStart = startOfDay(now);
-  const todayEnd = endOfDay(now);
-
-  if (preset === "last30") {
-    const from = new Date(todayStart);
-    from.setDate(from.getDate() - 29);
-    return { from, to: todayEnd };
-  }
-  if (preset === "last90") {
-    const from = new Date(todayStart);
-    from.setDate(from.getDate() - 89);
-    return { from, to: todayEnd };
-  }
-  if (preset === "thisYear") {
-    const from = new Date(now.getFullYear(), 0, 1);
-    return { from: startOfDay(from), to: todayEnd };
-  }
-
-  return { from: null as Date | null, to: null as Date | null };
-}
-
-function normalizeList(values: (string | undefined | null)[]) {
-  const set = new Set<string>();
-  for (const v of values) {
-    const s = (v ?? "").trim();
-    if (s) set.add(s);
-  }
-  return Array.from(set).sort((a, b) => a.localeCompare(b));
-}
-
 type WishlistFilterProps = {
   items: WishlistItem[];
   filters: WishlistFilters;
   onChange: Dispatch<SetStateAction<WishlistFilters>>;
   filteredCount: number;
 };
-
-function summarizeSelection(values: string[], emptyLabel = "Any") {
-  if (values.length === 0) return emptyLabel;
-  if (values.length === 1) return values[0];
-  if (values.length === 2) return `${values[0]}, ${values[1]}`;
-  return `${values[0]}, ${values[1]} +${values.length - 2}`;
-}
-
-function toggleInArray(arr: string[], value: string) {
-  return arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value];
-}
-
-function MultiSelectDropdown({
-  title,
-  options,
-  values,
-  onToggle,
-  onClear,
-  placeholder = "Any",
-  emptyText = "—",
-}: {
-  title: string;
-  options: string[];
-  values: string[];
-  onToggle: (value: string) => void;
-  onClear: () => void;
-  placeholder?: string;
-  emptyText?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-
-    const onClick = (e: MouseEvent) => {
-      const target = e.target as Node | null;
-      const root = rootRef.current;
-      if (!target || !root) return;
-      if (root.contains(target)) return;
-      setOpen(false);
-    };
-
-    window.addEventListener("keydown", onKey);
-    window.addEventListener("mousedown", onClick);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("mousedown", onClick);
-    };
-  }, [open]);
-
-  const summary = summarizeSelection(values, placeholder);
-
-  return (
-    <div ref={rootRef} className="relative">
-      <div className="flex items-center justify-between">
-        <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
-          {title}
-        </div>
-        {values.length > 0 && (
-          <button
-            type="button"
-            onClick={onClear}
-            className="text-[10px] font-medium text-neutral-500 hover:text-neutral-900"
-          >
-            Clear
-          </button>
-        )}
-      </div>
-
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className={[
-          "mt-2 inline-flex w-full items-center justify-between gap-2",
-          "rounded-lg border border-neutral-200 bg-white px-3 py-2",
-          "text-xs font-medium text-neutral-800",
-          "hover:bg-neutral-50",
-          "focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300 focus-visible:border-yellow-300",
-        ].join(" ")}
-        aria-expanded={open}
-        aria-haspopup="listbox"
-      >
-        <span className={values.length === 0 ? "text-neutral-500" : ""}>
-          {summary}
-        </span>
-        <ChevronDown
-          className={[
-            "h-3.5 w-3.5 transition-transform",
-            open ? "rotate-180 text-yellow-600" : "text-neutral-500",
-          ].join(" ")}
-          aria-hidden="true"
-        />
-      </button>
-
-      {open && (
-        <div
-          role="listbox"
-          aria-label={`${title} options`}
-          className={[
-            // NOTE: no "absolute" or "z-20" anymore – it's just in the normal flow
-            "mt-2 w-full",
-            "rounded-xl border border-neutral-200/80",
-            "bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90",
-            "shadow-xl max-h-56 overflow-auto",
-          ].join(" ")}
-        >
-          {options.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-neutral-400">
-              {emptyText}
-            </div>
-          ) : (
-            <div className="p-1">
-              {options.map((opt) => {
-                const active = values.includes(opt);
-                return (
-                  <button
-                    key={opt}
-                    type="button"
-                    onClick={() => onToggle(opt)}
-                    className={[
-                      "flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs",
-                      active
-                        ? "bg-yellow-50 text-yellow-900"
-                        : "text-neutral-800 hover:bg-neutral-50",
-                    ].join(" ")}
-                    role="option"
-                    aria-selected={active}
-                  >
-                    <span className="truncate">{opt}</span>
-                    {active && (
-                      <span className="ml-2 inline-flex h-4 w-4 items-center justify-center rounded-full bg-yellow-500 text-white">
-                        <Check className="h-3 w-3" aria-hidden="true" />
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 
 function DatePresetDropdown({
   value,

@@ -18,7 +18,7 @@ import {
   AlertCircle,
   Undo2, // ⬅️ new icon for the stamp
 } from "lucide-react";
-import type { InterviewType } from "@/components/dialogs";
+import type { InterviewType } from "../../components/dialogs";
 import type {
   WithdrawnDetails,
   WithdrawnReason,

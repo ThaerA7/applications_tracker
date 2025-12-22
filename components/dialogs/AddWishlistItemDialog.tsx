@@ -10,6 +10,7 @@ import {
   ExternalLink,
   Image as ImageIcon,
 } from "lucide-react";
+import { EMPLOYMENT_OPTIONS } from "@/lib/constants";
 
 export type NewWishlistItemForm = {
   company: string;
@@ -20,17 +21,6 @@ export type NewWishlistItemForm = {
   offerUrl: string;
   logoUrl?: string;
 };
-
-const EMPLOYMENT_OPTIONS: string[] = [
-  "Full-time",
-  "Part-time",
-  "Internship",
-  "Working student",
-  "Contract",
-  "Temporary",
-  "Mini-job",
-  "Freelance",
-];
 
 function makeInitialForm(): NewWishlistItemForm {
   return {

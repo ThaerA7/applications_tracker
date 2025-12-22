@@ -5,6 +5,7 @@ This guide explains how to set up interview reminder emails using Supabase Edge 
 ## Overview
 
 The system sends email reminders to users before their scheduled interviews. It uses:
+
 - **Resend** - Email delivery (free tier: 100 emails/day, no custom domain required)
 - **Supabase Edge Functions** - Serverless function to send emails
 - **Vercel Cron** - Scheduled trigger to check for upcoming interviews
@@ -29,6 +30,7 @@ npx supabase secrets set RESEND_API_KEY=re_your_api_key_here
 The `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are automatically available in Edge Functions.
 
 Add to Vercel environment variables:
+
 - `RESEND_API_KEY` - Your Resend API key
 - `SUPABASE_SERVICE_ROLE_KEY` - Your Supabase service role key (from Supabase Dashboard > Settings > API)
 - `CRON_SECRET` - A random string to secure the cron endpoint
@@ -81,6 +83,7 @@ Deploy your app to Vercel - the cron job will be automatically configured.
 By default, emails are sent from `onboarding@resend.dev` which is Resend's free shared domain. This works without requiring your own domain.
 
 If you later add a custom domain in Resend, update the `from` field in:
+
 - `supabase/functions/send-interview-reminders/index.ts`
 
 ## User Settings
@@ -100,6 +103,7 @@ npx supabase functions serve send-interview-reminders --env-file .env.local
 ```
 
 Then make a request:
+
 ```bash
 curl -X POST http://localhost:54321/functions/v1/send-interview-reminders \
   -H "Authorization: Bearer YOUR_SERVICE_ROLE_KEY" \

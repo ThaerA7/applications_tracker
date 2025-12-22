@@ -1,7 +1,7 @@
 "use client";
 
 import type { ComponentType } from "react";
-import type { RejectionDetails } from "@/components/dialogs";
+import type { RejectionDetails } from "../../components/dialogs";
 import {
   Briefcase,
   MapPin,

@@ -16,6 +16,7 @@ import {
   FileText,
   Image as ImageIcon,
 } from "lucide-react";
+import { EMPLOYMENT_OPTIONS } from "@/lib/constants";
 
 const INTERVIEWS_STORAGE_KEY = "job-tracker:interviews";
 
@@ -105,17 +106,6 @@ type FormState = {
   employmentType: string;
   notes: string;
 };
-
-const EMPLOYMENT_OPTIONS: string[] = [
-  "Full-time",
-  "Part-time",
-  "Internship",
-  "Working student",
-  "Contract",
-  "Temporary",
-  "Mini-job",
-  "Freelance",
-];
 
 function makeInitialForm(
   app: ScheduleInterviewDialogProps["application"]

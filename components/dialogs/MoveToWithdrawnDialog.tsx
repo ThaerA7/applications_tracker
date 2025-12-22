@@ -16,6 +16,7 @@ import {
   Image as ImageIcon,
 } from "lucide-react";
 import type { InterviewType } from "@/components/dialogs/ScheduleInterviewDialog";
+import { EMPLOYMENT_OPTIONS } from "@/lib/constants";
 
 export type WithdrawnReason =
   | "accepted-other-offer"
@@ -145,17 +146,6 @@ const REASON_OPTIONS: {
     label: "Other",
     description: "Any other reason not listed above.",
   },
-];
-
-const EMPLOYMENT_OPTIONS: string[] = [
-  "Full-time",
-  "Part-time",
-  "Internship",
-  "Working student",
-  "Contract",
-  "Temporary",
-  "Mini-job",
-  "Freelance",
 ];
 
 function todayISO() {

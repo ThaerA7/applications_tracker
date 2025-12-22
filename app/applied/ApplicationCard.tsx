@@ -18,7 +18,7 @@ import {
   CheckCircle2, // ⬅️ new icon for the stamp
 } from 'lucide-react';
 
-import type { AppliedApplication } from '@/lib/types';
+import type { AppliedApplication } from '../../lib/types';
 
 // Keep old export name so the rest of your app doesn't break
 export type Application = AppliedApplication;

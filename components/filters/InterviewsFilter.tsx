@@ -9,20 +9,15 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import { Filter, Check, X, ChevronDown } from "lucide-react";
+import { Filter, Check, X } from "lucide-react";
+import { parseDateSafe, startOfDay, endOfDay, presetRangeForStage, type InterviewDatePreset } from "@/lib/utils/dateUtils";
+import { normalizeList } from "@/lib/utils/filterUtils";
+import MultiSelectDropdown from "./shared/MultiSelectDropdown";
 
-// --------- Types & helpers (reusable across pages) ----------
+// --------- Types & helpers ----------
 
-export type InterviewDatePreset =
-  | "any"
-  | "next7"
-  | "next30"
-  | "next90"
-  | "last7"
-  | "last30"
-  | "last90"
-  | "thisYear"
-  | "custom";
+// Re-export for consumers
+export type { InterviewDatePreset };
 
 export type InterviewFilters = {
   // Date scopes
@@ -104,94 +99,6 @@ export type FilterableInterview = {
   url?: string | null;
   contact?: FilterableInterviewContact;
 };
-
-function parseDateSafe(value?: string) {
-  if (!value) return null;
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return null;
-  return d;
-}
-
-function startOfDay(d: Date) {
-  const copy = new Date(d);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
-}
-
-function endOfDay(d: Date) {
-  const copy = new Date(d);
-  copy.setHours(23, 59, 59, 999);
-  return copy;
-}
-
-function addDays(d: Date, days: number) {
-  const copy = new Date(d);
-  copy.setDate(copy.getDate() + days);
-  return copy;
-}
-
-function presetRangeForStage(
-  preset: InterviewDatePreset,
-  stageForRange: "upcoming" | "past"
-) {
-  const now = new Date();
-  const todayStart = startOfDay(now);
-  const todayEnd = endOfDay(now);
-
-  if (stageForRange === "upcoming") {
-    if (preset === "next7") {
-      return { from: todayStart, to: addDays(todayEnd, 6) };
-    }
-    if (preset === "next30") {
-      return { from: todayStart, to: addDays(todayEnd, 29) };
-    }
-    if (preset === "next90") {
-      return { from: todayStart, to: addDays(todayEnd, 89) };
-    }
-    // "any", "custom" or past-oriented presets => no range, handled elsewhere
-    return { from: null as Date | null, to: null as Date | null };
-  }
-
-  // stageForRange === "past"
-  if (preset === "last7") {
-    return { from: addDays(todayStart, -6), to: todayEnd };
-  }
-  if (preset === "last30") {
-    return { from: addDays(todayStart, -29), to: todayEnd };
-  }
-  if (preset === "last90") {
-    return { from: addDays(todayStart, -89), to: todayEnd };
-  }
-  if (preset === "thisYear") {
-    const from = startOfDay(new Date(now.getFullYear(), 0, 1));
-    return { from, to: todayEnd };
-  }
-
-  // "any", "custom" or upcoming-oriented presets => no range (handled elsewhere)
-  return { from: null as Date | null, to: null as Date | null };
-}
-
-function normalizeList(values: (string | undefined | null)[]) {
-  const set = new Set<string>();
-  values.forEach((v) => {
-    const s = (v ?? "").trim();
-    if (s) set.add(s);
-  });
-  return Array.from(set).sort((a, b) => a.localeCompare(b));
-}
-
-function summarizeSelection(
-  values: string[],
-  getLabel: (v: string) => string,
-  emptyLabel = "Any"
-) {
-  if (values.length === 0) return emptyLabel;
-  if (values.length === 1) return getLabel(values[0]);
-  if (values.length === 2)
-    return `${getLabel(values[0])}, ${getLabel(values[1])}`;
-  return `${getLabel(values[0])}, ${getLabel(values[1])} +${values.length - 2
-    }`;
-}
 
 function formatInterviewTypeLabel(value: string) {
   const v = value.toLowerCase();
@@ -315,156 +222,6 @@ export function filterInterviews<T extends FilterableInterview>(
   }
 
   return list;
-}
-
-// ---------- UI: Multi-select dropdown ----------
-
-type MultiSelectDropdownProps = {
-  title: string;
-  options: string[];
-  values: string[];
-  onToggle: (value: string) => void;
-  onClear: () => void;
-  emptyText?: string;
-  placeholder?: string;
-  getLabel?: (value: string) => string;
-};
-
-function MultiSelectDropdown({
-  title,
-  options,
-  values,
-  onToggle,
-  onClear,
-  emptyText = "—",
-  placeholder = "Any",
-  getLabel,
-}: MultiSelectDropdownProps) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement | null>(null);
-
-  const labelFor = useCallback(
-    (value: string) => (getLabel ? getLabel(value) : value),
-    [getLabel]
-  );
-
-  useEffect(() => {
-    if (!open) return;
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-
-    const onClick = (e: MouseEvent) => {
-      const target = e.target as Node | null;
-      const root = rootRef.current;
-      if (!target || !root) return;
-      if (root.contains(target)) return;
-      setOpen(false);
-    };
-
-    window.addEventListener("keydown", onKey);
-    window.addEventListener("mousedown", onClick);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("mousedown", onClick);
-    };
-  }, [open]);
-
-  const summary = summarizeSelection(values, labelFor, placeholder);
-
-  return (
-    <div ref={rootRef} className="relative">
-      <div className="flex items-center justify-between">
-        <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
-          {title}
-        </div>
-        {values.length > 0 && (
-          <button
-            type="button"
-            onClick={onClear}
-            className="text-[10px] font-medium text-neutral-500 hover:text-neutral-900"
-          >
-            Clear
-          </button>
-        )}
-      </div>
-
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className={[
-          "mt-2 inline-flex w-full items-center justify-between gap-2",
-          "rounded-lg border border-neutral-200 bg-white px-3 py-2",
-          "text-xs font-medium text-neutral-800",
-          "hover:bg-neutral-50",
-          "focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:border-emerald-300",
-        ].join(" ")}
-        aria-expanded={open}
-        aria-haspopup="listbox"
-      >
-        <span className={values.length === 0 ? "text-neutral-500" : ""}>
-          {summary}
-        </span>
-        <ChevronDown
-          className={[
-            "h-3.5 w-3.5 transition-transform",
-            open ? "rotate-180 text-emerald-600" : "text-neutral-500",
-          ].join(" ")}
-          aria-hidden="true"
-        />
-      </button>
-
-      {open && (
-        <div
-          role="listbox"
-          aria-label={`${title} options`}
-          className={[
-            "absolute z-20 mt-2 w-full",
-            "rounded-xl border border-neutral-200/80",
-            "bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90",
-            "shadow-xl",
-            "max-h-56 overflow-auto",
-          ].join(" ")}
-        >
-          {options.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-neutral-400">
-              {emptyText}
-            </div>
-          ) : (
-            <div className="p-1">
-              {options.map((opt) => {
-                const active = values.includes(opt);
-                const label = labelFor(opt);
-                return (
-                  <button
-                    key={opt}
-                    type="button"
-                    onClick={() => onToggle(opt)}
-                    className={[
-                      "flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs",
-                      active
-                        ? "bg-emerald-50 text-emerald-900"
-                        : "text-neutral-800 hover:bg-neutral-50",
-                    ].join(" ")}
-                    role="option"
-                    aria-selected={active}
-                  >
-                    <span className="truncate">{label}</span>
-                    {active && (
-                      <span className="ml-2 inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-600 text-white">
-                        <Check className="h-3 w-3" aria-hidden="true" />
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
 }
 
 // ---------- UI: Date preset dropdowns ----------

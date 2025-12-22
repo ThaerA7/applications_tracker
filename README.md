@@ -1,109 +1,252 @@
-<a href="https://demo-nextjs-with-supabase.vercel.app/">
-  <img alt="Next.js and Supabase Starter Kit - the fastest way to build apps with Next.js and Supabase" src="https://demo-nextjs-with-supabase.vercel.app/opengraph-image.png">
-  <h1 align="center">Next.js and Supabase Starter Kit</h1>
-</a>
+<p align="center">
+  <img src="public/icons/site_logo.png" alt="JobFlow Logo" width="80" height="80" />
+</p>
+
+<h1 align="center">JobFlow</h1>
 
 <p align="center">
- The fastest way to build apps with Next.js and Supabase
+  <strong>Your Personal Job Application Tracker</strong>
 </p>
 
 <p align="center">
-  <a href="#features"><strong>Features</strong></a> ·
-  <a href="#demo"><strong>Demo</strong></a> ·
-  <a href="#deploy-to-vercel"><strong>Deploy to Vercel</strong></a> ·
-  <a href="#clone-and-run-locally"><strong>Clone and run locally</strong></a> ·
-  <a href="#feedback-and-issues"><strong>Feedback and issues</strong></a>
-  <a href="#more-supabase-examples"><strong>More Examples</strong></a>
+  A beautiful, modern job search management app built with Next.js 16, React 19, and Supabase.<br/>
+  Track applications, schedule interviews, manage offers, and land your dream job.
 </p>
-<br/>
 
-## Features
+<p align="center">
+  <a href="#-features">Features</a> •
+  <a href="#-tech-stack">Tech Stack</a> •
+  <a href="#-getting-started">Getting Started</a> •
+  <a href="#-deployment">Deployment</a> •
+  <a href="#-project-structure">Structure</a>
+</p>
 
-- Works across the entire [Next.js](https://nextjs.org) stack
-  - App Router
-  - Pages Router
-  - Middleware
-  - Client
-  - Server
-  - It just works!
-- supabase-ssr. A package to configure Supabase Auth to use cookies
-- Password-based authentication block installed via the [Supabase UI Library](https://supabase.com/ui/docs/nextjs/password-based-auth)
-- Styling with [Tailwind CSS](https://tailwindcss.com)
-- Components with [shadcn/ui](https://ui.shadcn.com/)
-- Optional deployment with [Supabase Vercel Integration and Vercel deploy](#deploy-your-own)
-  - Environment variables automatically assigned to Vercel project
+<p align="center">
+  <img src="https://img.shields.io/badge/Next.js-16-black?style=for-the-badge&logo=next.js" alt="Next.js" />
+  <img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react" alt="React" />
+  <img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Supabase-Postgres-3FCF8E?style=for-the-badge&logo=supabase" alt="Supabase" />
+  <img src="https://img.shields.io/badge/TailwindCSS-3-06B6D4?style=for-the-badge&logo=tailwindcss" alt="Tailwind" />
+</p>
 
-## Demo
+---
 
-You can view a fully working demo at [demo-nextjs-with-supabase.vercel.app](https://demo-nextjs-with-supabase.vercel.app/).
+## ✨ Features
 
-## Deploy to Vercel
+### 📊 **Dashboard Overview**
+- Real-time statistics with beautiful animated charts
+- Weekly/monthly application trends visualization
+- Quick-add actions for applications, interviews, and notes
+- Upcoming interviews countdown timer
+- Recent activity feed
 
-Vercel deployment will guide you through creating a Supabase account and project.
+### 📝 **Application Management**
+- Track applications through every stage of the pipeline
+- Rich filtering by location, employment type, source, and date ranges
+- Add company logos, salary info, and detailed notes
+- Move applications between stages with one click
 
-After installation of the Supabase integration, all relevant environment variables will be assigned to the project so the deployment is fully functioning.
+### 📅 **Interview Scheduling**
+- Schedule phone, video, and in-person interviews
+- Calendar view with event visualization
+- Day-by-day breakdown sidebar
+- Application statistics by time period
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fnext.js%2Ftree%2Fcanary%2Fexamples%2Fwith-supabase&project-name=nextjs-with-supabase&repository-name=nextjs-with-supabase&demo-title=nextjs-with-supabase&demo-description=This+starter+configures+Supabase+Auth+to+use+cookies%2C+making+the+user%27s+session+available+throughout+the+entire+Next.js+app+-+Client+Components%2C+Server+Components%2C+Route+Handlers%2C+Server+Actions+and+Middleware.&demo-url=https%3A%2F%2Fdemo-nextjs-with-supabase.vercel.app%2F&external-id=https%3A%2F%2Fgithub.com%2Fvercel%2Fnext.js%2Ftree%2Fcanary%2Fexamples%2Fwith-supabase&demo-image=https%3A%2F%2Fdemo-nextjs-with-supabase.vercel.app%2Fopengraph-image.png)
+### 💼 **Offers & Negotiations**
+- Track received offers with salary and start date
+- Mark offers as accepted, pending, or declined
+- Keep negotiation notes organized
 
-The above will also clone the Starter kit to your GitHub, you can clone that locally and develop locally.
+### 📋 **Additional Features**
+- **Wishlist** - Save dream jobs to apply later
+- **Rejected/Withdrawn** - Learn from past applications
+- **Notes** - Color-coded sticky notes for quick reminders
+- **Job Search** - AI-powered job suggestions (coming soon)
 
-If you wish to just develop locally and not deploy to Vercel, [follow the steps below](#clone-and-run-locally).
+### ⚙️ **Settings & Data**
+- **Dual Storage Mode** - Works offline (IndexedDB) or synced (Supabase)
+- **Import/Export** - Full JSON backup and restore
+- **Email Reminders** - Weekly digest and interview reminders
+- **Browser Notifications** - Never miss an interview
+- **Theme Support** - Light mode with beautiful gradients
 
-## Clone and run locally
+---
 
-1. You'll first need a Supabase project which can be made [via the Supabase dashboard](https://database.new)
+## 🛠 Tech Stack
 
-2. Create a Next.js app using the Supabase Starter template npx command
+| Category | Technology |
+|----------|------------|
+| **Framework** | [Next.js 16](https://nextjs.org/) with App Router & Turbopack |
+| **UI Library** | [React 19](https://react.dev/) |
+| **Language** | [TypeScript 5](https://www.typescriptlang.org/) |
+| **Styling** | [Tailwind CSS 3](https://tailwindcss.com/) |
+| **Animations** | [Framer Motion](https://www.framer.com/motion/) |
+| **Charts** | [Recharts](https://recharts.org/) |
+| **Icons** | [Lucide React](https://lucide.dev/) |
+| **Backend** | [Supabase](https://supabase.com/) (Auth, Postgres, Edge Functions) |
+| **Offline Storage** | [IndexedDB](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API) via `idb` |
+| **Email** | [Resend](https://resend.com/) |
+| **Deployment** | [Vercel](https://vercel.com/) |
 
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js 18+ 
+- npm, yarn, or pnpm
+- Supabase account (optional, for cloud sync)
+
+### Installation
+
+1. **Clone the repository**
    ```bash
-   npx create-next-app --example with-supabase with-supabase-app
+   git clone https://github.com/yourusername/jobflow.git
+   cd jobflow
    ```
 
+2. **Install dependencies**
    ```bash
-   yarn create next-app --example with-supabase with-supabase-app
+   npm install
    ```
 
-   ```bash
-   pnpm create next-app --example with-supabase with-supabase-app
+3. **Set up environment variables**
+   
+   Create a `.env.local` file in the root directory:
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
    ```
 
-3. Use `cd` to change into the app's directory
-
-   ```bash
-   cd with-supabase-app
-   ```
-
-4. Rename `.env.example` to `.env.local` and update the following:
-
-  ```env
-  NEXT_PUBLIC_SUPABASE_URL=[INSERT SUPABASE PROJECT URL]
-  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=[INSERT SUPABASE PROJECT API PUBLISHABLE OR ANON KEY]
-  ```
-  > [!NOTE]
-  > This example uses `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, which refers to Supabase's new **publishable** key format.
-  > Both legacy **anon** keys and new **publishable** keys can be used with this variable name during the transition period. Supabase's dashboard may show `NEXT_PUBLIC_SUPABASE_ANON_KEY`; its value can be used in this example.
-  > See the [full announcement](https://github.com/orgs/supabase/discussions/29260) for more information.
-
-  Both `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` can be found in [your Supabase project's API settings](https://supabase.com/dashboard/project/_?showConnect=true)
-
-5. You can now run the Next.js local development server:
-
+4. **Run the development server**
    ```bash
    npm run dev
    ```
 
-   The starter kit should now be running on [localhost:3000](http://localhost:3000/).
+5. **Open your browser**
+   
+   Navigate to [http://localhost:3000](http://localhost:3000)
 
-6. This template comes with the default shadcn/ui style initialized. If you instead want other ui.shadcn styles, delete `components.json` and [re-install shadcn/ui](https://ui.shadcn.com/docs/installation/next)
+### Guest Mode
 
-> Check out [the docs for Local Development](https://supabase.com/docs/guides/getting-started/local-development) to also run Supabase locally.
+Don't want to create an account? No problem! The app works fully offline using IndexedDB. Your data stays in your browser until you decide to sync.
 
-## Feedback and issues
+---
 
-Please file feedback and issues over on the [Supabase GitHub org](https://github.com/supabase/supabase/issues/new/choose).
+## 📦 Deployment
 
-## More Supabase examples
+### Deploy to Vercel
 
-- [Next.js Subscription Payments Starter](https://github.com/vercel/nextjs-subscription-payments)
-- [Cookie-based Auth and the Next.js 13 App Router (free course)](https://youtube.com/playlist?list=PL5S4mPUpp4OtMhpnp93EFSo42iQ40XjbF)
-- [Supabase Auth and the Next.js App Router](https://github.com/supabase/supabase/tree/master/examples/auth/nextjs)
+The easiest way to deploy is with Vercel:
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/yourusername/jobflow)
+
+### Environment Variables
+
+Set these in your Vercel project settings:
+
+| Variable | Description |
+|----------|-------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Your Supabase anonymous key |
+| `RESEND_API_KEY` | (Optional) For email notifications |
+
+---
+
+## 📁 Project Structure
+
+```
+jobflow/
+├── app/                    # Next.js App Router pages
+│   ├── api/               # API routes (cron, reminders)
+│   ├── applied/           # Applications page
+│   ├── calendar/          # Calendar view
+│   ├── interviews/        # Interviews management
+│   ├── job-search/        # Job search (AI-powered)
+│   ├── notes/             # Notes page
+│   ├── offers-received/   # Offers tracking
+│   ├── rejected/          # Rejected applications
+│   ├── settings/          # App settings
+│   ├── wishlist/          # Job wishlist
+│   └── withdrawn/         # Withdrawn applications
+├── components/
+│   ├── cards/             # Reusable card components
+│   ├── dialogs/           # Modal dialogs
+│   ├── filters/           # Filter components
+│   ├── layout/            # App shell, sidebar, topbar
+│   ├── overview/          # Dashboard cards
+│   └── ui/                # Base UI components
+├── lib/
+│   ├── constants/         # App constants
+│   ├── services/          # Data services (CRUD operations)
+│   ├── supabase/          # Supabase client & helpers
+│   ├── types/             # TypeScript type definitions
+│   └── utils/             # Utility functions
+├── public/
+│   └── icons/             # App icons
+└── supabase/
+    ├── functions/         # Edge functions
+    └── migrations/        # Database migrations
+```
+
+---
+
+## 🗄️ Database Schema
+
+The app uses Supabase Postgres with the following main tables:
+
+- `applied` - Job applications
+- `interviews` - Scheduled interviews
+- `offers` - Received job offers
+- `rejected` - Rejected applications
+- `withdrawn` - Withdrawn applications
+- `wishlist` - Saved job listings
+- `notes` - User notes
+- `activity` - Activity log
+
+---
+
+## 🔐 Authentication
+
+- **Email/Password** - Traditional sign up and login
+- **Magic Link** - Passwordless email authentication
+- **OAuth** - Google, GitHub (configurable in Supabase)
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🙏 Acknowledgments
+
+- [Next.js](https://nextjs.org/) - The React Framework
+- [Supabase](https://supabase.com/) - Open source Firebase alternative
+- [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS framework
+- [Lucide](https://lucide.dev/) - Beautiful open-source icons
+- [Framer Motion](https://www.framer.com/motion/) - Production-ready animations
+
+---
+
+<p align="center">
+  Made with ❤️ for job seekers everywhere
+</p>
+
+<p align="center">
+  <a href="#jobflow">⬆ Back to top</a>
+</p>

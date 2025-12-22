@@ -16,6 +16,7 @@ import {
   FileText,
   Image as ImageIcon,
 } from "lucide-react";
+import { EMPLOYMENT_OPTIONS } from "@/lib/constants";
 
 export type RejectionType =
   | "no-interview"
@@ -122,17 +123,6 @@ const REJECTION_OPTIONS: {
     label: "After 2nd interview",
     description: "Rejected after the second interview round.",
   },
-];
-
-const EMPLOYMENT_OPTIONS: string[] = [
-  "Full-time",
-  "Part-time",
-  "Internship",
-  "Working student",
-  "Contract",
-  "Temporary",
-  "Mini-job",
-  "Freelance",
 ];
 
 function todayISO() {

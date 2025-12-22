@@ -21,6 +21,7 @@ import {
   FileText,
   Image as ImageIcon,
 } from 'lucide-react';
+import { EMPLOYMENT_OPTIONS } from '@/lib/constants';
 
 export type NewApplicationForm = {
   company: string;
@@ -40,18 +41,6 @@ export type NewApplicationForm = {
   logoUrl?: string;     // optional company logo URL / Data URL (base64) from upload
   website?: string;     // company website
 };
-
-// Same-style options as in ScheduleInterviewDialog
-const EMPLOYMENT_OPTIONS: string[] = [
-  'Full-time',
-  'Part-time',
-  'Internship',
-  'Working student',
-  'Contract',
-  'Temporary',
-  'Mini-job',
-  'Freelance',
-];
 
 function makeInitialForm(): NewApplicationForm {
   const today = new Date().toISOString().slice(0, 10);

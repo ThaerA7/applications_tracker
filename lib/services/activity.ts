@@ -3,6 +3,7 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { idbGet, idbSet, idbDel } from "./indexedDb";
 import { getModeCached } from "../supabase/sessionCache";
+import { makeUuidV4, isObject } from "@/lib/utils/serviceUtils";
 import {
   clearUserCache,
   getActiveUserId,
@@ -64,33 +65,6 @@ function isUuid(v: string) {
   );
 }
 
-function makeUuidV4() {
-  const cryptoObj = globalThis.crypto as Crypto | undefined;
-  if (cryptoObj?.randomUUID) return cryptoObj.randomUUID();
-
-  const buf = new Uint8Array(16);
-
-  // If crypto is missing (very rare), fallback to Math.random uuid-ish
-  if (!cryptoObj?.getRandomValues) {
-    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0;
-      const v = c === "x" ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
-  }
-
-  cryptoObj.getRandomValues(buf);
-
-  buf[6] = (buf[6] & 0x0f) | 0x40;
-  buf[8] = (buf[8] & 0x3f) | 0x80;
-
-  const hex = [...buf].map((b) => b.toString(16).padStart(2, "0")).join("");
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(
-    12,
-    16
-  )}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
-
 function normalizeItem(item: ActivityItem): ActivityItem {
   const id = isUuid(item.id) ? item.id : makeUuidV4();
   const timestamp = item.timestamp || new Date().toISOString();
@@ -98,10 +72,6 @@ function normalizeItem(item: ActivityItem): ActivityItem {
 }
 
 // -------- safe parsing --------
-function isObject(v: any) {
-  return v && typeof v === "object" && !Array.isArray(v);
-}
-
 function safeParseList(raw: any): ActivityItem[] {
   if (!Array.isArray(raw)) return [];
   return raw
