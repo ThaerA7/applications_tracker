@@ -38,6 +38,9 @@
   ],
   "exclude": [
     "node_modules",
-    "supabase/functions"
+    "supabase",
+    "supabase/**/*",
+    "supabase/functions",
+    "supabase/functions/**/*"
   ]
 }
