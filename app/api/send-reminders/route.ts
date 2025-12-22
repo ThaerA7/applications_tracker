@@ -7,8 +7,6 @@ import { NextRequest, NextResponse } from "next/server";
  * This can be triggered by Vercel Cron or manually
  */
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 interface InterviewData {
   company: string;
   role: string;
@@ -98,6 +96,8 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
+
+  const resend = new Resend(process.env.RESEND_API_KEY);
 
   try {
     const supabase = await createClient();
