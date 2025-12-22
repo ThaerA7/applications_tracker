@@ -38,6 +38,7 @@
 ## ✨ Features
 
 ### 📊 Dashboard Overview
+
 - **Real-time statistics** with animated bar and line charts (Recharts)
 - **Weekly application trends** — visualize your activity over time
 - **Quick-add buttons** for applications, interviews, and notes
@@ -46,6 +47,7 @@
 - **Customizable goals** — set weekly/monthly targets for interviews and offers
 
 ### 📝 Application Management
+
 - Track applications through the full pipeline: Applied → Interview → Offer/Rejected/Withdrawn
 - **Rich filtering** by location, employment type (Full-time, Part-time, Internship, Contract, etc.), source, and date ranges
 - Upload **company logos** or auto-fetch from URL
@@ -53,6 +55,7 @@
 - **One-click stage transitions** with dedicated dialogs
 
 ### 📅 Interview Scheduling
+
 - Schedule **phone, video, and in-person** interviews
 - **Interactive calendar** with month navigation and event dots
 - **Day sidebar** showing all events for the selected date
@@ -60,30 +63,35 @@
 - Live countdown to your next interview
 
 ### 💼 Offers Management
+
 - Track received offers with **salary, start date, and company details**
 - Mark offers as **Accepted**, **Pending**, or **Declined**
 - Store negotiation notes and decision history
 - View accepted offers separately for a clear overview
 
 ### 🌟 Wishlist
+
 - Save **dream jobs** to apply later
 - Set priority levels: **Dream, High, Medium, Low**
 - Auto-icon matching based on job title (Developer, Designer, etc.)
 - Move wishlist items directly to applications when ready
 
 ### 📋 Notes
+
 - **Color-coded sticky notes** (8 colors: gray, blue, green, yellow, orange, red, pink, purple)
 - **Pin important notes** to keep them at the top
 - **Tag system** for organization
 - Quick search and filter by color or date
 
 ### 🔍 Job Search
+
 - Integrated job search with smart autocomplete
 - **Profession and location suggestions**
 - Filter by distance, employment type, and more
 - Save jobs directly to wishlist with one click
 
 ### ⚙️ Settings & Data Management
+
 - **Dual Storage Mode**:
   - **Guest Mode** — fully offline using IndexedDB, no account required
   - **User Mode** — sync across devices with Supabase
@@ -98,22 +106,22 @@
 
 ## 🛠 Tech Stack
 
-| Category | Technology |
-|----------|------------|
-| **Framework** | [Next.js 16](https://nextjs.org/) with App Router & Turbopack |
-| **UI Library** | [React 19](https://react.dev/) |
-| **Language** | [TypeScript 5](https://www.typescriptlang.org/) |
-| **Styling** | [Tailwind CSS 3](https://tailwindcss.com/) + [tailwind-merge](https://github.com/dcastil/tailwind-merge) |
-| **Animations** | [Framer Motion 12](https://www.framer.com/motion/) |
-| **Charts** | [Recharts 3](https://recharts.org/) |
-| **Icons** | [Lucide React](https://lucide.dev/) + [Icons8](https://icons8.com/) (colorful PNG icons) |
-| **UI Components** | [Radix UI](https://www.radix-ui.com/) (Checkbox, Dropdown, Label) |
-| **Backend** | [Supabase](https://supabase.com/) (Auth, Postgres, Edge Functions) |
+| Category            | Technology                                                                                                                    |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| **Framework**       | [Next.js 16](https://nextjs.org/) with App Router & Turbopack                                                                 |
+| **UI Library**      | [React 19](https://react.dev/)                                                                                                |
+| **Language**        | [TypeScript 5](https://www.typescriptlang.org/)                                                                               |
+| **Styling**         | [Tailwind CSS 3](https://tailwindcss.com/) + [tailwind-merge](https://github.com/dcastil/tailwind-merge)                      |
+| **Animations**      | [Framer Motion 12](https://www.framer.com/motion/)                                                                            |
+| **Charts**          | [Recharts 3](https://recharts.org/)                                                                                           |
+| **Icons**           | [Lucide React](https://lucide.dev/) + [Icons8](https://icons8.com/) (colorful PNG icons)                                      |
+| **UI Components**   | [Radix UI](https://www.radix-ui.com/) (Checkbox, Dropdown, Label)                                                             |
+| **Backend**         | [Supabase](https://supabase.com/) (Auth, Postgres, Edge Functions)                                                            |
 | **Offline Storage** | [IndexedDB](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API) via [`idb`](https://github.com/jakearchibald/idb) |
-| **Email Service** | [Resend](https://resend.com/) |
-| **Validation** | [Zod 4](https://zod.dev/) |
-| **Font** | [Merriweather](https://fonts.google.com/specimen/Merriweather) (Google Fonts) |
-| **Deployment** | [Vercel](https://vercel.com/) |
+| **Email Service**   | [Resend](https://resend.com/)                                                                                                 |
+| **Validation**      | [Zod 4](https://zod.dev/)                                                                                                     |
+| **Font**            | [Merriweather](https://fonts.google.com/specimen/Merriweather) (Google Fonts)                                                 |
+| **Deployment**      | [Vercel](https://vercel.com/)                                                                                                 |
 
 ---
 
@@ -128,32 +136,37 @@
 ### Installation
 
 1. **Clone the repository**
+
    ```bash
    git clone https://github.com/yourusername/applications-tracker.git
    cd applications-tracker
    ```
 
 2. **Install dependencies**
+
    ```bash
    npm install
    ```
 
 3. **Set up environment variables**
-   
+
    Create a `.env.local` file in the root directory:
+
    ```env
    NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
    ```
 
 4. **Run the development server**
+
    ```bash
    npm run dev
    ```
+
    > Uses Turbopack for fast hot module replacement
 
 5. **Open your browser**
-   
+
    Navigate to [http://localhost:3000](http://localhost:3000)
 
 ### Guest Mode (No Account Required)
@@ -172,13 +185,13 @@ The app works **fully offline** without any signup. All data is stored locally i
 
 Set these in your Vercel project settings (Settings → Environment Variables):
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Your Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Your Supabase anonymous key |
-| `SUPABASE_SERVICE_ROLE_KEY` | For emails | Service role key for Edge Functions |
-| `RESEND_API_KEY` | For emails | Resend API key (starts with `re_`) |
-| `CRON_SECRET` | For emails | Random string to secure cron endpoints |
+| Variable                        | Required   | Description                            |
+| ------------------------------- | ---------- | -------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`      | Yes        | Your Supabase project URL              |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes        | Your Supabase anonymous key            |
+| `SUPABASE_SERVICE_ROLE_KEY`     | For emails | Service role key for Edge Functions    |
+| `RESEND_API_KEY`                | For emails | Resend API key (starts with `re_`)     |
+| `CRON_SECRET`                   | For emails | Random string to secure cron endpoints |
 
 ### Email Reminders Setup
 
@@ -252,17 +265,17 @@ applications-tracker/
 
 The app uses **Supabase Postgres** with the following tables:
 
-| Table | Description |
-|-------|-------------|
-| `applied` | Job applications with company, role, location, contact info |
-| `interviews` | Scheduled interviews with date, type (phone/video/in-person) |
-| `offers` | Received offers with salary, start date, acceptance status |
-| `rejected` | Rejected applications with rejection date and reason |
-| `withdrawn` | Withdrawn applications with withdrawal date and reason |
-| `wishlist` | Saved job listings with priority level |
-| `notes` | Color-coded sticky notes with tags and pin status |
-| `activity` | Activity log for tracking all user actions |
-| `user_email_preferences` | Email notification opt-in preferences |
+| Table                    | Description                                                  |
+| ------------------------ | ------------------------------------------------------------ |
+| `applied`                | Job applications with company, role, location, contact info  |
+| `interviews`             | Scheduled interviews with date, type (phone/video/in-person) |
+| `offers`                 | Received offers with salary, start date, acceptance status   |
+| `rejected`               | Rejected applications with rejection date and reason         |
+| `withdrawn`              | Withdrawn applications with withdrawal date and reason       |
+| `wishlist`               | Saved job listings with priority level                       |
+| `notes`                  | Color-coded sticky notes with tags and pin status            |
+| `activity`               | Activity log for tracking all user actions                   |
+| `user_email_preferences` | Email notification opt-in preferences                        |
 
 ---
 
@@ -278,12 +291,12 @@ Powered by **Supabase Auth**:
 
 ## 📜 Available Scripts
 
-| Script | Description |
-|--------|-------------|
-| `npm run dev` | Start development server with Turbopack |
-| `npm run build` | Build for production |
-| `npm start` | Start production server |
-| `npm run lint` | Run ESLint |
+| Script          | Description                             |
+| --------------- | --------------------------------------- |
+| `npm run dev`   | Start development server with Turbopack |
+| `npm run build` | Build for production                    |
+| `npm start`     | Start production server                 |
+| `npm run lint`  | Run ESLint                              |
 
 ---
 

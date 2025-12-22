@@ -111,14 +111,14 @@ export default function AddApplicationDialog({
 
   const handleChange =
     (field: keyof NewApplicationForm) =>
-    (
-      e: ChangeEvent<
-        HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-      >,
-    ) => {
-      const { value } = e.target;
-      setForm((f) => ({ ...f, [field]: value }));
-    };
+      (
+        e: ChangeEvent<
+          HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+        >,
+      ) => {
+        const { value } = e.target;
+        setForm((f) => ({ ...f, [field]: value }));
+      };
 
   const handleLogoChange = (
     e: ChangeEvent<HTMLInputElement>,

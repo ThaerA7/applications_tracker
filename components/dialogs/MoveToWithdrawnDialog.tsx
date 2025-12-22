@@ -111,42 +111,42 @@ const REASON_OPTIONS: {
   label: string;
   description: string;
 }[] = [
-  {
-    value: "accepted-other-offer",
-    label: "Accepted another offer",
-    description: "You chose another company or offer instead.",
-  },
-  {
-    value: "salary-not-right",
-    label: "Salary / conditions not right",
-    description: "Compensation, benefits, or contract terms were not a fit.",
-  },
-  {
-    value: "role-not-fit",
-    label: "Role not a good fit",
-    description: "Responsibilities, seniority, or tech stack didn’t match.",
-  },
-  {
-    value: "location-commute",
-    label: "Location / commute issues",
-    description: "On-site requirements, relocation, or commute problems.",
-  },
-  {
-    value: "process-too-slow",
-    label: "Process took too long",
-    description: "Hiring process or communication was too slow.",
-  },
-  {
-    value: "personal-reasons",
-    label: "Personal reasons",
-    description: "Health, family, timing, or other personal factors.",
-  },
-  {
-    value: "other",
-    label: "Other",
-    description: "Any other reason not listed above.",
-  },
-];
+    {
+      value: "accepted-other-offer",
+      label: "Accepted another offer",
+      description: "You chose another company or offer instead.",
+    },
+    {
+      value: "salary-not-right",
+      label: "Salary / conditions not right",
+      description: "Compensation, benefits, or contract terms were not a fit.",
+    },
+    {
+      value: "role-not-fit",
+      label: "Role not a good fit",
+      description: "Responsibilities, seniority, or tech stack didn’t match.",
+    },
+    {
+      value: "location-commute",
+      label: "Location / commute issues",
+      description: "On-site requirements, relocation, or commute problems.",
+    },
+    {
+      value: "process-too-slow",
+      label: "Process took too long",
+      description: "Hiring process or communication was too slow.",
+    },
+    {
+      value: "personal-reasons",
+      label: "Personal reasons",
+      description: "Health, family, timing, or other personal factors.",
+    },
+    {
+      value: "other",
+      label: "Other",
+      description: "Any other reason not listed above.",
+    },
+  ];
 
 function todayISO() {
   const now = new Date();
@@ -163,8 +163,8 @@ function makeInitialForm(
 
   const stage: FormState["stage"] =
     app?.interviewType === "phone" ||
-    app?.interviewType === "video" ||
-    app?.interviewType === "in-person"
+      app?.interviewType === "video" ||
+      app?.interviewType === "in-person"
       ? app.interviewType
       : "before-interview";
 
@@ -204,20 +204,20 @@ export default function MoveToWithdrawnDialog({
   const title = isEditMode
     ? "Edit withdrawn application"
     : isAddMode
-    ? "Add withdrawn application"
-    : "Move to the withdrawn section";
+      ? "Add withdrawn application"
+      : "Move to the withdrawn section";
 
   const description = isEditMode
     ? "Update the details of this withdrawn application."
     : isAddMode
-    ? "Record an application you previously withdrew from."
-    : "Capture when and why you decided to withdraw.";
+      ? "Record an application you previously withdrew from."
+      : "Capture when and why you decided to withdraw.";
 
   const submitLabel = isEditMode
     ? "Save changes"
     : isAddMode
-    ? "Save withdrawn application"
-    : "Save & move to withdrawn";
+      ? "Save withdrawn application"
+      : "Save & move to withdrawn";
 
   useEffect(() => {
     if (!open) return;
@@ -267,15 +267,15 @@ export default function MoveToWithdrawnDialog({
 
   const handleChange =
     (field: keyof FormState) =>
-    (
-      e:
-        | ChangeEvent<HTMLInputElement>
-        | ChangeEvent<HTMLSelectElement>
-        | ChangeEvent<HTMLTextAreaElement>
-    ) => {
-      const { value } = e.target;
-      setForm((prev) => ({ ...prev, [field]: value }));
-    };
+      (
+        e:
+          | ChangeEvent<HTMLInputElement>
+          | ChangeEvent<HTMLSelectElement>
+          | ChangeEvent<HTMLTextAreaElement>
+      ) => {
+        const { value } = e.target;
+        setForm((prev) => ({ ...prev, [field]: value }));
+      };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();

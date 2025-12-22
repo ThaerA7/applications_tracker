@@ -103,27 +103,27 @@ const REJECTION_OPTIONS: {
   label: string;
   description: string;
 }[] = [
-  {
-    value: "no-interview",
-    label: "No interview",
-    description: "Rejected after application without any interview.",
-  },
-  {
-    value: "after-phone-screening",
-    label: "After phone screening",
-    description: "Rejected after an initial phone screening.",
-  },
-  {
-    value: "after-first-interview",
-    label: "After first interview",
-    description: "Rejected after the first main interview round.",
-  },
-  {
-    value: "after-second-interview",
-    label: "After 2nd interview",
-    description: "Rejected after the second interview round.",
-  },
-];
+    {
+      value: "no-interview",
+      label: "No interview",
+      description: "Rejected after application without any interview.",
+    },
+    {
+      value: "after-phone-screening",
+      label: "After phone screening",
+      description: "Rejected after an initial phone screening.",
+    },
+    {
+      value: "after-first-interview",
+      label: "After first interview",
+      description: "Rejected after the first main interview round.",
+    },
+    {
+      value: "after-second-interview",
+      label: "After 2nd interview",
+      description: "Rejected after the second interview round.",
+    },
+  ];
 
 function todayISO() {
   const now = new Date();
@@ -237,10 +237,10 @@ export default function MoveToRejectedDialog({
 
   const handleChange =
     (field: keyof FormState) =>
-    (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-      const { value } = e.target;
-      setForm((prev) => ({ ...prev, [field]: value }));
-    };
+      (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+        const { value } = e.target;
+        setForm((prev) => ({ ...prev, [field]: value }));
+      };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
