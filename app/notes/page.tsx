@@ -335,6 +335,7 @@ export default function NotesPage() {
     "Tip: Add tags to filter notes faster.",
     "Tip: Use colors to group topics at a glance.",
     "Tip: Pin key notes to keep them on top.",
+    "Tip: Keep titles short for easy scanning.",
   ];
 
   return (
@@ -371,15 +372,30 @@ export default function NotesPage() {
           </div>
 
           <div className="hidden sm:flex flex-col items-end gap-2">
-            {headerTips.map((tip) => (
-              <span
-                key={tip}
-                className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white/70 px-3 py-1 text-xs font-semibold text-neutral-700 shadow-sm"
-              >
-                <Lightbulb className="h-4 w-4 text-amber-600" aria-hidden="true" />
-                <span className="text-neutral-700">{tip}</span>
-              </span>
-            ))}
+            <div className="flex items-center justify-end gap-2">
+              {headerTips.slice(0, 2).map((tip) => (
+                <span
+                  key={tip}
+                  className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white/70 px-3 py-1 text-xs font-semibold text-neutral-700 shadow-sm"
+                >
+                  <Lightbulb className="h-4 w-4 text-amber-600" aria-hidden="true" />
+                  <span className="text-neutral-700">{tip}</span>
+                </span>
+              ))}
+            </div>
+            {headerTips[2] ? (
+              <div className="flex items-center justify-end gap-2">
+                {headerTips.slice(2, 4).map((tip) => (
+                  <span
+                    key={tip}
+                    className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white/70 px-3 py-1 text-xs font-semibold text-neutral-700 shadow-sm"
+                  >
+                    <Lightbulb className="h-4 w-4 text-amber-600" aria-hidden="true" />
+                    <span className="text-neutral-700">{tip}</span>
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </div>
         </div>
 

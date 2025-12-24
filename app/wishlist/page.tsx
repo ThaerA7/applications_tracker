@@ -9,6 +9,8 @@ import {
   MapPin,
   ExternalLink,
   Star,
+  Pin,
+  PinOff,
   Code2,
   Server,
   Stethoscope,
@@ -555,12 +557,35 @@ export default function WishlistPage() {
     };
   }, []);
 
-  const filtered = useMemo(
-    () => filterWishlistItems(items, query, filters),
-    [items, query, filters]
-  );
+  const filtered = useMemo(() => {
+    const list = filterWishlistItems(items, query, filters);
+    return list
+      .map((item, idx) => ({ item, idx }))
+      .sort((a, b) => {
+        const ap = a.item.pinned ? 1 : 0;
+        const bp = b.item.pinned ? 1 : 0;
+        if (bp !== ap) return bp - ap;
+        return a.idx - b.idx;
+      })
+      .map(({ item }) => item);
+  }, [items, query, filters]);
 
   const cardCount = filtered.length;
+
+  function handleTogglePin(id: string) {
+    setItems((prev) => {
+      let updated: WishlistItem | null = null;
+      const next = prev.map((item) => {
+        if (item.id !== id) return item;
+        updated = { ...item, pinned: !item.pinned };
+        return updated;
+      });
+      if (updated) {
+        void upsertWishlistItem(updated, storageMode);
+      }
+      return next;
+    });
+  }
 
   // Delete from wishlist via star
   function handleDelete(id: string) {
@@ -586,6 +611,7 @@ export default function WishlistPage() {
       website,
       startDate: data.startDate || null,
       offerType: data.employmentType.trim() || undefined,
+      pinned: false,
     };
 
     setItems((prev) => [nextItem, ...prev]);
@@ -783,6 +809,29 @@ export default function WishlistPage() {
 
                 {/* Right side: STAR (delete) + View */}
                 <div className="flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleTogglePin(item.id)}
+                    aria-label={item.pinned ? "Unpin wishlist item" : "Pin wishlist item"}
+                    className={[
+                      "inline-flex items-center justify-center",
+                      "text-sm rounded-full",
+                      "bg-transparent border-0 p-0",
+                      "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-300",
+                    ].join(" ")}
+                  >
+                    {item.pinned ? (
+                      <Pin
+                        className="h-5 w-5 text-amber-600"
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <PinOff
+                        className="h-5 w-5 text-neutral-400 hover:text-neutral-500"
+                        aria-hidden="true"
+                      />
+                    )}
+                  </button>
                   <button
                     type="button"
                     onClick={() => handleDelete(item.id)}

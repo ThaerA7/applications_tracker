@@ -18,6 +18,7 @@ export type WishlistItem = {
   role?: string;
   location?: string;
   priority?: "Dream" | "High" | "Medium" | "Low";
+  pinned?: boolean;
   logoUrl?: string;
   website?: string;
   notes?: string;
