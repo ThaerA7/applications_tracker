@@ -689,13 +689,13 @@ export default function TopBar({ collapsed, onToggleSidebar }: TopBarProps) {
       if (error) {
         console.error("Sign out failed:", error.message);
       }
-
-      // The onAuthStateChange listener in this component will clear `user`
-      router.refresh();
     } catch (err) {
       console.error("Sign out failed:", err);
     } finally {
       setLoggingOut(false);
+      if (typeof window !== "undefined") {
+        window.location.replace("/");
+      }
     }
   }, [loggingOut, router]);
 
