@@ -53,17 +53,17 @@ const STAGE_STAMP_META: Record<
   upcoming: {
     label: "Upcoming",
     Icon: Calendar,
-    colorClasses: "border-emerald-500/70 text-emerald-700 bg-emerald-50/70",
+    colorClasses: "border-emerald-400/70 text-emerald-800 bg-emerald-50/70",
   },
   past: {
     label: "Passed date",
     Icon: History,
-    colorClasses: "border-amber-500/70 text-amber-700 bg-amber-50/70",
+    colorClasses: "border-amber-400/70 text-amber-800 bg-amber-50/70",
   },
   done: {
     label: "Done • waiting",
     Icon: CheckCircle2,
-    colorClasses: "border-sky-500/70 text-sky-700 bg-sky-50/70",
+    colorClasses: "border-sky-400/70 text-sky-800 bg-sky-50/70",
   },
 };
 
@@ -106,9 +106,9 @@ export default function InterviewCard({
             className={[
               "select-none rounded-xl border-[4px] px-4 py-2",
               "text-[11px] sm:text-sm font-semibold uppercase tracking-[0.24em]",
-              "shadow-[0_0_0_1px_rgba(255,255,255,0.6),_0_8px_20px_rgba(0,0,0,0.06)]",
+              "shadow-[0_0_0_1px_rgba(255,255,255,0.7),_0_10px_26px_rgba(0,0,0,0.08)]",
               "backdrop-blur-sm",
-              "opacity-15 mix-blend-multiply",
+              "opacity-10 mix-blend-multiply",
               stampMeta.colorClasses,
             ].join(" ")}
           >
@@ -211,7 +211,7 @@ export default function InterviewCard({
               <dd className="font-medium text-neutral-900 flex flex-wrap items-baseline gap-2">
                 <span>{date || "-"}</span>
                 {countdownLabel && (
-                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-900 ring-1 ring-inset ring-emerald-200">
                     {countdownLabel}
                   </span>
                 )}
@@ -269,7 +269,7 @@ export default function InterviewCard({
                 <dd className="font-medium text-neutral-900 flex flex-wrap items-baseline gap-2">
                   <span>{item.appliedOn}</span>
                   {appliedLabel && (
-                    <span className="rounded-full bg-neutral-50 px-2 py-0.5 text-xs font-medium text-neutral-700 ring-1 ring-inset ring-neutral-200">
+                    <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-700 ring-1 ring-inset ring-neutral-200">
                       {appliedLabel}
                     </span>
                   )}
@@ -313,7 +313,7 @@ export default function InterviewCard({
                 <dd className="font-medium text-neutral-900">
                   <a
                     href={`mailto:${item.contact.email}`}
-                    className="underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-600"
+                    className="underline decoration-neutral-300 underline-offset-2 hover:decoration-emerald-400"
                   >
                     {item.contact.email}
                   </a>
@@ -331,7 +331,7 @@ export default function InterviewCard({
                 <dd className="font-medium text-neutral-900">
                   <a
                     href={`tel:${item.contact.phone}`}
-                    className="underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-600"
+                    className="underline decoration-neutral-300 underline-offset-2 hover:decoration-emerald-400"
                   >
                     {item.contact.phone}
                   </a>
@@ -361,7 +361,7 @@ export default function InterviewCard({
               href={item.url}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1 text-sm font-medium text-neutral-900 hover:underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-700"
+              className="inline-flex items-center gap-1 text-sm font-medium text-neutral-900 underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-700"
             >
               <LinkIcon className="h-4 w-4" aria-hidden="true" />
               Job posting
@@ -373,13 +373,13 @@ export default function InterviewCard({
       {/* Follow-up status toggle – full-width footer, edges aligned with card bottom edges */}
       <div
         className={[
-          "mt-auto border-t border-neutral-200 bg-neutral-50/95 px-5 py-2.5",
+          "mt-auto border-t border-neutral-200/70 bg-white/90 px-5 py-2.5",
           "-mb-px rounded-b-xl",
         ].join(" ")}
       >
         <div className="flex items-center justify-between gap-2">
           <div className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
-            <Sparkles className="h-3 w-3 text-emerald-500" aria-hidden="true" />
+            <Sparkles className="h-3 w-3 text-emerald-600" aria-hidden="true" />
             <span>Interview status</span>
           </div>
           <span className="text-[11px] text-neutral-500">
@@ -420,7 +420,7 @@ export default function InterviewCard({
                   "flex items-center justify-center gap-1 rounded-full px-2 py-1.5 text-[11px] font-medium transition",
                   active
                     ? "bg-emerald-600 text-white shadow-sm"
-                    : "bg-white text-neutral-700 hover:bg-neutral-50",
+                    : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200",
                 ].join(" ")}
                 aria-pressed={active}
                 role="tab"
