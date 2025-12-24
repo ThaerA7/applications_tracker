@@ -17,12 +17,15 @@ import MultiSelectDropdown from "./shared/MultiSelectDropdown";
 
 export type WishlistDatePreset = "any" | "last30" | "last90" | "thisYear" | "custom";
 
+type WishlistPriorityFilter = "Default" | "Low" | "Medium" | "High";
+
 export type WishlistFilters = {
   startPreset: WishlistDatePreset;
   startFrom: string;
   startTo: string;
   locations: string[];
   offerTypes: string[];
+  priorities: WishlistPriorityFilter[];
 };
 
 export const DEFAULT_WISHLIST_FILTERS: WishlistFilters = {
@@ -31,14 +34,30 @@ export const DEFAULT_WISHLIST_FILTERS: WishlistFilters = {
   startTo: "",
   locations: [],
   offerTypes: [],
+  priorities: [],
 };
+
+const PRIORITY_OPTIONS: WishlistPriorityFilter[] = [
+  "Default",
+  "Low",
+  "Medium",
+  "High",
+];
 
 function getActiveFilterCount(filters: WishlistFilters): number {
   let c = 0;
   if (filters.startPreset !== "any") c += 1;
   c += filters.locations.length;
   c += filters.offerTypes.length;
+  c += filters.priorities.length;
   return c;
+}
+
+function normalizePriority(priority?: WishlistItem["priority"]): WishlistPriorityFilter {
+  if (priority === "Dream" || priority === "High") return "High";
+  if (priority === "Medium") return "Medium";
+  if (priority === "Low") return "Low";
+  return "Default";
 }
 
 type WishlistFilterProps = {
@@ -106,6 +125,12 @@ export function filterWishlistItems(
   if (filters.offerTypes.length > 0) {
     const set = new Set(filters.offerTypes);
     list = list.filter((w) => set.has((w.offerType ?? "").trim()));
+  }
+
+  // Priority filter
+  if (filters.priorities.length > 0) {
+    const set = new Set(filters.priorities);
+    list = list.filter((w) => set.has(normalizePriority(w.priority)));
   }
 
   // Start date filter
@@ -222,6 +247,16 @@ export default function WishlistFilter({
     [setFilters]
   );
 
+  const handleTogglePriority = useCallback(
+    (value: string) => {
+      setFilters((f) => ({
+        ...f,
+        priorities: toggleInArray(f.priorities, value as WishlistPriorityFilter),
+      }));
+    },
+    [setFilters]
+  );
+
   const handleStartPresetChange = useCallback(
     (preset: WishlistDatePreset) => {
       setFilters((f) => ({
@@ -298,7 +333,7 @@ export default function WishlistFilter({
                   </h3>
                 </div>
                 <p className="mt-1 text-xs text-neutral-600">
-                  Filter by start date, location, and employment type.
+                  Filter by start date, location, employment type, and priority.
                 </p>
               </div>
 
@@ -387,6 +422,16 @@ export default function WishlistFilter({
                 onClear={() => setFilters((f) => ({ ...f, offerTypes: [] }))}
                 placeholder="Any type"
               />
+              <div className="md:col-span-2">
+                <MultiSelectDropdown
+                  title="Priority"
+                  options={PRIORITY_OPTIONS}
+                  values={filters.priorities}
+                  onToggle={handleTogglePriority}
+                  onClear={() => setFilters((f) => ({ ...f, priorities: [] }))}
+                  placeholder="Any priority"
+                />
+              </div>
             </div>
           </div>
 

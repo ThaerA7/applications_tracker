@@ -9,6 +9,7 @@ import {
   MapPin,
   ExternalLink,
   Star,
+  Lightbulb,
   Pin,
   PinOff,
   Code2,
@@ -59,10 +60,12 @@ function makeUuid(): string {
   });
 }
 
+function normalizePriority(priority?: WishlistItem["priority"]) {
+  return priority === "Dream" ? "High" : priority;
+}
+
 function priorityClasses(priority?: WishlistItem["priority"]) {
-  switch (priority) {
-    case "Dream":
-      return "bg-violet-100 text-violet-800 ring-1 ring-inset ring-violet-300";
+  switch (normalizePriority(priority)) {
     case "High":
       return "bg-amber-100 text-amber-800 ring-1 ring-inset ring-amber-300";
     case "Medium":
@@ -71,6 +74,32 @@ function priorityClasses(priority?: WishlistItem["priority"]) {
       return "bg-slate-100 text-slate-800 ring-1 ring-inset ring-slate-300";
     default:
       return "bg-neutral-100 text-neutral-800 ring-1 ring-inset ring-neutral-300";
+  }
+}
+
+function prioritySortValue(priority?: WishlistItem["priority"]) {
+  switch (normalizePriority(priority)) {
+    case "High":
+      return 3;
+    case "Medium":
+      return 2;
+    case "Low":
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+function priorityAccentClasses(priority?: WishlistItem["priority"]) {
+  switch (normalizePriority(priority)) {
+    case "High":
+      return "before:from-amber-500 before:via-orange-500 before:to-rose-500";
+    case "Medium":
+      return "before:from-sky-500 before:via-cyan-500 before:to-blue-500";
+    case "Low":
+      return "before:from-slate-400 before:via-slate-500 before:to-slate-600";
+    default:
+      return "before:from-yellow-500 before:via-amber-500 before:to-orange-400";
   }
 }
 
@@ -153,6 +182,8 @@ function formatStartDate(raw?: string | null): string | null {
 
 /* ---------- Add dialog types / component ---------- */
 
+type WishlistPriorityValue = "Default" | "Low" | "Medium" | "High";
+
 export type NewWishlistItemForm = {
   company: string;
   role: string;
@@ -161,6 +192,7 @@ export type NewWishlistItemForm = {
   employmentType: string;
   offerUrl: string;
   logoUrl?: string;
+  priority: WishlistPriorityValue;
 };
 
 const EMPLOYMENT_OPTIONS: string[] = [
@@ -183,6 +215,7 @@ function makeInitialWishlistForm(): NewWishlistItemForm {
     employmentType: "",
     offerUrl: "",
     logoUrl: "",
+    priority: "Default",
   };
 }
 
@@ -462,6 +495,21 @@ function AddWishlistItemDialog({ open, onClose, onSave }: AddDialogProps) {
               </div>
             </label>
 
+            {/* Priority */}
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-neutral-800">Priority</span>
+              <select
+                value={form.priority}
+                onChange={handleChange("priority")}
+                className="h-9 w-full rounded-lg border border-neutral-200 bg-white/80 px-3 text-sm text-neutral-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:border-yellow-300"
+              >
+                <option value="Default">Default</option>
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+              </select>
+            </label>
+
             {/* Offer link */}
             <label className="space-y-1 text-sm md:col-span-2">
               <span className="font-medium text-neutral-800">Offer link</span>
@@ -565,12 +613,19 @@ export default function WishlistPage() {
         const ap = a.item.pinned ? 1 : 0;
         const bp = b.item.pinned ? 1 : 0;
         if (bp !== ap) return bp - ap;
+        const apr = prioritySortValue(a.item.priority);
+        const bpr = prioritySortValue(b.item.priority);
+        if (bpr !== apr) return bpr - apr;
         return a.idx - b.idx;
       })
       .map(({ item }) => item);
   }, [items, query, filters]);
 
   const cardCount = filtered.length;
+  const headerTips = [
+    "Tip: Set a priority to group offers fast.",
+    "Tip: Pin standout offers to keep them on top.",
+  ];
 
   function handleTogglePin(id: string) {
     setItems((prev) => {
@@ -578,6 +633,23 @@ export default function WishlistPage() {
       const next = prev.map((item) => {
         if (item.id !== id) return item;
         updated = { ...item, pinned: !item.pinned };
+        return updated;
+      });
+      if (updated) {
+        void upsertWishlistItem(updated, storageMode);
+      }
+      return next;
+    });
+  }
+
+  function handlePriorityChange(id: string, value: string) {
+    const nextPriority =
+      value === "Default" ? undefined : (value as WishlistItem["priority"]);
+    setItems((prev) => {
+      let updated: WishlistItem | null = null;
+      const next = prev.map((item) => {
+        if (item.id !== id) return item;
+        updated = { ...item, priority: nextPriority };
         return updated;
       });
       if (updated) {
@@ -612,6 +684,7 @@ export default function WishlistPage() {
       startDate: data.startDate || null,
       offerType: data.employmentType.trim() || undefined,
       pinned: false,
+      priority: data.priority === "Default" ? undefined : data.priority,
     };
 
     setItems((prev) => [nextItem, ...prev]);
@@ -630,25 +703,41 @@ export default function WishlistPage() {
       <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-yellow-300/20 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-amber-300/20 blur-3xl" />
 
-      <div className="flex items-center gap-2">
-        <Image
-          src="/icons/star.png"
-          alt=""
-          width={37}
-          height={37}
-          aria-hidden="true"
-          className="shrink-0 -mt-1"
-        />
-        <h1 className="text-2xl font-semibold text-neutral-900">Wishlist</h1>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <Image
+              src="/icons/star.png"
+              alt=""
+              width={37}
+              height={37}
+              aria-hidden="true"
+              className="shrink-0 -mt-1"
+            />
+            <h1 className="text-2xl font-semibold text-neutral-900">Wishlist</h1>
 
-        <span className="inline-flex items-center rounded-full border border-neutral-200 bg-white/80 px-2.5 py-0.5 text-xs font-medium text-neutral-800 shadow-sm">
-          {cardCount} item{cardCount === 1 ? "" : "s"}
-        </span>
+            <span className="inline-flex items-center rounded-full border border-neutral-200 bg-white/80 px-2.5 py-0.5 text-xs font-medium text-neutral-800 shadow-sm">
+              {cardCount} item{cardCount === 1 ? "" : "s"}
+            </span>
+          </div>
+
+          <p className="mt-1 text-neutral-700">
+            Saved offers you want to revisit later.
+          </p>
+        </div>
+
+        <div className="hidden sm:flex flex-col items-end gap-2">
+          {headerTips.map((tip) => (
+            <span
+              key={tip}
+              className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white/70 px-3 py-1 text-xs font-semibold text-neutral-700 shadow-sm"
+            >
+              <Lightbulb className="h-4 w-4 text-amber-600" aria-hidden="true" />
+              <span className="text-neutral-700">{tip}</span>
+            </span>
+          ))}
+        </div>
       </div>
-
-      <p className="mt-1 text-neutral-700">
-        Offers you starred from the Offers page or saved manually.
-      </p>
 
       {/* Toolbar */}
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -715,6 +804,8 @@ export default function WishlistPage() {
               item.offerType && item.offerType.trim().length > 0
                 ? item.offerType.trim()
                 : undefined;
+            const displayPriority = normalizePriority(item.priority);
+            const priorityValue = displayPriority ?? "Default";
 
             return (
               <article
@@ -725,7 +816,8 @@ export default function WishlistPage() {
                   "bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70",
                   "p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md",
                   "before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:rounded-l-xl",
-                  "before:bg-gradient-to-b before:from-yellow-500 before:via-amber-500 before:to-orange-400",
+                  "before:bg-gradient-to-b",
+                  priorityAccentClasses(item.priority),
                   "before:opacity-90",
                 ].join(" ")}
               >
@@ -761,18 +853,18 @@ export default function WishlistPage() {
                         • {item.role}
                       </span>
                     )}
-                    {item.priority && (
+                    {displayPriority && (
                       <span
                         className={[
                           "ml-2 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
-                          priorityClasses(item.priority),
+                          priorityClasses(displayPriority),
                         ].join(" ")}
                       >
                         <Star
                           className="mr-1 h-3.5 w-3.5 text-yellow-500"
                           aria-hidden="true"
                         />
-                        {item.priority}
+                        {displayPriority}
                       </span>
                     )}
                   </div>
@@ -848,6 +940,21 @@ export default function WishlistPage() {
                       aria-hidden="true"
                     />
                   </button>
+
+                  <select
+                    value={priorityValue}
+                    onChange={(e) => handlePriorityChange(item.id, e.target.value)}
+                    aria-label="Wishlist priority"
+                    className={[
+                      "h-8 rounded-md border border-neutral-200 bg-white/80 px-2 text-xs font-medium text-neutral-700 shadow-sm",
+                      "hover:bg-white focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:border-yellow-300",
+                    ].join(" ")}
+                  >
+                    <option value="Default">Default</option>
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                  </select>
 
                   {item.website && (
                     <a

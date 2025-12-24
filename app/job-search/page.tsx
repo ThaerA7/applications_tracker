@@ -139,6 +139,14 @@ function pickJobIcon(title: string) {
   return Briefcase;
 }
 
+function normalizePriority(priority?: WishlistItem["priority"]) {
+  return priority === "Dream" ? "High" : priority;
+}
+
+function prioritySelectValue(priority?: WishlistItem["priority"]) {
+  return normalizePriority(priority) ?? "Default";
+}
+
 // --------- BA mappings for FILTER (UI → API) ----------
 /** UI → BA `angebotsart` */
 function angebotToParam(v: string): string | null {
@@ -602,6 +610,7 @@ export default function JobSearchPage() {
   // Wishlist state (sourceKey-based).
   const [wishlistKeys, setWishlistKeys] = useState<Set<string>>(new Set());
   const [wishlistIndex, setWishlistIndex] = useState<Map<string, string>>(new Map()); // sourceKey -> uuid id
+  const [wishlistMeta, setWishlistMeta] = useState<Map<string, WishlistItem>>(new Map());
   const [wishlistMode, setWishlistMode] = useState<WishlistStorageMode>("guest");
 
   const [kwSugs, setKwSugs] = useState<string[]>([]);
@@ -616,16 +625,19 @@ export default function JobSearchPage() {
 
       const keys = new Set<string>();
       const index = new Map<string, string>();
+      const meta = new Map<string, WishlistItem>();
 
       for (const w of items) {
         const k = (w.sourceKey || w.website || w.id).trim();
         if (!k) continue;
         keys.add(k);
         index.set(k, w.id);
+        meta.set(k, w);
       }
 
       setWishlistKeys(keys);
       setWishlistIndex(index);
+      setWishlistMeta(meta);
     } catch (err) {
       console.error("Failed to load wishlist", err);
     }
@@ -658,6 +670,26 @@ export default function JobSearchPage() {
     };
   }, [syncWishlist]);
 
+  function buildWishlistEntry(
+    job: JobRow,
+    sourceKey: string,
+    overrides: Partial<WishlistItem> = {}
+  ): WishlistItem {
+    return {
+      id: makeUuid(),
+      sourceKey,
+      company: job.employer || "Unbekannter Arbeitgeber",
+      role: job.title,
+      location: job.location,
+      logoUrl: job.logoUrl,
+      website: job.detailUrl,
+      notes: "",
+      startDate: job.startDate ?? null,
+      offerType: job.offerType,
+      ...overrides,
+    };
+  }
+
   // toggle wishlist entry for a job (uuid id in storage, sourceKey for toggling)
   function toggleWishlist(job: JobRow) {
     const sourceKey = jobIdentity(job);
@@ -679,30 +711,68 @@ export default function JobSearchPage() {
         next.delete(sourceKey);
         return next;
       });
+      setWishlistMeta((prev) => {
+        const next = new Map(prev);
+        next.delete(sourceKey);
+        return next;
+      });
       void deleteWishlistItem(existingId, wishlistMode);
       return;
     }
 
-    const entry: WishlistItem = {
-      id: makeUuid(),
-      sourceKey,
-      company: job.employer || "Unbekannter Arbeitgeber",
-      role: job.title,
-      location: job.location,
-      logoUrl: job.logoUrl,
-      website: job.detailUrl,
-      notes: "",
-      startDate: job.startDate ?? null,
-      offerType: job.offerType,
-    };
+    const entry = buildWishlistEntry(job, sourceKey);
 
     setWishlistIndex((prev) => {
       const next = new Map(prev);
       next.set(sourceKey, entry.id);
       return next;
     });
+    setWishlistMeta((prev) => {
+      const next = new Map(prev);
+      next.set(sourceKey, entry);
+      return next;
+    });
 
     void upsertWishlistItem(entry, wishlistMode);
+  }
+
+  function handlePriorityChange(job: JobRow, value: string) {
+    const sourceKey = jobIdentity(job);
+    if (!sourceKey) return;
+
+    if (value === "Default" && !wishlistIndex.has(sourceKey)) {
+      return;
+    }
+
+    const nextPriority =
+      value === "Default" ? undefined : (value as WishlistItem["priority"]);
+    const existingId = wishlistIndex.get(sourceKey);
+    const current = wishlistMeta.get(sourceKey);
+
+    const updated = current
+      ? { ...current, priority: nextPriority }
+      : buildWishlistEntry(job, sourceKey, {
+        id: existingId ?? makeUuid(),
+        priority: nextPriority,
+      });
+
+    setWishlistKeys((prev) => {
+      const next = new Set(prev);
+      next.add(sourceKey);
+      return next;
+    });
+    setWishlistIndex((prev) => {
+      const next = new Map(prev);
+      next.set(sourceKey, updated.id);
+      return next;
+    });
+    setWishlistMeta((prev) => {
+      const next = new Map(prev);
+      next.set(sourceKey, updated);
+      return next;
+    });
+
+    void upsertWishlistItem(updated, wishlistMode);
   }
 
   function pushUrl(nextUiPage = 1) {
@@ -1117,6 +1187,8 @@ export default function JobSearchPage() {
             const identity = jobIdentity(job);
             const key = identity || `idx-${idx}`;
             const isWishlisted = identity ? wishlistKeys.has(identity) : false;
+            const wishMeta = identity ? wishlistMeta.get(identity) : undefined;
+            const priorityValue = prioritySelectValue(wishMeta?.priority);
 
             const apiOfferLabel =
               job.offerType && job.offerType.trim().length > 0 ? job.offerType.trim() : "Job";
@@ -1217,6 +1289,21 @@ export default function JobSearchPage() {
                       aria-hidden="true"
                     />
                   </button>
+
+                  <select
+                    value={priorityValue}
+                    onChange={(e) => handlePriorityChange(job, e.target.value)}
+                    aria-label="Wishlist priority"
+                    className={[
+                      "h-8 rounded-md border border-neutral-200 bg-white/80 px-2 text-xs font-medium text-neutral-700 shadow-sm",
+                      "hover:bg-white focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-300",
+                    ].join(" ")}
+                  >
+                    <option value="Default">Default</option>
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                  </select>
 
                   {job.detailUrl && (
                     <a
