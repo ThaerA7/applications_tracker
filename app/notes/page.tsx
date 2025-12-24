@@ -5,6 +5,7 @@ import {
   Search,
   Plus,
   Filter,
+  Lightbulb,
   Pin,
   PinOff,
   Tag,
@@ -330,6 +331,11 @@ export default function NotesPage() {
     setExpandedNote((s) => ({ ...s, [id]: !s[id] }));
 
   const noteCount = filtered.length;
+  const headerTips = [
+    "Tip: Add tags to filter notes faster.",
+    "Tip: Use colors to group topics at a glance.",
+    "Tip: Pin key notes to keep them on top.",
+  ];
 
   return (
     <>
@@ -343,23 +349,39 @@ export default function NotesPage() {
         <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-fuchsia-400/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-violet-400/20 blur-3xl" />
 
-        <div className="flex items-center gap-2">
-          <Image
-            src="/icons/note.png"
-            alt=""
-            width={37}
-            height={37}
-            aria-hidden="true"
-            className="shrink-0 -mt-1"
-          />
-          <h1 className="text-2xl font-semibold text-neutral-900">Notes</h1>
-          <span className="inline-flex items-center rounded-full border border-neutral-200 bg-white/80 px-2.5 py-0.5 text-xs font-medium text-neutral-800 shadow-sm">
-            {noteCount} note{noteCount === 1 ? "" : "s"}
-          </span>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <Image
+                src="/icons/note.png"
+                alt=""
+                width={37}
+                height={37}
+                aria-hidden="true"
+                className="shrink-0 -mt-1"
+              />
+              <h1 className="text-2xl font-semibold text-neutral-900">Notes</h1>
+              <span className="inline-flex items-center rounded-full border border-neutral-200 bg-white/80 px-2.5 py-0.5 text-xs font-medium text-neutral-800 shadow-sm">
+                {noteCount} note{noteCount === 1 ? "" : "s"}
+              </span>
+            </div>
+            <p className="mt-1 text-neutral-700">
+              Quick research, interview prep, and reminders.
+            </p>
+          </div>
+
+          <div className="hidden sm:flex flex-col items-end gap-2">
+            {headerTips.map((tip) => (
+              <span
+                key={tip}
+                className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white/70 px-3 py-1 text-xs font-semibold text-neutral-700 shadow-sm"
+              >
+                <Lightbulb className="h-4 w-4 text-amber-600" aria-hidden="true" />
+                <span className="text-neutral-700">{tip}</span>
+              </span>
+            ))}
+          </div>
         </div>
-        <p className="mt-1 text-neutral-700">
-          Quick research, interview prep, and reminders.
-        </p>
 
         {/* Toolbar */}
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -607,7 +629,12 @@ export default function NotesPage() {
           {!loading && filtered.length === 0 && (
             <div className="col-span-full flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center backdrop-blur">
               <div className="mb-2 text-5xl">📝</div>
-              <p className="text-sm text-neutral-700">No notes match your filters.</p>
+              <p className="text-sm font-semibold text-neutral-900">
+                No notes match your filters.
+              </p>
+              <p className="mt-1 text-xs text-neutral-600">
+                Try clearing filters or add a new note.
+              </p>
             </div>
           )}
         </div>

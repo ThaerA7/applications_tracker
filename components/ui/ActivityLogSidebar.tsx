@@ -345,6 +345,7 @@ const VARIANT_CONFIG: Record<ActivityVariant, VariantConfig> = {
     closeButtonFocusRingClass:
       "focus-visible:ring-2 focus-visible:ring-emerald-300",
   },
+
 };
 
 type ActivityLogSidebarProps = {

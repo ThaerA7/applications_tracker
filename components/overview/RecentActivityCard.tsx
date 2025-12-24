@@ -22,7 +22,12 @@ const MAX_FEEDS = 5;
 const COUNTS_EVENT = "job-tracker:refresh-counts";
 const ACTIVITY_EVENT = "job-tracker:refresh-activity";
 
-type SourceBucket = "applied" | "interview" | "rejected" | "withdrawn" | "offer";
+type SourceBucket =
+  | "applied"
+  | "interview"
+  | "rejected"
+  | "withdrawn"
+  | "offer";
 type InternalActivityItem = ActivityItem & { __source?: SourceBucket };
 
 function toMs(ts?: string) {
