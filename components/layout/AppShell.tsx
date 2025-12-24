@@ -29,6 +29,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [digestData, setDigestData] = useState<WeeklyDigestData | null>(null);
   const [digestLoading, setDigestLoading] = useState(false);
   const pathname = usePathname();
+  const useTightBottomGap = pathname !== "/" && !pathname.startsWith("/settings");
+  const contentPaddingClass = useTightBottomGap ? "px-5 pt-5 pb-[5px]" : "px-5 py-5";
 
   // Handle weekly digest dialog trigger
   const openDigestDialog = useCallback(async () => {
@@ -147,16 +149,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       />
 
       <Sidebar collapsed={collapsed} />
-      <div className="min-h-screen pl-[var(--sidebar-width)] transition-[padding-left] duration-200">
+      <div className="pl-[var(--sidebar-width)] transition-[padding-left] duration-200">
         <TopBar
           collapsed={collapsed}
           onToggleSidebar={() =>
             setCollapsed((prev) => (alwaysCollapsed ? true : !prev))
           }
         />
-        <main className="min-h-screen bg-white">
+        <main className="bg-transparent">
           <RouteTransition triggerKey={pathname} fadeOutMs={820} fadeInMs={760}>
-            <div className="w-full px-5 py-5">{children}</div>
+            <div className={`min-h-[calc(100vh-3.5rem)] ${contentPaddingClass}`}>
+              {children}
+            </div>
           </RouteTransition>
         </main>
       </div>

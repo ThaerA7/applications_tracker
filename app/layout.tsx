@@ -17,8 +17,11 @@ const merriweather = Merriweather({
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`h-full text-[115%] ${merriweather.variable}`}>
-      <body className="h-full bg-neutral-100 text-neutral-900 antialiased font-display">
+    <html
+      lang="en"
+      className={`h-full overflow-x-hidden overflow-y-hidden bg-ornate text-[115%] ${merriweather.variable}`}
+    >
+      <body className="h-full overflow-x-hidden overflow-y-auto bg-transparent text-neutral-900 antialiased font-display">
         <AuthProvider>
           <AppShell>{children}</AppShell>
         </AuthProvider>

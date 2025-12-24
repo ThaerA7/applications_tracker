@@ -32,7 +32,6 @@
 
     --radius: 0.5rem;
 
-    
   }
 
   .dark {
@@ -80,6 +79,43 @@
 /* Handy utility to apply Knewave anywhere */
 @layer utilities {
   .font-display { font-family: var(--font-display); }
+
+  .bg-ornate {
+    background-color: #f3ecdf;
+    background-image:
+      radial-gradient(1200px 650px at 12% 6%, rgba(205, 178, 136, 0.35), transparent 60%),
+      radial-gradient(950px 600px at 88% 10%, rgba(199, 170, 126, 0.28), transparent 58%),
+      radial-gradient(900px 650px at 80% 90%, rgba(190, 160, 120, 0.24), transparent 60%),
+      radial-gradient(1200px 820px at 100% 100%, rgba(205, 178, 136, 0.38), transparent 60%),
+      radial-gradient(
+        circle at 50% 50%,
+        rgba(152, 124, 90, 0.08) 0,
+        rgba(152, 124, 90, 0.08) 10px,
+        transparent 11px,
+        transparent 20px,
+        rgba(152, 124, 90, 0.05) 21px,
+        rgba(152, 124, 90, 0.05) 34px,
+        transparent 35px
+      ),
+      repeating-linear-gradient(
+        45deg,
+        rgba(152, 124, 90, 0.035) 0,
+        rgba(152, 124, 90, 0.035) 1px,
+        transparent 1px,
+        transparent 24px
+      ),
+      repeating-linear-gradient(
+        -45deg,
+        rgba(152, 124, 90, 0.035) 0,
+        rgba(152, 124, 90, 0.035) 1px,
+        transparent 1px,
+        transparent 24px
+      );
+    background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 260px 260px, 240px 240px, 240px 240px;
+    background-position: 0 0, 0 0, 0 0, 0 0, 18px 18px, 0 0, 0 0;
+    background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, repeat, repeat, repeat;
+    background-attachment: fixed, fixed, fixed, fixed, scroll, scroll, scroll;
+  }
 }
 
 /* SpinKit: Three Bounce */
