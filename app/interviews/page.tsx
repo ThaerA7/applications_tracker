@@ -807,7 +807,7 @@ export default function InterviewsPage() {
       <section
         className={[
           "relative rounded-2xl border border-neutral-200/70",
-          "bg-gradient-to-br from-emerald-50 via-white to-teal-50",
+          "bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50",
           "p-8 shadow-md",
         ].join(" ")}
       >

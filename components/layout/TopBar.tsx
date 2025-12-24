@@ -752,6 +752,10 @@ export default function TopBar({ collapsed, onToggleSidebar }: TopBarProps) {
           "bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60",
           "relative bg-gradient-to-r to-transparent",
           accent.washFrom,
+          "after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-gradient-to-r after:content-['']",
+          "after:opacity-80",
+          accent.barFrom,
+          accent.barTo,
         ].join(" ")}
       >
         {/* keep 5px padding left/right */}
