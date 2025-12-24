@@ -922,7 +922,9 @@ export default function InterviewsPage() {
                   onClick={() => setStageFilter(option.id)}
                   className={[
                     "flex items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-[11px] font-medium transition",
-                    active ? "bg-emerald-600 text-white shadow-sm" : "text-neutral-700 hover:bg-neutral-50",
+                    active
+                      ? "bg-emerald-600 text-white shadow-sm"
+                      : "text-neutral-700 hover:bg-neutral-50",
                   ].join(" ")}
                   aria-pressed={active}
                   role="tab"
