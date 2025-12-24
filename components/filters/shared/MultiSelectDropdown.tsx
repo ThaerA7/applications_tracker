@@ -117,14 +117,22 @@ export default function MultiSelectDropdown({
     return (
         <div ref={rootRef} className="relative">
             <div className="flex items-center justify-between">
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+                <div
+                    className={[
+                        "text-[11px] font-semibold uppercase tracking-wide",
+                        "text-neutral-500",
+                    ].join(" ")}
+                >
                     {title}
                 </div>
                 {values.length > 0 && (
                     <button
                         type="button"
                         onClick={onClear}
-                        className="text-[10px] font-medium text-neutral-500 hover:text-neutral-900"
+                        className={[
+                            "text-[10px] font-medium",
+                            "text-neutral-500 hover:text-neutral-900",
+                        ].join(" ")}
                     >
                         Clear
                     </button>
@@ -137,15 +145,19 @@ export default function MultiSelectDropdown({
                 onClick={() => setOpen((o) => !o)}
                 className={[
                     "mt-2 inline-flex w-full items-center justify-between gap-2",
-                    "rounded-lg border border-neutral-200 bg-white px-3 py-2",
-                    "text-xs font-medium text-neutral-800",
-                    "hover:bg-neutral-50",
-                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:border-sky-300",
+                    "rounded-lg px-3 py-2 text-xs font-medium",
+                    "border border-neutral-200 bg-white text-neutral-800 hover:bg-neutral-50",
+                    "focus:outline-none focus-visible:ring-2",
+                    "focus-visible:ring-sky-300 focus-visible:border-sky-300",
                 ].join(" ")}
                 aria-expanded={open}
                 aria-haspopup="listbox"
             >
-                <span className={values.length === 0 ? "text-neutral-500" : ""}>
+                <span
+                    className={
+                        values.length === 0 ? "text-neutral-500" : ""
+                    }
+                >
                     {summary}
                 </span>
                 <ChevronDown
@@ -172,8 +184,8 @@ export default function MultiSelectDropdown({
                             visibility: pos.visibility,
                         }}
                         className={[
-                            "rounded-xl border border-neutral-200/80",
-                            "bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90",
+                            "rounded-xl border backdrop-blur",
+                            "border-neutral-200/80 bg-white/95 supports-[backdrop-filter]:bg-white/90",
                             "shadow-xl",
                             "max-h-56 overflow-auto",
                         ].join(" ")}
@@ -202,7 +214,12 @@ export default function MultiSelectDropdown({
                                         >
                                             <span className="truncate">{getLabel(opt)}</span>
                                             {active && (
-                                                <span className="ml-2 inline-flex h-4 w-4 items-center justify-center rounded-full bg-sky-600 text-white">
+                                                <span
+                                                    className={[
+                                                        "ml-2 inline-flex h-4 w-4 items-center justify-center rounded-full text-white",
+                                                        "bg-sky-600",
+                                                    ].join(" ")}
+                                                >
                                                     <Check className="h-3 w-3" aria-hidden="true" />
                                                 </span>
                                             )}
