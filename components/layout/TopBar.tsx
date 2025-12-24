@@ -1,11 +1,26 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  useCallback,
+  useRef,
+  type ChangeEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { LogOut, Menu, UserRound } from "lucide-react";
+import { LogOut, Menu, Search, UserRound, X } from "lucide-react";
 import type { User, Session, AuthChangeEvent } from "@supabase/supabase-js";
 
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { loadApplied } from "@/lib/services/applied";
+import { loadInterviews } from "@/lib/services/interviews";
+import { loadNotes } from "@/lib/services/notes";
+import { loadOffers } from "@/lib/services/offers";
+import { loadRejected } from "@/lib/services/rejected";
+import { loadWishlist } from "@/lib/services/wishlist";
+import { loadWithdrawn } from "@/lib/services/withdrawn";
 
 const ROUTES: Record<string, { title: string }> = {
   "/": { title: "Overview" },
@@ -96,6 +111,58 @@ const ACCENTS: Record<string, Accent> = {
     focus: "focus-visible:ring-indigo-300",
   },
 };
+
+type SearchKind =
+  | "applied"
+  | "interviews"
+  | "offers"
+  | "rejected"
+  | "withdrawn"
+  | "wishlist"
+  | "notes";
+
+type SearchItem = {
+  id: string;
+  kind: SearchKind;
+  title: string;
+  subtitle?: string;
+  meta?: string;
+  href: string;
+  searchText: string;
+};
+
+const SEARCH_SECTIONS: Array<{ kind: SearchKind; label: string; href: string }> = [
+  { kind: "applied", label: "Applied", href: "/applied" },
+  { kind: "interviews", label: "Interviews", href: "/interviews" },
+  { kind: "offers", label: "Offers", href: "/offers-received" },
+  { kind: "rejected", label: "Rejected", href: "/rejected" },
+  { kind: "withdrawn", label: "Withdrawn", href: "/withdrawn" },
+  { kind: "wishlist", label: "Wishlist", href: "/wishlist" },
+  { kind: "notes", label: "Notes", href: "/notes" },
+];
+
+const SEARCH_RESULT_LIMIT = 40;
+const SEARCH_SECTION_LIMIT = 6;
+
+function buildSearchText(parts: Array<string | null | undefined>) {
+  return parts
+    .map((part) => (part ?? "").toString().trim())
+    .filter((part) => part.length > 0)
+    .join(" ")
+    .toLowerCase();
+}
+
+function makeSnippet(value: string | null | undefined, maxLength = 80) {
+  const cleaned = (value ?? "").replace(/\s+/g, " ").trim();
+  if (!cleaned) return "";
+  if (cleaned.length <= maxLength) return cleaned;
+  return `${cleaned.slice(0, Math.max(0, maxLength - 3))}...`;
+}
+
+function buildFocusHref(base: string, id: string) {
+  const params = new URLSearchParams({ focus: id });
+  return `${base}?${params.toString()}`;
+}
 
 type TopBarProps = {
   collapsed: boolean;
@@ -248,6 +315,11 @@ export default function TopBar({ collapsed, onToggleSidebar }: TopBarProps) {
   const accent = ACCENTS[activeKey];
 
   const [user, setUser] = useState<User | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchItems, setSearchItems] = useState<SearchItem[]>([]);
+  const searchRef = useRef<HTMLDivElement | null>(null);
 
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -275,6 +347,302 @@ export default function TopBar({ collapsed, onToggleSidebar }: TopBarProps) {
       sub.subscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadSearchIndex = async () => {
+      setSearchLoading(true);
+      try {
+        const [
+          appliedRes,
+          interviewsRes,
+          offersRes,
+          rejectedRes,
+          withdrawnRes,
+          wishlistRes,
+          notesRes,
+        ] = await Promise.all([
+          loadApplied(),
+          loadInterviews(),
+          loadOffers(),
+          loadRejected(),
+          loadWithdrawn(),
+          loadWishlist(),
+          loadNotes(),
+        ]);
+
+        if (!active) return;
+
+        const next: SearchItem[] = [];
+
+        next.push(
+          ...appliedRes.items.map((item: any) => {
+            const company = String(item.company ?? "").trim();
+            const role = String(item.role ?? "").trim();
+            const location = String(item.location ?? "").trim();
+            const status = String(item.status ?? "").trim();
+            const notes = String(item.notes ?? "").trim();
+            const title = company || "Untitled application";
+            const subtitle = role || location || status || undefined;
+
+            return {
+              id: item.id,
+              kind: "applied",
+              title,
+              subtitle,
+              meta: location || status || undefined,
+              href: buildFocusHref("/applied", item.id),
+              searchText: buildSearchText([
+                company,
+                role,
+                location,
+                status,
+                notes,
+                item.contactPerson,
+                item.contactEmail,
+                item.contactPhone,
+              ]),
+            };
+          })
+        );
+
+        next.push(
+          ...interviewsRes.items.map((item: any) => {
+            const company = String(item.company ?? "").trim();
+            const role = String(item.role ?? "").trim();
+            const location = String(item.location ?? "").trim();
+            const type = String(item.type ?? "").trim();
+            const date = String(item.date ?? "").trim();
+            const notes = String(item.notes ?? "").trim();
+            const title = company || "Untitled interview";
+            const subtitle = role || location || undefined;
+
+            return {
+              id: item.id,
+              kind: "interviews",
+              title,
+              subtitle,
+              meta: type || location || undefined,
+              href: buildFocusHref("/interviews", item.id),
+              searchText: buildSearchText([
+                company,
+                role,
+                location,
+                type,
+                date,
+                notes,
+                item.contact?.name,
+                item.contact?.email,
+                item.contact?.phone,
+              ]),
+            };
+          })
+        );
+
+        next.push(
+          ...offersRes.items.map((item: any) => {
+            const company = String(item.company ?? "").trim();
+            const role = String(item.role ?? "").trim();
+            const location = String(item.location ?? "").trim();
+            const salary = String(item.salary ?? "").trim();
+            const notes = String(item.notes ?? "").trim();
+            const title = company || "Untitled offer";
+            const subtitle = role || location || undefined;
+
+            return {
+              id: item.id,
+              kind: "offers",
+              title,
+              subtitle,
+              meta: salary || undefined,
+              href: buildFocusHref("/offers-received", item.id),
+              searchText: buildSearchText([
+                company,
+                role,
+                location,
+                salary,
+                notes,
+                item.offerReceivedDate,
+                item.offerAcceptedDate,
+                item.offerDeclinedDate,
+                item.decisionDate,
+                item.employmentType,
+              ]),
+            };
+          })
+        );
+
+        next.push(
+          ...rejectedRes.items.map((item: any) => {
+            const company = String(item.company ?? "").trim();
+            const role = String(item.role ?? "").trim();
+            const location = String(item.location ?? "").trim();
+            const reason = String(item.reason ?? "").trim();
+            const notes = String(item.notes ?? "").trim();
+            const title = company || "Untitled rejection";
+            const subtitle = role || location || undefined;
+
+            return {
+              id: item.id,
+              kind: "rejected",
+              title,
+              subtitle,
+              meta: reason || undefined,
+              href: buildFocusHref("/rejected", item.id),
+              searchText: buildSearchText([
+                company,
+                role,
+                location,
+                reason,
+                notes,
+                item.rejectionType,
+                item.decisionDate,
+              ]),
+            };
+          })
+        );
+
+        next.push(
+          ...withdrawnRes.items.map((item: any) => {
+            const company = String(item.company ?? "").trim();
+            const role = String(item.role ?? "").trim();
+            const location = String(item.location ?? "").trim();
+            const reason = String(item.withdrawnReason ?? "").trim();
+            const notes = String(item.notes ?? "").trim();
+            const title = company || "Untitled withdrawn";
+            const subtitle = role || location || undefined;
+
+            return {
+              id: item.id,
+              kind: "withdrawn",
+              title,
+              subtitle,
+              meta: reason || undefined,
+              href: buildFocusHref("/withdrawn", item.id),
+              searchText: buildSearchText([
+                company,
+                role,
+                location,
+                reason,
+                notes,
+                item.withdrawnDate,
+                item.interviewDate,
+                item.interviewType,
+              ]),
+            };
+          })
+        );
+
+        next.push(
+          ...wishlistRes.items.map((item: any) => {
+            const company = String(item.company ?? "").trim();
+            const role = String(item.role ?? "").trim();
+            const location = String(item.location ?? "").trim();
+            const notes = String(item.notes ?? "").trim();
+            const priority = String(item.priority ?? "").trim();
+            const title = company || "Untitled wishlist";
+            const subtitle = role || location || undefined;
+
+            return {
+              id: item.id,
+              kind: "wishlist",
+              title,
+              subtitle,
+              meta: priority || undefined,
+              href: buildFocusHref("/wishlist", item.id),
+              searchText: buildSearchText([
+                company,
+                role,
+                location,
+                priority,
+                notes,
+                item.offerType,
+                item.website,
+              ]),
+            };
+          })
+        );
+
+        next.push(
+          ...notesRes.items.map((note: any) => {
+            const title = String(note.title ?? "").trim() || "Untitled note";
+            const snippet = makeSnippet(note.content, 90);
+            const tagText = Array.isArray(note.tags) ? note.tags.join(" ") : "";
+
+            return {
+              id: note.id,
+              kind: "notes",
+              title,
+              subtitle: snippet || undefined,
+              meta: note.pinned ? "Pinned" : undefined,
+              href: buildFocusHref("/notes", note.id),
+              searchText: buildSearchText([title, note.content, tagText]),
+            };
+          })
+        );
+
+        setSearchItems(next);
+      } catch (err) {
+        console.error("Failed to load search data:", err);
+        if (active) setSearchItems([]);
+      } finally {
+        if (active) setSearchLoading(false);
+      }
+    };
+
+    void loadSearchIndex();
+
+    const handleRefresh = () => {
+      void loadSearchIndex();
+    };
+
+    window.addEventListener("job-tracker:refresh-counts", handleRefresh);
+    return () => {
+      active = false;
+      window.removeEventListener("job-tracker:refresh-counts", handleRefresh);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!searchOpen) return;
+
+    const handleClick = (event: MouseEvent) => {
+      if (!searchRef.current) return;
+      if (!searchRef.current.contains(event.target as Node)) {
+        setSearchOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClick);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+    };
+  }, [searchOpen]);
+
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const searchResults = useMemo(() => {
+    if (!normalizedQuery) return [];
+    const matches = searchItems.filter((item) =>
+      item.searchText.includes(normalizedQuery)
+    );
+    return matches.slice(0, SEARCH_RESULT_LIMIT);
+  }, [normalizedQuery, searchItems]);
+
+  const resultsByKind = useMemo(() => {
+    const grouped = new Map<SearchKind, SearchItem[]>();
+    for (const item of searchResults) {
+      const list = grouped.get(item.kind);
+      if (list) {
+        list.push(item);
+      } else {
+        grouped.set(item.kind, [item]);
+      }
+    }
+    return grouped;
+  }, [searchResults]);
+
+  const showResults = searchOpen && normalizedQuery.length > 0;
 
   const avatarLabel = useMemo(() => {
     if (!user) return "Guest";
@@ -331,6 +699,44 @@ export default function TopBar({ collapsed, onToggleSidebar }: TopBarProps) {
     }
   }, [loggingOut, router]);
 
+  const handleSearchChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const value = event.target.value;
+      setSearchQuery(value);
+      setSearchOpen(value.trim().length > 0);
+    },
+    []
+  );
+
+  const handleClearSearch = useCallback(() => {
+    setSearchQuery("");
+    setSearchOpen(false);
+  }, []);
+
+  const handleSearchKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLInputElement>) => {
+      if (event.key === "Escape") {
+        handleClearSearch();
+        event.currentTarget.blur();
+        return;
+      }
+
+      if (event.key === "Enter" && searchResults.length > 0) {
+        router.push(searchResults[0].href);
+        setSearchOpen(false);
+      }
+    },
+    [handleClearSearch, router, searchResults]
+  );
+
+  const handleSelectResult = useCallback(
+    (href: string) => {
+      router.push(href);
+      setSearchOpen(false);
+    },
+    [router]
+  );
+
   return (
     <>
       <ConfirmLogoutDialog
@@ -342,16 +748,16 @@ export default function TopBar({ collapsed, onToggleSidebar }: TopBarProps) {
 
       <header
         className={[
-          "sticky top-0 z-40 shadow-lg",
+          "sticky top-0 z-40 shadow-lg overflow-visible",
           "bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60",
           "relative bg-gradient-to-r to-transparent",
           accent.washFrom,
         ].join(" ")}
       >
         {/* keep 5px padding left/right */}
-        <div className="w-full h-14 pl-[15px] pr-[15px] flex items-center justify-between">
+        <div className="w-full h-14 pl-[15px] pr-[15px] flex items-center gap-3 overflow-visible">
           {/* Left: collapse icon + title */}
-          <div className="flex items-center gap-2 sm:gap-2">
+          <div className="flex items-center gap-2 sm:gap-2 shrink-0">
             <button
               type="button"
               onClick={onToggleSidebar}
@@ -371,8 +777,117 @@ export default function TopBar({ collapsed, onToggleSidebar }: TopBarProps) {
             <h1 className="text-lg font-semibold text-neutral-900">{title}</h1>
           </div>
 
+          {/* Center: global search */}
+          <div
+            ref={searchRef}
+            className="relative flex-1 min-w-[160px] overflow-visible"
+          >
+            <div className="relative">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-neutral-400"
+                aria-hidden="true"
+              />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={handleSearchChange}
+                onFocus={() => {
+                  if (searchQuery.trim().length > 0) {
+                    setSearchOpen(true);
+                  }
+                }}
+                onKeyDown={handleSearchKeyDown}
+                placeholder="Search all lists..."
+                aria-label="Search all lists"
+                className={[
+                  "h-9 w-full rounded-lg pl-9 pr-9 text-sm text-neutral-900 placeholder:text-neutral-500",
+                  "bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70",
+                  "border border-neutral-200 shadow-sm",
+                  "focus:outline-none focus:ring-2 focus:ring-offset-1",
+                  accent.focus,
+                ].join(" ")}
+              />
+              {searchQuery.trim().length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClearSearch}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-neutral-400 hover:text-neutral-700"
+                  aria-label="Clear search"
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                </button>
+              )}
+            </div>
+
+            {showResults && (
+              <div className="absolute left-0 right-0 z-50 mt-2 rounded-xl border border-neutral-200 bg-white/95 shadow-xl backdrop-blur">
+                <div className="max-h-[60vh] overflow-y-auto p-2">
+                  {searchLoading ? (
+                    <div className="px-3 py-2 text-xs text-neutral-500">
+                      Loading results...
+                    </div>
+                  ) : searchResults.length === 0 ? (
+                    <div className="px-3 py-2 text-xs text-neutral-500">
+                      No results for "{searchQuery.trim()}".
+                    </div>
+                  ) : (
+                    <>
+                      {SEARCH_SECTIONS.map((section) => {
+                        const items = resultsByKind.get(section.kind) ?? [];
+                        if (items.length === 0) return null;
+
+                        return (
+                          <div key={section.kind} className="mb-2 last:mb-0">
+                            <div className="flex items-center justify-between px-2 py-1">
+                              <span className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+                                {section.label}
+                              </span>
+                              {items.length > SEARCH_SECTION_LIMIT && (
+                                <span className="text-[10px] text-neutral-400">
+                                  Showing first {SEARCH_SECTION_LIMIT}
+                                </span>
+                              )}
+                            </div>
+                            <div className="space-y-1">
+                              {items
+                                .slice(0, SEARCH_SECTION_LIMIT)
+                                .map((item) => (
+                                  <button
+                                    key={item.id}
+                                    type="button"
+                                    onClick={() => handleSelectResult(item.href)}
+                                    className="flex w-full items-start justify-between gap-3 rounded-lg px-3 py-2 text-left hover:bg-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-200"
+                                  >
+                                    <div className="min-w-0">
+                                      <p className="truncate text-sm font-medium text-neutral-900">
+                                        {item.title}
+                                      </p>
+                                      {item.subtitle && (
+                                        <p className="truncate text-xs text-neutral-500">
+                                          {item.subtitle}
+                                        </p>
+                                      )}
+                                    </div>
+                                    {item.meta && (
+                                      <span className="shrink-0 text-[10px] uppercase tracking-wide text-neutral-400">
+                                        {makeSnippet(item.meta, 22)}
+                                      </span>
+                                    )}
+                                  </button>
+                                ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Right: auth-aware area */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 shrink-0">
             {/* Avatar / Guest badge */}
             <div
               className={[

@@ -44,7 +44,7 @@ import InterviewsFilter, {
 } from "@/components/filters/InterviewsFilter";
 
 import { getSupabaseClient } from "@/lib/supabase/client";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   loadInterviews,
   upsertInterview,
@@ -250,6 +250,8 @@ function makeUuidV4() {
 
 export default function InterviewsPage() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const focusId = searchParams.get("focus");
   const isActiveRoute = pathname === "/interviews";
 
   const [query, setQuery] = useState("");
@@ -277,6 +279,13 @@ export default function InterviewsPage() {
   const [activityMode, setActivityMode] = useState<ActivityStorageMode>("guest");
 
   const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    if (!focusId) return;
+    const target = items.find((item) => item.id === focusId);
+    if (!target) return;
+    setStageFilter((prev) => (prev === target.stage ? prev : target.stage));
+  }, [focusId, items]);
 
   // keep "now" ticking
   useEffect(() => {

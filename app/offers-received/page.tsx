@@ -11,6 +11,7 @@ import {
   History,
 } from "lucide-react";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
+import { useSearchParams } from "next/navigation";
 
 import MoveToAcceptedDialog, {
   type AcceptedDetails,
@@ -128,6 +129,8 @@ function makeUuid(): string {
 }
 
 export default function OffersReceivedPage() {
+  const searchParams = useSearchParams();
+  const focusId = searchParams.get("focus");
   const [items, setItems] = useState<OfferReceivedJob[]>([]);
   const [storageMode, setStorageMode] = useState<OffersStorageMode>("guest");
   const [hydrated, setHydrated] = useState(false);
@@ -211,6 +214,18 @@ export default function OffersReceivedPage() {
       sub?.subscription?.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (!focusId) return;
+    const target = items.find((item) => item.id === focusId);
+    if (!target) return;
+    const nextView: OffersReceivedView = isAcceptedOffer(target)
+      ? "accepted"
+      : isDeclinedOffer(target)
+        ? "declined"
+        : "received";
+    setView((prev) => (prev === nextView ? prev : nextView));
+  }, [focusId, items]);
 
   // Delete flow
   const openDeleteDialog = (id: string) => {
