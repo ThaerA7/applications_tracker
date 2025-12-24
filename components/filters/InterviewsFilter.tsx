@@ -476,7 +476,8 @@ export default function InterviewsFilter({
             "absolute right-0 mt-2 w-[min(92vw,560px)]",
             "rounded-2xl border border-neutral-200/80",
             "bg-white/90 backdrop-blur-xl supports-[backdrop-filter]:bg-white/80",
-            "shadow-2xl z-50",
+            "shadow-2xl",
+            "z-50",
           ].join(" ")}
         >
           {/* Header */}
