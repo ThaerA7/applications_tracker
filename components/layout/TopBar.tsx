@@ -377,7 +377,7 @@ export default function TopBar({ collapsed, onToggleSidebar }: TopBarProps) {
         const next: SearchItem[] = [];
 
         next.push(
-          ...appliedRes.items.map((item: any) => {
+          ...appliedRes.items.map((item: any): SearchItem => {
             const company = String(item.company ?? "").trim();
             const role = String(item.role ?? "").trim();
             const location = String(item.location ?? "").trim();
@@ -408,7 +408,7 @@ export default function TopBar({ collapsed, onToggleSidebar }: TopBarProps) {
         );
 
         next.push(
-          ...interviewsRes.items.map((item: any) => {
+          ...interviewsRes.items.map((item: any): SearchItem => {
             const company = String(item.company ?? "").trim();
             const role = String(item.role ?? "").trim();
             const location = String(item.location ?? "").trim();
@@ -441,7 +441,7 @@ export default function TopBar({ collapsed, onToggleSidebar }: TopBarProps) {
         );
 
         next.push(
-          ...offersRes.items.map((item: any) => {
+          ...offersRes.items.map((item: any): SearchItem => {
             const company = String(item.company ?? "").trim();
             const role = String(item.role ?? "").trim();
             const location = String(item.location ?? "").trim();
@@ -474,7 +474,7 @@ export default function TopBar({ collapsed, onToggleSidebar }: TopBarProps) {
         );
 
         next.push(
-          ...rejectedRes.items.map((item: any) => {
+          ...rejectedRes.items.map((item: any): SearchItem => {
             const company = String(item.company ?? "").trim();
             const role = String(item.role ?? "").trim();
             const location = String(item.location ?? "").trim();
@@ -504,7 +504,7 @@ export default function TopBar({ collapsed, onToggleSidebar }: TopBarProps) {
         );
 
         next.push(
-          ...withdrawnRes.items.map((item: any) => {
+          ...withdrawnRes.items.map((item: any): SearchItem => {
             const company = String(item.company ?? "").trim();
             const role = String(item.role ?? "").trim();
             const location = String(item.location ?? "").trim();
@@ -535,7 +535,7 @@ export default function TopBar({ collapsed, onToggleSidebar }: TopBarProps) {
         );
 
         next.push(
-          ...wishlistRes.items.map((item: any) => {
+          ...wishlistRes.items.map((item: any): SearchItem => {
             const company = String(item.company ?? "").trim();
             const role = String(item.role ?? "").trim();
             const location = String(item.location ?? "").trim();
@@ -565,7 +565,7 @@ export default function TopBar({ collapsed, onToggleSidebar }: TopBarProps) {
         );
 
         next.push(
-          ...notesRes.items.map((note: any) => {
+          ...notesRes.items.map((note: any): SearchItem => {
             const title = String(note.title ?? "").trim() || "Untitled note";
             const snippet = makeSnippet(note.content, 90);
             const tagText = Array.isArray(note.tags) ? note.tags.join(" ") : "";
@@ -802,7 +802,7 @@ export default function TopBar({ collapsed, onToggleSidebar }: TopBarProps) {
                 className={[
                   "h-9 w-full rounded-lg pl-9 pr-9 text-sm text-neutral-900 placeholder:text-neutral-500",
                   "bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70",
-                  "border border-neutral-200 shadow-sm",
+                  "border border-neutral-200",
                   "focus:outline-none focus:ring-2 focus:ring-offset-1",
                   accent.focus,
                 ].join(" ")}
