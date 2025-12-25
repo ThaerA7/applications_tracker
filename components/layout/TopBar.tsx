@@ -694,10 +694,10 @@ export default function TopBar({ collapsed, onToggleSidebar }: TopBarProps) {
     } finally {
       setLoggingOut(false);
       if (typeof window !== "undefined") {
-        window.location.replace("/");
+        window.location.href = "/";
       }
     }
-  }, [loggingOut, router]);
+  }, [loggingOut]);
 
   const handleSearchChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
