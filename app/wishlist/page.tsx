@@ -622,6 +622,48 @@ export default function WishlistPage() {
   }, [items, query, filters]);
 
   const cardCount = filtered.length;
+  const priorityCounts = useMemo(() => {
+    const counts = { high: 0, medium: 0, low: 0, other: 0 };
+    for (const item of filtered) {
+      switch (normalizePriority(item.priority)) {
+        case "High":
+          counts.high += 1;
+          break;
+        case "Medium":
+          counts.medium += 1;
+          break;
+        case "Low":
+          counts.low += 1;
+          break;
+        default:
+          counts.other += 1;
+          break;
+      }
+    }
+    return counts;
+  }, [filtered]);
+  
+  const cardSummary = (
+
+    <span className="inline-flex flex-wrap items-center gap-1">
+
+      <span>
+
+        {cardCount} {cardCount === 1 ? "Card" : "Cards"}:
+
+      </span>
+
+      <span className="text-amber-700">{priorityCounts.high} high,</span>
+
+      <span className="text-sky-700">{priorityCounts.medium} medium,</span>
+
+      <span className="text-slate-700">{priorityCounts.low} low,</span>
+
+      <span className="text-neutral-600">{priorityCounts.other} others</span>
+
+    </span>
+
+  );
   const headerTips = [
     "Tip: Set a priority to group offers fast.",
     "Tip: Pin standout offers to keep them on top.",
@@ -717,7 +759,7 @@ export default function WishlistPage() {
             <h1 className="text-2xl font-semibold text-neutral-900">Wishlist</h1>
 
             <span className="inline-flex items-center rounded-full border border-neutral-200 bg-white/80 px-2.5 py-0.5 text-xs font-medium text-neutral-800 shadow-sm">
-              {cardCount} item{cardCount === 1 ? "" : "s"}
+              {cardSummary}
             </span>
           </div>
 
