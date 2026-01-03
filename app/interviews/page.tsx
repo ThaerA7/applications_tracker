@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Suspense,
   useEffect,
   useMemo,
   useState,
@@ -248,7 +249,7 @@ function makeUuidV4() {
 
 // --- Component ---
 
-export default function InterviewsPage() {
+function InterviewsContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const focusId = searchParams.get("focus");
@@ -1010,5 +1011,13 @@ export default function InterviewsPage() {
         </div>
       </section>
     </>
+  );
+}
+
+export default function InterviewsPage() {
+  return (
+    <Suspense fallback={null}>
+      <InterviewsContent />
+    </Suspense>
   );
 }
