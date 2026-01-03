@@ -11,7 +11,6 @@ import {
   History,
 } from "lucide-react";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
-import { useSearchParams } from "next/navigation";
 
 import MoveToAcceptedDialog, {
   type AcceptedDetails,
@@ -129,8 +128,7 @@ function makeUuid(): string {
 }
 
 function OffersReceivedContent() {
-  const searchParams = useSearchParams();
-  const focusId = searchParams.get("focus");
+  const [focusId, setFocusId] = useState<string | null>(null);
   const [items, setItems] = useState<OfferReceivedJob[]>([]);
   const [storageMode, setStorageMode] = useState<OffersStorageMode>("guest");
   const [hydrated, setHydrated] = useState(false);
@@ -156,6 +154,12 @@ function OffersReceivedContent() {
     const saved = await appendActivityToStorage("offers", entry, activityMode);
     setActivityItems((prev) => [saved, ...prev].slice(0, 100));
   };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    setFocusId(params.get("focus"));
+  }, []);
 
   // Load offers + offers activity (and handle auth switching)
   useEffect(() => {
