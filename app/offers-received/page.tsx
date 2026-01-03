@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ComponentType } from "react";
+import { Suspense, useEffect, useMemo, useState, type ComponentType } from "react";
 import Image from "next/image";
 import {
   PartyPopper,
@@ -128,7 +128,7 @@ function makeUuid(): string {
   });
 }
 
-export default function OffersReceivedPage() {
+function OffersReceivedContent() {
   const searchParams = useSearchParams();
   const focusId = searchParams.get("focus");
   const [items, setItems] = useState<OfferReceivedJob[]>([]);
@@ -862,5 +862,13 @@ export default function OffersReceivedPage() {
         items={activityItems}
       />
     </>
+  );
+}
+
+export default function OffersReceivedPage() {
+  return (
+    <Suspense fallback={null}>
+      <OffersReceivedContent />
+    </Suspense>
   );
 }
