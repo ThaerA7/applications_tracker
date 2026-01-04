@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useRef, FormEvent } from "react";
+import { useEffect, useMemo, useState, useRef, FormEvent, type PointerEvent } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import {
@@ -180,6 +180,13 @@ function formatStartDate(raw?: string | null): string | null {
   });
 }
 
+function isInteractiveTarget(target: EventTarget | null) {
+  if (!(target instanceof Element)) return false;
+  return Boolean(
+    target.closest("button, a, input, select, textarea, label, [role='button']")
+  );
+}
+
 /* ---------- Add dialog types / component ---------- */
 
 type WishlistPriorityValue = "Default" | "Low" | "Medium" | "High";
@@ -206,6 +213,9 @@ const EMPLOYMENT_OPTIONS: string[] = [
   "Freelance",
 ];
 
+const LONG_PRESS_MS = 550;
+const LONG_PRESS_MOVE_PX = 12;
+
 function makeInitialWishlistForm(): NewWishlistItemForm {
   return {
     company: "",
@@ -219,31 +229,58 @@ function makeInitialWishlistForm(): NewWishlistItemForm {
   };
 }
 
+function makeWishlistFormFromItem(
+  item?: WishlistItem | null
+): NewWishlistItemForm {
+  if (!item) return makeInitialWishlistForm();
+  const priority = normalizePriority(item.priority) ?? "Default";
+  return {
+    company: item.company ?? "",
+    role: item.role ?? "",
+    location: item.location ?? "",
+    startDate: item.startDate ?? "",
+    employmentType: item.offerType ?? "",
+    offerUrl: item.website ?? "",
+    logoUrl: item.logoUrl ?? "",
+    priority: priority as WishlistPriorityValue,
+  };
+}
+
 type AddDialogProps = {
   open: boolean;
+  mode: "add" | "edit";
+  initialItem?: WishlistItem | null;
   onClose: () => void;
   onSave: (data: NewWishlistItemForm) => void;
 };
 
-function AddWishlistItemDialog({ open, onClose, onSave }: AddDialogProps) {
+function AddWishlistItemDialog({
+  open,
+  mode,
+  initialItem,
+  onClose,
+  onSave,
+}: AddDialogProps) {
   const [form, setForm] = useState<NewWishlistItemForm>(() =>
     makeInitialWishlistForm()
   );
   const [logoError, setLogoError] = useState<string | null>(null);
   const firstFieldRef = useRef<HTMLInputElement | null>(null);
   const logoInputRef = useRef<HTMLInputElement | null>(null);
+  const isEditMode = mode === "edit";
+  const titleId = "wishlist-item-dialog-title";
 
   // Reset form + focus when opened
   useEffect(() => {
     if (!open) return;
-    setForm(makeInitialWishlistForm());
+    setForm(makeWishlistFormFromItem(initialItem));
     setLogoError(null);
     if (logoInputRef.current) {
       logoInputRef.current.value = "";
     }
     const t = firstFieldRef.current;
     if (t) setTimeout(() => t.focus(), 10);
-  }, [open]);
+  }, [open, initialItem?.id]);
 
   // Close on Escape
   useEffect(() => {
@@ -271,7 +308,9 @@ function AddWishlistItemDialog({ open, onClose, onSave }: AddDialogProps) {
 
     if (!file) {
       setLogoError(null);
-      setForm((f) => ({ ...f, logoUrl: "" }));
+      if (!isEditMode) {
+        setForm((f) => ({ ...f, logoUrl: "" }));
+      }
       return;
     }
 
@@ -319,7 +358,7 @@ function AddWishlistItemDialog({ open, onClose, onSave }: AddDialogProps) {
       <div
         role="dialog"
         aria-modal="true"
-        aria-labelledby="add-wishlist-item-title"
+        aria-labelledby={titleId}
         className={[
           "relative z-10 max-h-full w-full max-w-2xl overflow-hidden rounded-2xl border border-yellow-100/80",
           "bg-gradient-to-br from-yellow-50 via-white to-amber-50 shadow-xl",
@@ -331,18 +370,20 @@ function AddWishlistItemDialog({ open, onClose, onSave }: AddDialogProps) {
           <div className="flex items-center gap-2">
             <img
               src="/icons/addtowl.png"
-              alt="Add wishlist item"
+              alt={isEditMode ? "Edit wishlist item" : "Add wishlist item"}
               className="h-9 w-9 md:h-11 md:w-11 object-contain"
             />
             <div>
               <h2
-                id="add-wishlist-item-title"
+                id={titleId}
                 className="text-base font-semibold text-neutral-900"
               >
-                Add wishlist offer
+                {isEditMode ? "Edit wishlist offer" : "Add wishlist offer"}
               </h2>
               <p className="mt-0.5 text-xs text-neutral-600">
-                Save a job offer manually to your wishlist.
+                {isEditMode
+                  ? "Update the details for this wishlist item."
+                  : "Save a job offer manually to your wishlist."}
               </p>
             </div>
           </div>
@@ -548,7 +589,7 @@ function AddWishlistItemDialog({ open, onClose, onSave }: AddDialogProps) {
                   : "cursor-not-allowed bg-neutral-200 text-neutral-500",
               ].join(" ")}
             >
-              Save to wishlist
+              {isEditMode ? "Save changes" : "Save to wishlist"}
             </button>
           </div>
         </form>
@@ -568,10 +609,15 @@ export default function WishlistPage() {
   const [hydrated, setHydrated] = useState(false);
 
   const [query, setQuery] = useState("");
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<WishlistItem | null>(null);
   const [filters, setFilters] = useState<WishlistFilters>(
     DEFAULT_WISHLIST_FILTERS
   );
+  const dialogMode: "add" | "edit" = editingItem ? "edit" : "add";
+
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressStartRef = useRef<{ x: number; y: number } | null>(null);
 
   // Load on mount + refresh when other pages change wishlist
   useEffect(() => {
@@ -669,6 +715,54 @@ export default function WishlistPage() {
     "Tip: Pin standout offers to keep them on top.",
   ];
 
+  const clearLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    longPressStartRef.current = null;
+  };
+
+  const openAddDialog = () => {
+    setEditingItem(null);
+    setIsDialogOpen(true);
+  };
+
+  const openEditDialog = (item: WishlistItem) => {
+    setEditingItem(item);
+    setIsDialogOpen(true);
+  };
+
+  const closeDialog = () => {
+    setIsDialogOpen(false);
+    setEditingItem(null);
+    clearLongPress();
+  };
+
+  const handleCardPointerDown = (
+    item: WishlistItem,
+    event: PointerEvent<HTMLElement>
+  ) => {
+    if (isDialogOpen) return;
+    if (isInteractiveTarget(event.target)) return;
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    clearLongPress();
+    longPressStartRef.current = { x: event.clientX, y: event.clientY };
+    longPressTimerRef.current = setTimeout(() => {
+      clearLongPress();
+      openEditDialog(item);
+    }, LONG_PRESS_MS);
+  };
+
+  const handleCardPointerMove = (event: PointerEvent<HTMLElement>) => {
+    if (!longPressTimerRef.current || !longPressStartRef.current) return;
+    const dx = Math.abs(event.clientX - longPressStartRef.current.x);
+    const dy = Math.abs(event.clientY - longPressStartRef.current.y);
+    if (dx > LONG_PRESS_MOVE_PX || dy > LONG_PRESS_MOVE_PX) {
+      clearLongPress();
+    }
+  };
+
   function handleTogglePin(id: string) {
     setItems((prev) => {
       let updated: WishlistItem | null = null;
@@ -707,13 +801,32 @@ export default function WishlistPage() {
     void deleteWishlistItem(id, storageMode);
   }
 
-  // Add from dialog
-  function handleAddFromDialog(data: NewWishlistItemForm) {
+  // Add/edit from dialog
+  function handleSaveFromDialog(data: NewWishlistItemForm) {
     const website = data.offerUrl.trim() || undefined;
+    const computedKey = `${data.company.trim()}|${data.role.trim()}|${data.location.trim()}`.toLowerCase();
+    const sourceKey = website || editingItem?.sourceKey || computedKey;
 
-    const sourceKey =
-      website ||
-      `${data.company.trim()}|${data.role.trim()}|${data.location.trim()}`.toLowerCase();
+    if (editingItem) {
+      const nextItem: WishlistItem = {
+        ...editingItem,
+        sourceKey,
+        company: data.company.trim(),
+        role: data.role.trim() || undefined,
+        location: data.location.trim() || undefined,
+        logoUrl: data.logoUrl?.trim() || undefined,
+        website,
+        startDate: data.startDate || null,
+        offerType: data.employmentType.trim() || undefined,
+        priority: data.priority === "Default" ? undefined : data.priority,
+      };
+
+      setItems((prev) =>
+        prev.map((item) => (item.id === editingItem.id ? nextItem : item))
+      );
+      void upsertWishlistItem(nextItem, storageMode);
+      return;
+    }
 
     const nextItem: WishlistItem = {
       id: makeUuid(),
@@ -810,7 +923,7 @@ export default function WishlistPage() {
         {/* Add */}
         <button
           type="button"
-          onClick={() => setIsAddDialogOpen(true)}
+          onClick={openAddDialog}
           className={[
             "inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800",
             "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
@@ -852,6 +965,11 @@ export default function WishlistPage() {
             return (
               <article
                 key={item.id}
+                onPointerDown={(event) => handleCardPointerDown(item, event)}
+                onPointerMove={handleCardPointerMove}
+                onPointerUp={clearLongPress}
+                onPointerLeave={clearLongPress}
+                onPointerCancel={clearLongPress}
                 className={[
                   "relative grid grid-cols-[64px,1fr,auto] items-center gap-4",
                   "rounded-xl border border-neutral-200/80",
@@ -1028,9 +1146,11 @@ export default function WishlistPage() {
       </div>
 
       <AddWishlistItemDialog
-        open={isAddDialogOpen}
-        onClose={() => setIsAddDialogOpen(false)}
-        onSave={handleAddFromDialog}
+        open={isDialogOpen}
+        mode={dialogMode}
+        initialItem={editingItem}
+        onClose={closeDialog}
+        onSave={handleSaveFromDialog}
       />
     </section>
   );
