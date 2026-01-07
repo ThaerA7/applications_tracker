@@ -175,6 +175,7 @@ export default function MultiSelectDropdown({
                         ref={menuRef}
                         role="listbox"
                         aria-label={`${title} options`}
+                        data-multiselect-dropdown
                         style={{
                             position: "fixed",
                             left: pos.left,

@@ -10,134 +10,124 @@ import {
   type SetStateAction,
 } from "react";
 import { Check, Filter, X } from "lucide-react";
-import type { RejectionDetails } from "@/components/dialogs/MoveToRejectedDialog";
+import type { InterviewType } from "@/components/dialogs/ScheduleInterviewDialog";
+import type { WithdrawnReason } from "@/components/dialogs/MoveToWithdrawnDialog";
+import type { WithdrawnRecord } from "@/components/cards/WithdrawnCard";
 import { parseDateSafe, startOfDay, endOfDay, presetRange, type DateFilterPreset } from "@/lib/utils/dateUtils";
-import { toggleInArray, normalizeList } from "@/lib/utils/filterUtils";
+import { normalizeList, toggleInArray } from "@/lib/utils/filterUtils";
 import MultiSelectDropdown from "./shared/MultiSelectDropdown";
 
-// Shape we rely on – your Rejection type is compatible with this
-type RejectionLike = {
-  company: string;
-  role: string;
-  location?: string;
-  employmentType?: string;
-  rejectionType: RejectionDetails["rejectionType"];
-  decisionDate: string;
-  notes?: string;
-  contactName?: string;
-  contactEmail?: string;
-  contactPhone?: string;
-  url?: string;
-};
+export type WithdrawnDatePreset = DateFilterPreset;
 
-// Re-export DateFilterPreset for consumers
-export type { DateFilterPreset };
-
-export type RejectedFilters = {
-  // decision date
-  decisionPreset: DateFilterPreset;
-  decisionFrom: string;
-  decisionTo: string;
-
-  // multi-selects
+export type WithdrawnFilters = {
+  withdrawnPreset: WithdrawnDatePreset;
+  withdrawnFrom: string;
+  withdrawnTo: string;
   locations: string[];
   employmentTypes: string[];
-  rejectionKinds: string[];
-
-  // toggles
+  reasons: WithdrawnReason[];
+  interviewStages: ("before-interview" | InterviewType)[];
   hasNotes: boolean;
-  /** when true: only show rejectionType === "no-interview" */
-  onlyNoInterview: boolean;
+  hasContact: boolean;
   hasJobLink: boolean;
 };
 
-export const DEFAULT_REJECTED_FILTERS: RejectedFilters = {
-  decisionPreset: "any",
-  decisionFrom: "",
-  decisionTo: "",
+export const DEFAULT_WITHDRAWN_FILTERS: WithdrawnFilters = {
+  withdrawnPreset: "any",
+  withdrawnFrom: "",
+  withdrawnTo: "",
   locations: [],
   employmentTypes: [],
-  rejectionKinds: [],
+  reasons: [],
+  interviewStages: [],
   hasNotes: false,
-  onlyNoInterview: false,
+  hasContact: false,
   hasJobLink: false,
 };
 
-export function getActiveFilterCount(filters: RejectedFilters): number {
+function getActiveFilterCount(filters: WithdrawnFilters): number {
   let c = 0;
+  if (filters.withdrawnPreset !== "any") c += 1;
   c += filters.locations.length;
   c += filters.employmentTypes.length;
-  c += filters.rejectionKinds.length;
-
-  if (filters.decisionPreset !== "any") c += 1;
-
+  c += filters.reasons.length;
+  c += filters.interviewStages.length;
   if (filters.hasNotes) c += 1;
-  if (filters.onlyNoInterview) c += 1;
+  if (filters.hasContact) c += 1;
   if (filters.hasJobLink) c += 1;
-
   return c;
 }
 
-const PRESET_OPTIONS: { value: DateFilterPreset; label: string }[] = [
-  { value: "any", label: "Any time" },
-  { value: "last7", label: "Last 7 days" },
-  { value: "last30", label: "Last 30 days" },
-  { value: "last90", label: "Last 90 days" },
-  { value: "thisYear", label: "This year" },
-  { value: "custom", label: "Custom range" },
-];
+type FilterableWithdrawn = Pick<
+  WithdrawnRecord,
+  | "company"
+  | "role"
+  | "location"
+  | "employmentType"
+  | "withdrawnReason"
+  | "withdrawnDate"
+  | "notes"
+  | "contactName"
+  | "contactEmail"
+  | "contactPhone"
+  | "url"
+  | "interviewType"
+>;
 
-const REJECTION_LABELS: Record<string, string> = {
-  "no-interview": "No interview",
-  "after-phone-screening": "After phone screening",
-  "after-first-interview": "After first interview",
-  "after-second-interview": "After second interview",
+const WITHDRAWN_REASON_LABEL: Record<WithdrawnReason, string> = {
+  "accepted-other-offer": "Accepted another offer",
+  "salary-not-right": "Salary / conditions not right",
+  "role-not-fit": "Role not a good fit",
+  "location-commute": "Location / commute issues",
+  "process-too-slow": "Process took too long",
+  "personal-reasons": "Personal reasons",
+  other: "Other",
 };
 
-function labelForRejectionType(value: string) {
-  return REJECTION_LABELS[value] ?? value;
-}
+const INTERVIEW_STAGE_LABEL: Record<"before-interview" | InterviewType, string> = {
+  "before-interview": "Before interview",
+  phone: "Phone screening",
+  video: "Video call",
+  "in-person": "In person",
+};
 
 function DatePresetDropdown({
-  label,
   value,
   onChange,
 }: {
-  label: string;
-  value: DateFilterPreset;
-  onChange: (preset: DateFilterPreset) => void;
+  value: WithdrawnDatePreset;
+  onChange: (preset: WithdrawnDatePreset) => void;
 }) {
   return (
     <label className="space-y-1">
       <span className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
-        {label}
+        Withdrawn date
       </span>
       <select
         value={value}
-        onChange={(e) => onChange(e.target.value as DateFilterPreset)}
+        onChange={(e) => onChange(e.target.value as WithdrawnDatePreset)}
         className={[
           "h-9 w-full rounded-lg px-2.5 text-xs font-medium",
           "border border-neutral-200 bg-white text-neutral-900",
           "hover:bg-neutral-50",
-          "focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-300",
+          "focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-300",
         ].join(" ")}
       >
-        {PRESET_OPTIONS.map((p) => (
-          <option key={p.value} value={p.value}>
-            {p.label}
-          </option>
-        ))}
+        <option value="any">Any time</option>
+        <option value="last7">Last 7 days</option>
+        <option value="last30">Last 30 days</option>
+        <option value="last90">Last 90 days</option>
+        <option value="thisYear">This year</option>
+        <option value="custom">Custom range</option>
       </select>
     </label>
   );
 }
 
-// ---------- Filtering logic (reused by page) ----------
-
-export function filterRejected<T extends RejectionLike>(
+export function filterWithdrawn<T extends FilterableWithdrawn>(
   items: T[],
   query: string,
-  filters: RejectedFilters
+  filters: WithdrawnFilters
 ): T[] {
   let list = items;
 
@@ -149,7 +139,7 @@ export function filterRejected<T extends RejectionLike>(
         item.role,
         item.location,
         item.employmentType,
-        item.rejectionType,
+        item.withdrawnReason,
         item.notes,
         item.contactName,
         item.contactEmail,
@@ -160,56 +150,59 @@ export function filterRejected<T extends RejectionLike>(
     );
   }
 
-  // Location filter
   if (filters.locations.length > 0) {
     const set = new Set(filters.locations);
     list = list.filter((item) => set.has((item.location ?? "").trim()));
   }
 
-  // Employment type filter
   if (filters.employmentTypes.length > 0) {
     const set = new Set(filters.employmentTypes);
-    list = list.filter((item) =>
-      set.has((item.employmentType ?? "").trim())
-    );
+    list = list.filter((item) => set.has((item.employmentType ?? "").trim()));
   }
 
-  // Rejection kind filter
-  if (filters.rejectionKinds.length > 0) {
-    const set = new Set(filters.rejectionKinds);
-    list = list.filter((item) => set.has(item.rejectionType));
+  if (filters.reasons.length > 0) {
+    const set = new Set(filters.reasons);
+    list = list.filter((item) => item.withdrawnReason && set.has(item.withdrawnReason));
   }
 
-  // Toggles
+  if (filters.interviewStages.length > 0) {
+    const set = new Set(filters.interviewStages);
+    list = list.filter((item) => {
+      const stage: "before-interview" | InterviewType = item.interviewType ?? "before-interview";
+      return set.has(stage);
+    });
+  }
+
   if (filters.hasNotes) {
-    list = list.filter((item) => !!item.notes && item.notes.trim().length > 0);
+    list = list.filter((item) => !!(item.notes && item.notes.trim().length > 0));
   }
 
-  // NEW: only show "no-interview" rejections if enabled
-  if (filters.onlyNoInterview) {
-    list = list.filter((item) => item.rejectionType === "no-interview");
+  if (filters.hasContact) {
+    list = list.filter((item) =>
+      !!(
+        (item.contactName && item.contactName.trim()) ||
+        (item.contactEmail && item.contactEmail.trim()) ||
+        (item.contactPhone && item.contactPhone.trim())
+      )
+    );
   }
 
   if (filters.hasJobLink) {
-    list = list.filter(
-      (item) => !!item.url && item.url.trim().length > 0
-    );
+    list = list.filter((item) => !!(item.url && item.url.trim().length > 0));
   }
 
-  // Decision date filter
-  if (filters.decisionPreset !== "any") {
-    if (filters.decisionPreset === "custom") {
-      const from = parseDateSafe(filters.decisionFrom);
-      const to = parseDateSafe(filters.decisionTo);
+  if (filters.withdrawnPreset !== "any") {
+    if (filters.withdrawnPreset === "custom") {
+      const from = parseDateSafe(filters.withdrawnFrom);
+      const to = parseDateSafe(filters.withdrawnTo);
 
       if (from || to) {
         const fromD = from ? startOfDay(from) : null;
         const toD = to ? endOfDay(to) : null;
 
         list = list.filter((item) => {
-          const d = parseDateSafe(item.decisionDate);
+          const d = parseDateSafe(item.withdrawnDate);
           if (!d) return false;
-
           const t = d.getTime();
           if (fromD && t < fromD.getTime()) return false;
           if (toD && t > toD.getTime()) return false;
@@ -217,13 +210,12 @@ export function filterRejected<T extends RejectionLike>(
         });
       }
     } else {
-      const { from, to } = presetRange(filters.decisionPreset);
+      const { from, to } = presetRange(filters.withdrawnPreset);
       if (from && to) {
         const fromT = from.getTime();
         const toT = to.getTime();
-
         list = list.filter((item) => {
-          const d = parseDateSafe(item.decisionDate);
+          const d = parseDateSafe(item.withdrawnDate);
           if (!d) return false;
           const t = d.getTime();
           return t >= fromT && t <= toT;
@@ -235,46 +227,52 @@ export function filterRejected<T extends RejectionLike>(
   return list;
 }
 
-// ---------- UI component (Filter button + popover) ----------
-
-type RejectedFilterProps = {
-  items: RejectionLike[];
-  filters: RejectedFilters;
-  onChange: Dispatch<SetStateAction<RejectedFilters>>;
+type WithdrawnFilterProps = {
+  items: WithdrawnRecord[];
+  filters: WithdrawnFilters;
+  onChange: Dispatch<SetStateAction<WithdrawnFilters>>;
   filteredCount: number;
 };
 
-export default function RejectedFilter({
+export default function WithdrawnFilter({
   items,
   filters,
   onChange,
   filteredCount,
-}: RejectedFilterProps) {
+}: WithdrawnFilterProps) {
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
 
   const totalCount = items.length;
-  const activeFilterCount = useMemo(
-    () => getActiveFilterCount(filters),
-    [filters]
-  );
-  const hasAnyItems = totalCount > 0;
+  const activeFilterCount = useMemo(() => getActiveFilterCount(filters), [filters]);
 
-  const locationOptions = useMemo(
-    () => normalizeList(items.map((i) => i.location)),
+  const locationOptions = useMemo(() => normalizeList(items.map((i) => i.location)), [items]);
+  const employmentOptions = useMemo(() => normalizeList(items.map((i) => i.employmentType)), [items]);
+  const reasonOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          items
+            .map((i) => i.withdrawnReason)
+            .filter(Boolean)
+            .map((r) => r as WithdrawnReason)
+        )
+      ),
     [items]
   );
-  const employmentOptions = useMemo(
-    () => normalizeList(items.map((i) => i.employmentType)),
-    [items]
-  );
-  const rejectionOptions = useMemo(
-    () => normalizeList(items.map((i) => i.rejectionType)),
+  const stageOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          items.map((i) => (i.interviewType ? i.interviewType : "before-interview" as const))
+        )
+      ),
     [items]
   );
 
-  // close on ESC / outside click
+  const setFilters = onChange;
+
   useEffect(() => {
     if (!open) return;
 
@@ -306,13 +304,11 @@ export default function RejectedFilter({
     };
   }, [open]);
 
-  const setFilters = onChange;
-
-  const handleDecisionPresetChange = useCallback(
-    (preset: DateFilterPreset) => {
+  const handleDatePresetChange = useCallback(
+    (preset: WithdrawnDatePreset) => {
       setFilters((f) => ({
         ...f,
-        decisionPreset: preset,
+        withdrawnPreset: preset,
       }));
     },
     [setFilters]
@@ -338,18 +334,31 @@ export default function RejectedFilter({
     [setFilters]
   );
 
-  const handleToggleRejectionKind = useCallback(
+  const handleToggleReason = useCallback(
     (value: string) => {
       setFilters((f) => ({
         ...f,
-        rejectionKinds: toggleInArray(f.rejectionKinds, value),
+        reasons: toggleInArray(f.reasons, value as WithdrawnReason),
+      }));
+    },
+    [setFilters]
+  );
+
+  const handleToggleStage = useCallback(
+    (value: string) => {
+      setFilters((f) => ({
+        ...f,
+        interviewStages: toggleInArray(
+          f.interviewStages,
+          value as "before-interview" | InterviewType
+        ),
       }));
     },
     [setFilters]
   );
 
   const clearFilters = useCallback(
-    () => setFilters(DEFAULT_REJECTED_FILTERS),
+    () => setFilters(DEFAULT_WITHDRAWN_FILTERS),
     [setFilters]
   );
 
@@ -364,9 +373,9 @@ export default function RejectedFilter({
           "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
           "border shadow-sm hover:bg-white active:bg-neutral-50",
           activeFilterCount > 0
-            ? "border-rose-200 text-rose-900"
+            ? "border-amber-200 text-amber-900"
             : "border-neutral-200 text-neutral-800",
-          "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-rose-300",
+          "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-300",
         ].join(" ")}
         aria-expanded={open}
         aria-haspopup="dialog"
@@ -374,14 +383,13 @@ export default function RejectedFilter({
         <Filter
           className={[
             "h-4 w-4",
-            activeFilterCount > 0 ? "text-rose-600" : "text-neutral-700",
+            activeFilterCount > 0 ? "text-amber-600" : "text-neutral-700",
           ].join(" ")}
           aria-hidden="true"
         />
         <span>Filter</span>
-
-        {activeFilterCount > 0 && (
-          <span className="ml-1 inline-flex items-center rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold text-rose-900 ring-1 ring-inset ring-rose-200">
+        {activeFilterCount > 0 && totalCount > 0 && (
+          <span className="ml-1 inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-900 ring-1 ring-inset ring-amber-200">
             {activeFilterCount}
           </span>
         )}
@@ -391,7 +399,7 @@ export default function RejectedFilter({
         <div
           ref={panelRef}
           role="dialog"
-          aria-label="Filter rejected applications"
+          aria-label="Filter withdrawn applications"
           className={[
             "absolute right-0 mt-2 w-[min(92vw,560px)]",
             "rounded-2xl border border-neutral-200/80",
@@ -400,24 +408,22 @@ export default function RejectedFilter({
             "z-50",
           ].join(" ")}
         >
-          {/* Header */}
           <div className="relative overflow-hidden rounded-t-2xl border-b border-neutral-200/70 px-5 py-4">
-            <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-rose-400/15 blur-2xl" />
-            <div className="pointer-events-none absolute -left-12 -bottom-10 h-36 w-36 rounded-full bg-pink-400/15 blur-2xl" />
+            <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-amber-400/20 blur-2xl" />
+            <div className="pointer-events-none absolute -left-12 -bottom-10 h-36 w-36 rounded-full bg-orange-400/15 blur-2xl" />
 
             <div className="relative flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-rose-50 ring-1 ring-inset ring-rose-100">
-                    <Filter className="h-4 w-4 text-rose-600" />
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-amber-50 ring-1 ring-inset ring-amber-100">
+                    <Filter className="h-4 w-4 text-amber-600" />
                   </span>
                   <h3 className="text-sm font-semibold text-neutral-900">
-                    Refine your rejected list
+                    Refine your withdrawn list
                   </h3>
                 </div>
                 <p className="mt-1 text-xs text-neutral-600">
-                  Date scopes, location, interview stage, employment, and quick
-                  toggles.
+                  Narrow down by date, location, reason, and more.
                 </p>
               </div>
 
@@ -432,71 +438,51 @@ export default function RejectedFilter({
             </div>
           </div>
 
-          {/* Body */}
-          <div className="max-h-[70vh] overflow-auto px-5 py-3">
-            {!hasAnyItems && (
-              <div className="mt-4 rounded-xl border border-dashed border-neutral-200 bg-white px-4 py-3 text-xs text-neutral-600">
-                Add a few rejected applications first — filters will populate
-                automatically.
+          <div className="max-h-[70vh] overflow-auto px-5 py-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <DatePresetDropdown
+                  value={filters.withdrawnPreset}
+                  onChange={handleDatePresetChange}
+                />
+                {filters.withdrawnPreset === "custom" && (
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <label className="space-y-1">
+                      <span className="text-[10px] font-medium text-neutral-500">From</span>
+                      <input
+                        type="date"
+                        value={filters.withdrawnFrom}
+                        onChange={(e) =>
+                          setFilters((f) => ({ ...f, withdrawnFrom: e.target.value }))
+                        }
+                        className={[
+                          "h-9 w-full rounded-lg px-2.5 text-xs text-neutral-900",
+                          "border border-neutral-200 bg-white",
+                          "focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-300",
+                        ].join(" ")}
+                      />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="text-[10px] font-medium text-neutral-500">To</span>
+                      <input
+                        type="date"
+                        value={filters.withdrawnTo}
+                        onChange={(e) =>
+                          setFilters((f) => ({ ...f, withdrawnTo: e.target.value }))
+                        }
+                        className={[
+                          "h-9 w-full rounded-lg px-2.5 text-xs text-neutral-900",
+                          "border border-neutral-200 bg-white",
+                          "focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-300",
+                        ].join(" ")}
+                      />
+                    </label>
+                  </div>
+                )}
               </div>
-            )}
-
-            {/* Decision date */}
-            <div className="mt-0">
-              <DatePresetDropdown
-                label="Decision date"
-                value={filters.decisionPreset}
-                onChange={handleDecisionPresetChange}
-              />
-
-              {filters.decisionPreset === "custom" && (
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <label className="space-y-1">
-                    <span className="text-[10px] font-medium text-neutral-500">
-                      From
-                    </span>
-                    <input
-                      type="date"
-                      value={filters.decisionFrom}
-                      onChange={(e) =>
-                        setFilters((f) => ({
-                          ...f,
-                          decisionFrom: e.target.value,
-                        }))
-                      }
-                      className={[
-                        "h-9 w-full rounded-lg px-2.5 text-xs text-neutral-900",
-                        "border border-neutral-200 bg-white",
-                        "focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-300",
-                      ].join(" ")}
-                    />
-                  </label>
-                  <label className="space-y-1">
-                    <span className="text-[10px] font-medium text-neutral-500">
-                      To
-                    </span>
-                    <input
-                      type="date"
-                      value={filters.decisionTo}
-                      onChange={(e) =>
-                        setFilters((f) => ({
-                          ...f,
-                          decisionTo: e.target.value,
-                        }))
-                      }
-                      className={[
-                        "h-9 w-full rounded-lg px-2.5 text-xs text-neutral-900",
-                        "border border-neutral-200 bg-white",
-                        "focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-300",
-                      ].join(" ")}
-                    />
-                  </label>
-                </div>
-              )}
             </div>
 
-            {/* Location / employment / rejection kind */}
-            <div className="mt-6 grid gap-6 md:grid-cols-3">
+            <div className="mt-6 grid gap-6 md:grid-cols-2">
               <MultiSelectDropdown
                 title="Location / City"
                 options={locationOptions}
@@ -507,51 +493,57 @@ export default function RejectedFilter({
               />
 
               <MultiSelectDropdown
-                title="Employment TYPE"
+                title="Employment"
                 options={employmentOptions}
                 values={filters.employmentTypes}
                 onToggle={handleToggleEmployment}
-                onClear={() =>
-                  setFilters((f) => ({ ...f, employmentTypes: [] }))
-                }
+                onClear={() => setFilters((f) => ({ ...f, employmentTypes: [] }))}
                 placeholder="Any type"
-              />
-
-              <MultiSelectDropdown
-                title="Rejection stage"
-                options={rejectionOptions}
-                values={filters.rejectionKinds}
-                onToggle={handleToggleRejectionKind}
-                onClear={() =>
-                  setFilters((f) => ({ ...f, rejectionKinds: [] }))
-                }
-                placeholder="Any stage"
-                getLabel={labelForRejectionType}
               />
             </div>
 
-            {/* Toggles */}
+            <div className="mt-6 grid gap-6 md:grid-cols-2">
+              <MultiSelectDropdown
+                title="Reason"
+                options={reasonOptions}
+                values={filters.reasons}
+                onToggle={handleToggleReason}
+                onClear={() => setFilters((f) => ({ ...f, reasons: [] }))}
+                placeholder="Any reason"
+                getLabel={(v) => WITHDRAWN_REASON_LABEL[v as WithdrawnReason] ?? v}
+              />
+
+              <MultiSelectDropdown
+                title="Stage when withdrawn"
+                options={stageOptions}
+                values={filters.interviewStages}
+                onToggle={handleToggleStage}
+                onClear={() => setFilters((f) => ({ ...f, interviewStages: [] }))}
+                placeholder="Any stage"
+                getLabel={(v) => INTERVIEW_STAGE_LABEL[v as "before-interview" | InterviewType] ?? v}
+              />
+            </div>
+
             <div className="mt-6">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
                 Helpful shortcuts
               </div>
-
               <div className="mt-2 grid gap-2 sm:grid-cols-3">
                 {[
                   {
                     key: "hasNotes" as const,
                     label: "Has notes",
-                    hint: "See items with context",
+                    hint: "Only cards with notes",
                   },
                   {
-                    key: "onlyNoInterview" as const,
-                    label: "No interview",
-                    hint: "Rejected before interview",
+                    key: "hasContact" as const,
+                    label: "Has contact",
+                    hint: "Name, email, or phone",
                   },
                   {
                     key: "hasJobLink" as const,
                     label: "Has job link",
-                    hint: "Open posting quickly",
+                    hint: "View posting quickly",
                   },
                 ].map((opt) => {
                   const active = filters[opt.key];
@@ -568,7 +560,7 @@ export default function RejectedFilter({
                       className={[
                         "group rounded-xl border px-3 py-2 text-left transition-all",
                         active
-                          ? "border-rose-200 bg-rose-50/70 ring-1 ring-inset ring-rose-100"
+                          ? "border-amber-200 bg-amber-50/80 ring-1 ring-inset ring-amber-100"
                           : "border-neutral-200 bg-white hover:bg-neutral-50",
                       ].join(" ")}
                     >
@@ -576,7 +568,7 @@ export default function RejectedFilter({
                         <span
                           className={[
                             "text-xs font-semibold",
-                            active ? "text-rose-900" : "text-neutral-900",
+                            active ? "text-amber-900" : "text-neutral-900",
                           ].join(" ")}
                         >
                           {opt.label}
@@ -584,7 +576,7 @@ export default function RejectedFilter({
                         <span
                           className={[
                             "inline-flex h-5 w-9 items-center rounded-full p-0.5 transition",
-                            active ? "bg-rose-600" : "bg-neutral-200",
+                            active ? "bg-amber-600" : "bg-neutral-200",
                           ].join(" ")}
                           aria-hidden="true"
                         >
@@ -599,7 +591,7 @@ export default function RejectedFilter({
                       <div
                         className={[
                           "mt-0.5 text-[10px]",
-                          active ? "text-rose-700" : "text-neutral-500",
+                          active ? "text-amber-700" : "text-neutral-500",
                         ].join(" ")}
                       >
                         {opt.hint}
@@ -611,17 +603,10 @@ export default function RejectedFilter({
             </div>
           </div>
 
-          {/* Footer */}
           <div className="mt-2 flex items-center justify-between gap-2 border-t border-neutral-200/70 px-5 py-3">
             <div className="text-[11px] text-neutral-500">
-              Showing{" "}
-              <span className="font-semibold text-neutral-800">
-                {filteredCount}
-              </span>{" "}
-              of{" "}
-              <span className="font-semibold text-neutral-800">
-                {totalCount}
-              </span>
+              Showing <span className="font-semibold text-neutral-800">{filteredCount}</span> of
+              <span className="ml-1 font-semibold text-neutral-800">{totalCount}</span>
             </div>
 
             <div className="flex items-center gap-2">
@@ -641,7 +626,7 @@ export default function RejectedFilter({
                 onClick={() => setOpen(false)}
                 className={[
                   "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium",
-                  "border border-rose-500 bg-rose-600 text-white hover:bg-rose-500",
+                  "border border-amber-500 bg-amber-600 text-white hover:bg-amber-500",
                 ].join(" ")}
               >
                 <Check className="h-3.5 w-3.5" />

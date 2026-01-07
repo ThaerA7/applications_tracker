@@ -216,6 +216,9 @@ export default function WishlistFilter({
       if (panel?.contains(target)) return;
       if (btn?.contains(target)) return;
 
+      const el = target as HTMLElement | null;
+      if (el?.closest("[data-multiselect-dropdown]")) return;
+
       setOpen(false);
     };
 

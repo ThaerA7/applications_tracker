@@ -2,16 +2,20 @@
 
 import type React from "react";
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { Search, Filter, Plus, History } from "lucide-react";
+import { Search, Plus, History } from "lucide-react";
 import Image from "next/image";
 import WithdrawnCard, { type WithdrawnRecord } from "@/components/cards/WithdrawnCard";
-import type { InterviewType } from "@/components/dialogs/ScheduleInterviewDialog";
 import MoveToWithdrawnDialog, {
   type WithdrawnDetails,
 } from "@/components/dialogs/MoveToWithdrawnDialog";
 import { animateCardExit } from "@/components/dialogs/cardExitAnimation";
 import ActivityLogSidebar, { type ActivityItem } from "@/components/ui/ActivityLogSidebar";
 import ThreeBounceSpinner from "@/components/ui/ThreeBounceSpinner";
+import WithdrawnFilter, {
+  DEFAULT_WITHDRAWN_FILTERS,
+  filterWithdrawn,
+  type WithdrawnFilters,
+} from "@/components/filters/WithdrawnFilter";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 
 import { getSupabaseClient } from "@/lib/supabase/client";
@@ -30,12 +34,6 @@ import {
   migrateGuestActivityToUser,
   type ActivityStorageMode,
 } from "@/lib/services/activity";
-
-const INTERVIEW_TYPE_LABEL: Record<InterviewType, string> = {
-  phone: "Phone screening",
-  video: "Video call",
-  "in-person": "In person",
-};
 
 function makeUuidV4() {
   const cryptoObj = globalThis.crypto as Crypto | undefined;
@@ -62,6 +60,7 @@ export default function WithdrawnPage() {
   const [withdrawn, setWithdrawn] = useState<WithdrawnRecord[]>([]);
   const [storageMode, setStorageMode] = useState<WithdrawnStorageMode>("guest");
   const [query, setQuery] = useState("");
+  const [filters, setFilters] = useState<WithdrawnFilters>(DEFAULT_WITHDRAWN_FILTERS);
   const [deleteTarget, setDeleteTarget] = useState<WithdrawnRecord | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
@@ -145,25 +144,10 @@ export default function WithdrawnPage() {
     };
   }, []);
 
-  const filtered = useMemo(() => {
-    const q = query.toLowerCase().trim();
-    if (!q) return withdrawn;
-
-    return withdrawn.filter((item) =>
-      [
-        item.company,
-        item.role,
-        item.location,
-        item.employmentType,
-        item.contactName,
-        item.contactEmail,
-        item.notes,
-        item.interviewType ? INTERVIEW_TYPE_LABEL[item.interviewType] : undefined,
-      ]
-        .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(q))
-    );
-  }, [query, withdrawn]);
+  const filtered = useMemo(
+    () => filterWithdrawn(withdrawn, query, filters),
+    [withdrawn, query, filters]
+  );
 
   const cardCount = filtered.length;
 
@@ -378,7 +362,7 @@ export default function WithdrawnPage() {
         className={[
           "relative rounded-2xl border border-neutral-200/70",
           "bg-gradient-to-br from-amber-50 via-white to-rose-50",
-          "p-8 shadow-md overflow-hidden",
+          "p-8 shadow-md overflow-visible",
         ].join(" ")}
       >
         <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-amber-400/20 blur-3xl" />
@@ -460,18 +444,12 @@ export default function WithdrawnPage() {
             Add
           </button>
 
-          <button
-            type="button"
-            className={[
-              "inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-800",
-              "bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60",
-              "border border-neutral-200 shadow-sm hover:bg-white active:bg-neutral-50",
-              "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-300",
-            ].join(" ")}
-          >
-            <Filter className="h-4 w-4" aria-hidden="true" />
-            Filter
-          </button>
+          <WithdrawnFilter
+            items={withdrawn}
+            filters={filters}
+            onChange={setFilters}
+            filteredCount={filtered.length}
+          />
         </div>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -505,7 +483,7 @@ export default function WithdrawnPage() {
                 </>
               ) : (
                 <p className="text-sm text-neutral-700">
-                  No withdrawn applications match your search.
+                  No withdrawn applications match your search or filters.
                 </p>
               )}
             </div>
