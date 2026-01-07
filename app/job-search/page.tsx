@@ -424,6 +424,11 @@ function AutoCompleteInput({
   }, [open, value]);
 
   const Icon = icon === "search" ? Search : MapPin;
+  const deferSubmit = () => {
+    const form = inputRef.current?.form as HTMLFormElement | undefined;
+    if (!form) return;
+    setTimeout(() => form.requestSubmit(), 0);
+  };
 
   const dropdownEl = (
     <ul
@@ -446,7 +451,7 @@ function AutoCompleteInput({
             e.preventDefault();
             onChange(s);
             setOpen(false);
-            if (submitOnPick) inputRef.current?.form?.requestSubmit();
+            if (submitOnPick) deferSubmit();
           }}
           className={[
             "cursor-pointer px-3 py-2 text-sm",
@@ -497,7 +502,7 @@ function AutoCompleteInput({
               e.preventDefault();
               onChange(items[active]);
               setOpen(false);
-              (inputRef.current?.form as HTMLFormElement | undefined)?.requestSubmit();
+              deferSubmit();
               return;
             }
             if (e.key === "Escape") {
@@ -506,7 +511,8 @@ function AutoCompleteInput({
             }
           }
           if (e.key === "Enter") {
-            (inputRef.current?.form as HTMLFormElement | undefined)?.requestSubmit();
+            e.preventDefault();
+            deferSubmit();
           }
         }}
         className={[
