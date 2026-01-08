@@ -15,6 +15,7 @@ import {
   Save,
   X,
   Palette,
+  Maximize2,
 } from "lucide-react";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -151,6 +152,8 @@ export default function NotesPage() {
 
   const [expandedNote, setExpandedNote] = useState<Record<string, boolean>>({});
   const [deleteTarget, setDeleteTarget] = useState<Note | null>(null);
+  const [viewingNote, setViewingNote] = useState<Note | null>(null);
+  const [viewContent, setViewContent] = useState("");
 
   // Load from storage (Supabase if signed in, else guest)
   useEffect(() => {
@@ -563,6 +566,19 @@ export default function NotesPage() {
                     <div className="flex shrink-0 items-center gap-1">
                       <button
                         type="button"
+                        onClick={() => {
+                          setViewingNote(n);
+                          setViewContent(n.content ?? "");
+                        }}
+                        className="rounded-md border border-neutral-200 bg-white/70 p-1 text-neutral-700 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+                        aria-label="View full note"
+                        title="View Full"
+                      >
+                        <Maximize2 className="h-4 w-4" aria-hidden="true" />
+                      </button>
+
+                      <button
+                        type="button"
                         onClick={() => void togglePin(n.id)}
                         className="rounded-md border border-neutral-200 bg-white/70 p-1 text-neutral-700 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-300"
                         aria-label={n.pinned ? "Unpin note" : "Pin note"}
@@ -724,7 +740,7 @@ export default function NotesPage() {
           />
 
           <div
-            className="relative z-10 w-full max-w-xl"
+            className="relative z-10 w-full max-w-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <article
@@ -826,6 +842,144 @@ export default function NotesPage() {
                 </button>
               </div>
             </article>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW FULL NOTE DIALOG */}
+      {viewingNote && (
+        <div
+          className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[12600] flex items-center justify-center px-4 py-8"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setViewingNote(null)}
+        >
+          <div
+            className="absolute inset-0 bg-indigo-950/40 backdrop-blur-sm"
+            aria-hidden="true"
+          />
+
+          <div
+            className="relative z-10 w-full max-w-4xl max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div 
+              className="overflow-y-auto max-h-[90vh] rounded-xl"
+              style={{
+                scrollbarWidth: 'none',
+                msOverflowStyle: 'none',
+              }}
+            >
+              <style>{`
+                div::-webkit-scrollbar {
+                  display: none;
+                }
+              `}</style>
+              <article
+                style={{
+                  borderLeftWidth: 4,
+                  borderLeftColor: getColorHex((viewingNote.color ?? "gray") as ColorKey),
+                }}
+                className="relative flex flex-col rounded-xl border p-6 sm:p-8 shadow-lg transition-all bg-white border-neutral-200"
+              >
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`inline-block h-3 w-3 rounded-full ${COLOR_STYLES[(viewingNote.color ?? "gray") as ColorKey].dot}`}
+                    aria-hidden="true"
+                  />
+                  <h2 className="text-2xl font-bold text-neutral-900">
+                    {viewingNote.title ?? "Untitled note"}
+                  </h2>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setViewingNote(null)}
+                  className="rounded-md border border-neutral-200 bg-white/80 p-2 text-neutral-700 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+                  aria-label="Close"
+                  title="Close"
+                >
+                  <X className="h-5 w-5" aria-hidden="true" />
+                </button>
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-neutral-600">
+                <span className="inline-flex items-center gap-1.5">
+                  <CalendarDays className="h-4 w-4" aria-hidden="true" />
+                  <span>Updated</span>
+                  <time dateTime={viewingNote.updatedAt ?? ""}>
+                    {viewingNote.updatedAt ? fmtDate(viewingNote.updatedAt) : "—"}
+                  </time>
+                </span>
+
+                {viewingNote.pinned && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
+                    <Pin className="h-3.5 w-3.5" aria-hidden="true" />
+                    Pinned
+                  </span>
+                )}
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                {(viewingNote.tags ?? []).map((t: string) => (
+                  <span
+                    key={t}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white/70 px-3 py-1.5 text-sm text-neutral-700 backdrop-blur"
+                  >
+                    <Tag className="h-3.5 w-3.5" aria-hidden="true" />
+                    {t}
+                  </span>
+                ))}
+              </div>
+
+              <div className="mt-6 border-t border-neutral-200 pt-6">
+                <div
+                  contentEditable
+                  suppressContentEditableWarning
+                  onBlur={(e) => {
+                    const text = e.currentTarget.innerText || "";
+                    setViewContent(text);
+                  }}
+                  className="whitespace-pre-line text-base leading-relaxed text-neutral-700 focus:outline-none min-h-[200px]"
+                >
+                  {viewContent || "No content yet."}
+                </div>
+              </div>
+
+              <div className="mt-6 flex items-center justify-end gap-2 border-t border-neutral-200 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setViewingNote(null)}
+                  className="inline-flex items-center gap-2 rounded-md border border-neutral-200 bg-white/80 px-4 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const updated: Note = {
+                      ...viewingNote,
+                      content: viewContent.trim() || "Empty note",
+                      updatedAt: new Date().toISOString(),
+                    };
+
+                    setNotes((prev) =>
+                      prev.map((n) => (n.id === viewingNote.id ? updated : n))
+                    );
+                    await upsertNote(updated, mode);
+                    notifyNotesChanged();
+                    setViewingNote(null);
+                  }}
+                  className="inline-flex items-center gap-2 rounded-md border border-neutral-900 bg-neutral-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-neutral-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+                >
+                  <Save className="h-4 w-4" aria-hidden="true" />
+                  Save Changes
+                </button>
+              </div>
+            </article>
+            </div>
           </div>
         </div>
       )}
