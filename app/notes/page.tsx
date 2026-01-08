@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Search,
   Plus,
@@ -34,6 +34,7 @@ import {
 
 const COUNTS_EVENT = "job-tracker:refresh-counts";
 const NOTES_EVENT = "job-tracker:refresh-notes";
+const VIEW_CONTENT_PLACEHOLDER = "No content yet.";
 function notifyNotesChanged() {
   window.dispatchEvent(new Event(NOTES_EVENT));
   window.dispatchEvent(new Event(COUNTS_EVENT));
@@ -98,6 +99,14 @@ function truncateText(text: string, max = 220) {
   return (lastSpace > 0 ? cut.slice(0, lastSpace) : cut).trim() + "…";
 }
 
+function normalizeViewContent(value: string, initial: string) {
+  const trimmed = value.trim();
+  if (!initial && trimmed === VIEW_CONTENT_PLACEHOLDER) {
+    return "";
+  }
+  return value;
+}
+
 /** Solid color values used for swatches. */
 function getColorHex(c: ColorKey): string {
   switch (c) {
@@ -129,6 +138,13 @@ function makeId(): string {
   return `note-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+type NoteDraftSnapshot = {
+  title: string;
+  content: string;
+  tags: string;
+  color: ColorKey;
+};
+
 export default function NotesPage() {
   const pathname = usePathname();
   const isActiveRoute = pathname === "/notes";
@@ -149,11 +165,14 @@ export default function NotesPage() {
   const [draftTags, setDraftTags] = useState("");
   const [draftColor, setDraftColor] = useState<ColorKey>("gray");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [dialogSnapshot, setDialogSnapshot] = useState<NoteDraftSnapshot | null>(null);
 
   const [expandedNote, setExpandedNote] = useState<Record<string, boolean>>({});
   const [deleteTarget, setDeleteTarget] = useState<Note | null>(null);
   const [viewingNote, setViewingNote] = useState<Note | null>(null);
   const [viewContent, setViewContent] = useState("");
+  const viewContentRef = useRef("");
+  const viewInitialContentRef = useRef("");
 
   // Load from storage (Supabase if signed in, else guest)
   useEffect(() => {
@@ -224,22 +243,54 @@ export default function NotesPage() {
     return res;
   }, [notes, query, activeTag, activeColor]);
 
+  const isDialogDirty =
+    isDialogOpen &&
+    !!dialogSnapshot &&
+    (draftTitle !== dialogSnapshot.title ||
+      draftContent !== dialogSnapshot.content ||
+      draftTags !== dialogSnapshot.tags ||
+      draftColor !== dialogSnapshot.color);
+
   function openAddDialog() {
+    const snapshot: NoteDraftSnapshot = {
+      title: "",
+      content: "",
+      tags: "",
+      color: "gray",
+    };
+
     setEditingId("new");
-    setDraftTitle("");
-    setDraftContent("");
-    setDraftTags("");
-    setDraftColor("gray");
+    setDraftTitle(snapshot.title);
+    setDraftContent(snapshot.content);
+    setDraftTags(snapshot.tags);
+    setDraftColor(snapshot.color);
+    setDialogSnapshot(snapshot);
     setIsDialogOpen(true);
   }
 
   function startEdit(note: Note) {
+    const snapshot: NoteDraftSnapshot = {
+      title: note.title ?? "",
+      content: note.content ?? "",
+      tags: (note.tags ?? []).join(", "),
+      color: (note.color ?? "gray") as ColorKey,
+    };
+
     setEditingId(note.id);
-    setDraftTitle(note.title ?? "");
-    setDraftContent(note.content ?? "");
-    setDraftTags((note.tags ?? []).join(", "));
-    setDraftColor((note.color ?? "gray") as ColorKey);
+    setDraftTitle(snapshot.title);
+    setDraftContent(snapshot.content);
+    setDraftTags(snapshot.tags);
+    setDraftColor(snapshot.color);
+    setDialogSnapshot(snapshot);
     setIsDialogOpen(true);
+  }
+
+  function openView(note: Note) {
+    const content = note.content ?? "";
+    setViewingNote(note);
+    setViewContent(content);
+    viewContentRef.current = content;
+    viewInitialContentRef.current = content;
   }
 
   async function saveEdit() {
@@ -273,6 +324,7 @@ export default function NotesPage() {
 
       setEditingId(null);
       setIsDialogOpen(false);
+      setDialogSnapshot(null);
       notifyNotesChanged();
       return;
     }
@@ -291,12 +343,28 @@ export default function NotesPage() {
 
     setEditingId(null);
     setIsDialogOpen(false);
+    setDialogSnapshot(null);
     notifyNotesChanged();
   }
 
-  function closeDialog() {
+  function closeDialog(force = false) {
+    if (!force && isDialogDirty) return;
     setIsDialogOpen(false);
     setEditingId(null);
+    setDialogSnapshot(null);
+  }
+
+  function closeViewDialog(force = false) {
+    if (!force && viewingNote) {
+      const initial = viewInitialContentRef.current;
+      const current = viewContentRef.current;
+      const normalizedInitial = normalizeViewContent(initial, initial);
+      const normalizedCurrent = normalizeViewContent(current, initial);
+
+      if (normalizedCurrent !== normalizedInitial) return;
+    }
+
+    setViewingNote(null);
   }
 
   async function togglePin(id: string) {
@@ -566,10 +634,7 @@ export default function NotesPage() {
                     <div className="flex shrink-0 items-center gap-1">
                       <button
                         type="button"
-                        onClick={() => {
-                          setViewingNote(n);
-                          setViewContent(n.content ?? "");
-                        }}
+                        onClick={() => openView(n)}
                         className="rounded-md border border-neutral-200 bg-white/70 p-1 text-neutral-700 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
                         aria-label="View full note"
                         title="View Full"
@@ -732,7 +797,7 @@ export default function NotesPage() {
           className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[12500] flex items-center justify-center px-4 py-8"
           role="dialog"
           aria-modal="true"
-          onClick={closeDialog}
+          onClick={() => closeDialog()}
         >
           <div
             className="absolute inset-0 bg-fuchsia-950/40 backdrop-blur-sm"
@@ -826,7 +891,7 @@ export default function NotesPage() {
               <div className="mt-4 flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  onClick={closeDialog}
+                  onClick={() => closeDialog(true)}
                   className="inline-flex items-center gap-1 rounded-md border border-neutral-200 bg-white/80 px-3 py-1.5 text-xs font-medium text-neutral-700 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-300"
                 >
                   <X className="h-3 w-3" aria-hidden="true" />
@@ -852,7 +917,7 @@ export default function NotesPage() {
           className="fixed inset-y-0 right-0 left-0 md:left-[var(--sidebar-width)] z-[12600] flex items-center justify-center px-4 py-8"
           role="dialog"
           aria-modal="true"
-          onClick={() => setViewingNote(null)}
+          onClick={() => closeViewDialog()}
         >
           <div
             className="absolute inset-0 bg-indigo-950/40 backdrop-blur-sm"
@@ -895,7 +960,7 @@ export default function NotesPage() {
 
                 <button
                   type="button"
-                  onClick={() => setViewingNote(null)}
+                  onClick={() => closeViewDialog(true)}
                   className="rounded-md border border-neutral-200 bg-white/80 p-2 text-neutral-700 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
                   aria-label="Close"
                   title="Close"
@@ -937,20 +1002,24 @@ export default function NotesPage() {
                 <div
                   contentEditable
                   suppressContentEditableWarning
+                  onInput={(e) => {
+                    viewContentRef.current = e.currentTarget.innerText || "";
+                  }}
                   onBlur={(e) => {
                     const text = e.currentTarget.innerText || "";
+                    viewContentRef.current = text;
                     setViewContent(text);
                   }}
                   className="whitespace-pre-line text-base leading-relaxed text-neutral-700 focus:outline-none min-h-[200px]"
                 >
-                  {viewContent || "No content yet."}
+                  {viewContent || VIEW_CONTENT_PLACEHOLDER}
                 </div>
               </div>
 
               <div className="mt-6 flex items-center justify-end gap-2 border-t border-neutral-200 pt-4">
                 <button
                   type="button"
-                  onClick={() => setViewingNote(null)}
+                  onClick={() => closeViewDialog(true)}
                   className="inline-flex items-center gap-2 rounded-md border border-neutral-200 bg-white/80 px-4 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
                 >
                   <X className="h-4 w-4" aria-hidden="true" />
@@ -959,9 +1028,10 @@ export default function NotesPage() {
                 <button
                   type="button"
                   onClick={async () => {
+                    const nextContent = viewContentRef.current;
                     const updated: Note = {
                       ...viewingNote,
-                      content: viewContent.trim() || "Empty note",
+                      content: nextContent.trim() || "Empty note",
                       updatedAt: new Date().toISOString(),
                     };
 
@@ -970,7 +1040,7 @@ export default function NotesPage() {
                     );
                     await upsertNote(updated, mode);
                     notifyNotesChanged();
-                    setViewingNote(null);
+                    closeViewDialog(true);
                   }}
                   className="inline-flex items-center gap-2 rounded-md border border-neutral-900 bg-neutral-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-neutral-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
                 >
