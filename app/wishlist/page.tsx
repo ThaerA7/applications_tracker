@@ -27,6 +27,7 @@ import {
   Tag,
   X,
   Image as ImageIcon,
+  CheckCircle,
 } from "lucide-react";
 
 import WishlistFilter, {
@@ -34,6 +35,12 @@ import WishlistFilter, {
   filterWishlistItems,
   type WishlistFilters,
 } from "@/components/filters/WishlistFilter";
+
+import AddApplicationDialog, {
+  type NewApplicationForm,
+} from "@/components/dialogs/AddApplicationDialog";
+
+import { animateCardExit } from "@/components/dialogs/cardExitAnimation";
 
 import ThreeBounceSpinner from "@/components/ui/ThreeBounceSpinner";
 
@@ -44,6 +51,11 @@ import {
   type WishlistItem,
   type WishlistStorageMode,
 } from "@/lib/services/wishlist";
+
+import {
+  upsertApplied,
+  type AppliedStorageMode,
+} from "@/lib/services/applied";
 
 /** sidebar refresh event name used across the app */
 const COUNTS_EVENT = "job-tracker:refresh-counts";
@@ -605,6 +617,7 @@ function AddWishlistItemDialog({
 export default function WishlistPage() {
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [storageMode, setStorageMode] = useState<WishlistStorageMode>("guest");
+  const [appliedStorageMode, setAppliedStorageMode] = useState<AppliedStorageMode>("guest");
 
   const [hydrated, setHydrated] = useState(false);
 
@@ -615,6 +628,11 @@ export default function WishlistPage() {
     DEFAULT_WISHLIST_FILTERS
   );
   const dialogMode: "add" | "edit" = editingItem ? "edit" : "add";
+
+  // Application dialog state (for moving to applied)
+  const [appDialogOpen, setAppDialogOpen] = useState(false);
+  const [appDialogData, setAppDialogData] = useState<NewApplicationForm | null>(null);
+  const [itemBeingMovedToApplied, setItemBeingMovedToApplied] = useState<WishlistItem | null>(null);
 
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -632,6 +650,8 @@ export default function WishlistPage() {
         if (!alive) return;
         setStorageMode(mode);
         setItems(items);
+        // Load applied storage mode for when we save items to applied
+        setAppliedStorageMode(mode as AppliedStorageMode);
       } finally {
         if (alive) setHydrated(true);
       }
@@ -739,6 +759,91 @@ export default function WishlistPage() {
     clearLongPress();
   };
 
+  const wishlistItemToApplicationForm = (item: WishlistItem): NewApplicationForm => {
+    const today = new Date().toISOString().slice(0, 10);
+    return {
+      company: item.company || "",
+      role: item.role || "",
+      location: item.location || "",
+      appliedOn: today,
+      startDate: item.startDate || "",
+      employmentType: item.offerType || "",
+      offerUrl: item.website || "",
+      salary: "",
+      contactPerson: "",
+      contactPhone: "",
+      contactEmail: "",
+      source: "",
+      status: "Applied",
+      notes: item.notes || "",
+      logoUrl: item.logoUrl || "",
+      website: item.website || "",
+    };
+  };
+
+  const openMoveToAppliedDialog = (item: WishlistItem) => {
+    setItemBeingMovedToApplied(item);
+    const formData = wishlistItemToApplicationForm(item);
+    setAppDialogData(formData);
+    setAppDialogOpen(true);
+  };
+
+  const closeAppDialog = () => {
+    setAppDialogOpen(false);
+    setAppDialogData(null);
+    setItemBeingMovedToApplied(null);
+  };
+
+  const handleMoveToApplied = async (data: NewApplicationForm) => {
+    if (!itemBeingMovedToApplied) return;
+
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const appId = makeUuid();
+      const elementId = `wishlist-card-${itemBeingMovedToApplied.id}`;
+      
+      const application = {
+        id: appId,
+        company: data.company,
+        role: data.role,
+        location: data.location,
+        appliedOn: data.appliedOn || today,
+        startDate: data.startDate || "",
+        employmentType: data.employmentType,
+        offerUrl: data.offerUrl,
+        salary: data.salary,
+        contactPerson: data.contactPerson,
+        contactPhone: data.contactPhone,
+        contactEmail: data.contactEmail,
+        source: data.source,
+        status: data.status,
+        notes: data.notes,
+        logoUrl: data.logoUrl,
+        website: data.website,
+      };
+
+      // Close dialog first
+      closeAppDialog();
+
+      // Animate card exit and then save
+      animateCardExit(elementId, "move", async () => {
+        // Remove from wishlist
+        setItems((prev) => prev.filter((item) => item.id !== itemBeingMovedToApplied.id));
+        await deleteWishlistItem(itemBeingMovedToApplied.id, storageMode);
+
+        // Save to applied
+        await upsertApplied(application, appliedStorageMode);
+
+        // Notify other pages to refresh
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event(COUNTS_EVENT));
+        }
+      });
+    } catch (err) {
+      console.error("Failed to move to applied:", err);
+    }
+  };
+
   const handleCardPointerDown = (
     item: WishlistItem,
     event: PointerEvent<HTMLElement>
@@ -797,8 +902,11 @@ export default function WishlistPage() {
 
   // Delete from wishlist via star
   function handleDelete(id: string) {
-    setItems((prev) => prev.filter((item) => item.id !== id));
-    void deleteWishlistItem(id, storageMode);
+    const elementId = `wishlist-card-${id}`;
+    animateCardExit(elementId, "delete", async () => {
+      setItems((prev) => prev.filter((item) => item.id !== id));
+      await deleteWishlistItem(id, storageMode);
+    });
   }
 
   // Add/edit from dialog
@@ -965,6 +1073,7 @@ export default function WishlistPage() {
             return (
               <article
                 key={item.id}
+                id={`wishlist-card-${item.id}`}
                 onPointerDown={(event) => handleCardPointerDown(item, event)}
                 onPointerMove={handleCardPointerMove}
                 onPointerUp={clearLongPress}
@@ -1116,6 +1225,16 @@ export default function WishlistPage() {
                     <option value="High">High</option>
                   </select>
 
+                  <button
+                    type="button"
+                    onClick={() => openMoveToAppliedDialog(item)}
+                    aria-label="Move to applied applications"
+                    className="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-emerald-50/70 px-2.5 py-1.5 text-sm text-emerald-700 shadow-sm hover:bg-emerald-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-300"
+                  >
+                    <CheckCircle className="h-4 w-4" aria-hidden="true" />
+                    Applied
+                  </button>
+
                   {item.website && (
                     <a
                       href={item.website}
@@ -1151,6 +1270,13 @@ export default function WishlistPage() {
         initialItem={editingItem}
         onClose={closeDialog}
         onSave={handleSaveFromDialog}
+      />
+
+      <AddApplicationDialog
+        open={appDialogOpen}
+        onClose={closeAppDialog}
+        onSave={handleMoveToApplied}
+        initialData={appDialogData}
       />
     </section>
   );
