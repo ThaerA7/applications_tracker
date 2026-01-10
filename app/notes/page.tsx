@@ -100,11 +100,19 @@ function truncateText(text: string, max = 220) {
 }
 
 function normalizeViewContent(value: string, initial: string) {
-  const trimmed = value.trim();
+  const normalized = value
+    .replace(/\r\n?/g, "\n")
+    .replace(/\u00a0/g, " ")
+    .replace(/[\u200B-\u200D\uFEFF\u2060]/g, "");
+  const lines = normalized.split("\n");
+  while (lines.length && lines[0].trim() === "") lines.shift();
+  while (lines.length && lines[lines.length - 1].trim() === "") lines.pop();
+  const collapsed = lines.join("\n");
+  const trimmed = collapsed.trim();
   if (!initial && trimmed === VIEW_CONTENT_PLACEHOLDER) {
     return "";
   }
-  return value;
+  return collapsed;
 }
 
 /** Solid color values used for swatches. */
@@ -999,21 +1007,16 @@ export default function NotesPage() {
               </div>
 
               <div className="mt-6 border-t border-neutral-200 pt-6">
-                <div
-                  contentEditable
-                  suppressContentEditableWarning
-                  onInput={(e) => {
-                    viewContentRef.current = e.currentTarget.innerText || "";
-                  }}
-                  onBlur={(e) => {
-                    const text = e.currentTarget.innerText || "";
+                <textarea
+                  value={viewContent}
+                  onChange={(e) => {
+                    const text = e.currentTarget.value;
                     viewContentRef.current = text;
                     setViewContent(text);
                   }}
-                  className="whitespace-pre-line text-base leading-relaxed text-neutral-700 focus:outline-none min-h-[200px]"
-                >
-                  {viewContent || VIEW_CONTENT_PLACEHOLDER}
-                </div>
+                  placeholder={VIEW_CONTENT_PLACEHOLDER}
+                  className="w-full min-h-[200px] resize-none border-0 bg-transparent p-0 text-base leading-relaxed text-neutral-700 focus:outline-none placeholder:text-neutral-400"
+                />
               </div>
 
               <div className="mt-6 flex items-center justify-end gap-2 border-t border-neutral-200 pt-4">
@@ -1028,10 +1031,14 @@ export default function NotesPage() {
                 <button
                   type="button"
                   onClick={async () => {
-                    const nextContent = viewContentRef.current;
+                    const nextContent = normalizeViewContent(
+                      viewContentRef.current,
+                      viewInitialContentRef.current
+                    );
+                    const trimmedContent = nextContent.trim();
                     const updated: Note = {
                       ...viewingNote,
-                      content: nextContent.trim() || "Empty note",
+                      content: trimmedContent || "Empty note",
                       updatedAt: new Date().toISOString(),
                     };
 
