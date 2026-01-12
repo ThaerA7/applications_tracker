@@ -933,7 +933,7 @@ export default function NotesPage() {
           />
 
           <div
-            className="relative z-10 w-full max-w-4xl max-h-screen"
+            className="relative z-10 w-full max-w-6xl max-h-screen"
             onClick={(e) => e.stopPropagation()}
           >
             <div 
@@ -953,7 +953,7 @@ export default function NotesPage() {
                   borderLeftWidth: 4,
                   borderLeftColor: getColorHex((viewingNote.color ?? "gray") as ColorKey),
                 }}
-                className="relative flex flex-col rounded-xl border p-6 sm:p-8 shadow-lg transition-all bg-white border-neutral-200"
+                className="relative flex flex-col rounded-xl border p-4 shadow-lg transition-all bg-white border-neutral-200"
               >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-3">
@@ -996,7 +996,7 @@ export default function NotesPage() {
 
               
 
-              <div className="mt-4 border-t border-neutral-200 pt-6">
+              <div className="mt-4 border-t border-neutral-200 pt-4">
                 <textarea
                   value={viewContent}
                   onChange={(e) => {
@@ -1005,7 +1005,7 @@ export default function NotesPage() {
                     setViewContent(text);
                   }}
                   placeholder={VIEW_CONTENT_PLACEHOLDER}
-                  className="w-full min-h-[500px] resize-none border-0 bg-transparent p-0 text-base leading-relaxed text-neutral-700 focus:outline-none placeholder:text-neutral-400"
+                  className="w-full min-h-[600px] resize-none border-0 bg-transparent p-0 text-base leading-relaxed text-neutral-700 focus:outline-none placeholder:text-neutral-400"
                 />
               </div>
 
