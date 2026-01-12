@@ -933,7 +933,7 @@ export default function NotesPage() {
           />
 
           <div
-            className="relative z-10 w-full max-w-4xl max-h-[90vh]"
+            className="relative z-10 w-full max-w-4xl max-h-screen"
             onClick={(e) => e.stopPropagation()}
           >
             <div 
@@ -977,7 +977,7 @@ export default function NotesPage() {
                 </button>
               </div>
 
-              <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-neutral-600">
+              <div className="mt-0 flex flex-wrap items-center gap-3 text-sm text-neutral-600">
                 <span className="inline-flex items-center gap-1.5">
                   <CalendarDays className="h-4 w-4" aria-hidden="true" />
                   <span>Updated</span>
@@ -994,19 +994,9 @@ export default function NotesPage() {
                 )}
               </div>
 
-              <div className="mt-3 flex flex-wrap gap-2">
-                {(viewingNote.tags ?? []).map((t: string) => (
-                  <span
-                    key={t}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white/70 px-3 py-1.5 text-sm text-neutral-700 backdrop-blur"
-                  >
-                    <Tag className="h-3.5 w-3.5" aria-hidden="true" />
-                    {t}
-                  </span>
-                ))}
-              </div>
+              
 
-              <div className="mt-6 border-t border-neutral-200 pt-6">
+              <div className="mt-4 border-t border-neutral-200 pt-6">
                 <textarea
                   value={viewContent}
                   onChange={(e) => {
@@ -1015,11 +1005,11 @@ export default function NotesPage() {
                     setViewContent(text);
                   }}
                   placeholder={VIEW_CONTENT_PLACEHOLDER}
-                  className="w-full min-h-[200px] resize-none border-0 bg-transparent p-0 text-base leading-relaxed text-neutral-700 focus:outline-none placeholder:text-neutral-400"
+                  className="w-full min-h-[500px] resize-none border-0 bg-transparent p-0 text-base leading-relaxed text-neutral-700 focus:outline-none placeholder:text-neutral-400"
                 />
               </div>
 
-              <div className="mt-6 flex items-center justify-end gap-2 border-t border-neutral-200 pt-4">
+              <div className="mt-2 flex items-center justify-end gap-2 border-t border-neutral-200 pt-4">
                 <button
                   type="button"
                   onClick={() => closeViewDialog(true)}
