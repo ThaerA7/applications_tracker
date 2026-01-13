@@ -33,6 +33,11 @@ export const ROUTES: Record<string, RouteConfig> = {
   },
   wishlist: { path: "/wishlist", title: "Wishlist", icon: "/icons/star.png" },
   notes: { path: "/notes", title: "Notes", icon: "/icons/note.png" },
+  documents: {
+    path: "/documents",
+    title: "Documents",
+    icon: "/icons/documents.png",
+  },
   calendar: {
     path: "/calendar",
     title: "Calendar",

@@ -76,7 +76,19 @@
 - Auto-icon matching based on job title (Developer, Designer, etc.)
 - Move wishlist items directly to applications when ready
 
-### 📋 Notes
+### � Documents
+
+- Upload and store **job-related documents** (resumes, cover letters, certificates, etc.)
+- Supported formats: **PDF, DOC, DOCX, TXT, PNG, JPG**
+- **Dual storage**:
+  - Guest users: Store documents locally in IndexedDB
+  - Authenticated users: Store in Supabase Storage (cloud)
+- **File preview** — view images and PDF first pages directly in cards
+- **Full-screen viewer** — open documents in a clean, distraction-free reader
+- Download, pin, edit, and delete documents
+- Organize with tags for easy categorization
+
+### �📋 Notes
 
 - **Color-coded sticky notes** (8 colors: gray, blue, green, yellow, orange, red, pink, purple)
 - **Pin important notes** to keep them at the top
