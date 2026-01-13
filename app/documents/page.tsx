@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { animateCardExit } from "@/components/dialogs/cardExitAnimation";
 
 import ThreeBounceSpinner from "@/components/ui/ThreeBounceSpinner";
 
@@ -405,18 +406,21 @@ export default function DocumentsPage() {
   async function confirmDelete() {
     if (!deleteTarget) return;
     const id = deleteTarget.id;
+    const elementId = `document-card-${id}`;
 
-    // Delete file from storage if exists (only for authenticated users)
-    if (deleteTarget.fileUrl && mode === "user") {
-      await deleteDocumentFile(deleteTarget.fileUrl);
-    }
-    // For guest users, fileData is stored in the document itself, so it will be removed with the document
+    animateCardExit(elementId, "delete", async () => {
+      // Delete file from storage if exists (only for authenticated users)
+      if (deleteTarget?.fileUrl && mode === "user") {
+        await deleteDocumentFile(deleteTarget.fileUrl);
+      }
+      // For guest users, fileData is stored in the document itself, so it will be removed with the document
 
-    setDocuments((prev) => prev.filter((d) => d.id !== id));
-    await deleteDocument(id, mode);
+      setDocuments((prev) => prev.filter((d) => d.id !== id));
+      await deleteDocument(id, mode);
 
-    setDeleteTarget(null);
-    notifyDocumentsChanged();
+      setDeleteTarget(null);
+      notifyDocumentsChanged();
+    });
   }
 
   function cancelDelete() {
@@ -448,7 +452,6 @@ export default function DocumentsPage() {
   const headerTips = [
     "Tip: Store resumes, cover letters, and references.",
     "Tip: Keep important documents organized with tags.",
-    "Tip: Pin frequently accessed documents.",
   ];
 
   return (
@@ -485,27 +488,14 @@ export default function DocumentsPage() {
           </div>
 
           <div className="hidden sm:flex flex-col items-end gap-2">
-            <div className="flex items-center justify-end gap-2">
-              {headerTips.slice(0, 2).map((tip) => (
-                <span
-                  key={tip}
-                  className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white/70 px-3 py-1 text-xs font-semibold text-neutral-700 shadow-sm"
-                >
+            {headerTips.map((tip) => (
+              <div key={tip} className="flex items-center justify-end">
+                <span className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white/70 px-3 py-1 text-xs font-semibold text-neutral-700 shadow-sm">
                   <Lightbulb className="h-4 w-4 text-amber-600" aria-hidden="true" />
                   <span className="text-neutral-700">{tip}</span>
                 </span>
-              ))}
-            </div>
-            {headerTips[2] ? (
-              <div className="flex items-center justify-end gap-2">
-                <span
-                  className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white/70 px-3 py-1 text-xs font-semibold text-neutral-700 shadow-sm"
-                >
-                  <Lightbulb className="h-4 w-4 text-amber-600" aria-hidden="true" />
-                  <span className="text-neutral-700">{headerTips[2]}</span>
-                </span>
               </div>
-            ) : null}
+            ))}
           </div>
         </div>
 
@@ -612,6 +602,7 @@ export default function DocumentsPage() {
               return (
                 <article
                   key={d.id}
+                  id={`document-card-${d.id}`}
                   className={[
                     "relative flex flex-col rounded-xl border shadow-sm transition-all",
                     "bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70",

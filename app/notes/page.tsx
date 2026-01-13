@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { animateCardExit } from "@/components/dialogs/cardExitAnimation";
 
 import ThreeBounceSpinner from "@/components/ui/ThreeBounceSpinner";
 
@@ -394,12 +395,15 @@ export default function NotesPage() {
   async function confirmDelete() {
     if (!deleteTarget) return;
     const id = deleteTarget.id;
+    const elementId = `note-card-${id}`;
 
-    setNotes((prev) => prev.filter((n) => n.id !== id));
-    await deleteNote(id, mode);
+    animateCardExit(elementId, "delete", async () => {
+      setNotes((prev) => prev.filter((n) => n.id !== id));
+      await deleteNote(id, mode);
 
-    setDeleteTarget(null);
-    notifyNotesChanged();
+      setDeleteTarget(null);
+      notifyNotesChanged();
+    });
   }
 
   function cancelDelete() {
@@ -620,6 +624,7 @@ export default function NotesPage() {
               return (
                 <article
                   key={n.id}
+                  id={`note-card-${n.id}`}
                   className={[
                     "relative flex flex-col rounded-xl border p-4 shadow-sm transition-all",
                     "bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70",
