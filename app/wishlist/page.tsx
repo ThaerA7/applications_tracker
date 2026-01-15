@@ -56,6 +56,11 @@ import {
   upsertApplied,
   type AppliedStorageMode,
 } from "@/lib/services/applied";
+import {
+  appendActivity,
+  detectActivityMode,
+  type ActivityItem,
+} from "@/lib/services/activity";
 
 /** sidebar refresh event name used across the app */
 const COUNTS_EVENT = "job-tracker:refresh-counts";
@@ -822,6 +827,21 @@ export default function WishlistPage() {
         website: data.website,
       };
 
+      const activityEntry: ActivityItem = {
+        id: makeUuid(),
+        appId,
+        type: "moved_to_applied",
+        timestamp: new Date().toISOString(),
+        company: application.company,
+        role: application.role,
+        location: application.location,
+        appliedOn: application.appliedOn,
+        fromStatus: "Wishlist",
+        toStatus: "Applied",
+      };
+
+      const activityMode = await detectActivityMode();
+
       // Close dialog first
       closeAppDialog();
 
@@ -833,6 +853,9 @@ export default function WishlistPage() {
 
         // Save to applied
         await upsertApplied(application, appliedStorageMode);
+
+        // Log in Applied activity
+        await appendActivity("applied", activityEntry, activityMode);
 
         // Notify other pages to refresh
         if (typeof window !== "undefined") {

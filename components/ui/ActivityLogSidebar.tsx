@@ -13,6 +13,7 @@ export type ActivityType =
   | "added"
   | "edited"
   | "deleted"
+  | "moved_to_applied"
   | "moved_to_interviews"
   | "moved_to_rejected"
   | "moved_to_withdrawn";
@@ -72,6 +73,8 @@ function getActivityIconSrc(type: ActivityType): string {
       return "/icons/edit.png";
     case "deleted":
       return "/icons/delete.png";
+    case "moved_to_applied":
+      return "/icons/add.png";
     case "moved_to_rejected":
       return "/icons/cancel.png";
     case "moved_to_withdrawn":
@@ -99,6 +102,8 @@ function getActivityLabel(
           return "Application updated";
         case "deleted":
           return "Application deleted";
+        case "moved_to_applied":
+          return "Moved to applied";
         case "moved_to_interviews":
           return "Moved to interviews";
         case "moved_to_rejected":
@@ -456,6 +461,7 @@ export default function ActivityLogSidebar({
                 const iconSrc = getActivityIconSrc(item.type);
 
                 const isMoveType =
+                  item.type === "moved_to_applied" ||
                   item.type === "moved_to_interviews" ||
                   item.type === "moved_to_rejected" ||
                   item.type === "moved_to_withdrawn";

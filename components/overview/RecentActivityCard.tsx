@@ -161,6 +161,9 @@ function buildLabel(item: InternalActivityItem) {
     case "moved_to_withdrawn":
       return withNote("Moved to Withdrawn");
 
+    case "moved_to_applied":
+      return withNote("Moved to Applied");
+
     default:
       if (from && to) {
         const prefix = `Status change (${from} → ${to})`;

@@ -24,6 +24,7 @@ export type ActivityType =
   | "added"
   | "edited"
   | "deleted"
+  | "moved_to_applied"
   | "moved_to_interviews"
   | "moved_to_rejected"
   | "moved_to_withdrawn";
