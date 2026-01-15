@@ -12,6 +12,7 @@ import { loadRejected } from "@/lib/services/rejected";
 import { loadOffers } from "@/lib/services/offers";
 import { loadWishlist } from "@/lib/services/wishlist";
 import { loadNotes } from "@/lib/services/notes";
+import { loadDocuments } from "@/lib/services/documents";
 
 type Item = {
   href: string;
@@ -30,6 +31,7 @@ const items: Item[] = [
   // Bottom cluster (order matters).
   { href: "/wishlist", label: "Wishlist", icon: "/icons/star.png" },
   { href: "/notes", label: "Notes", icon: "/icons/note.png" },
+  { href: "/documents", label: "Documents", icon: "/icons/documents.png" },
   { href: "/calendar", label: "Calendar", icon: "/icons/calendar.png" },
   { href: "/settings", label: "Settings", icon: "/icons/settings.png" },
 ];
@@ -51,6 +53,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
   const [withdrawnCount, setWithdrawnCount] = useState<number | null>(null);
   const [wishlistCount, setWishlistCount] = useState<number | null>(null);
   const [notesCount, setNotesCount] = useState<number | null>(null);
+  const [documentsCount, setDocumentsCount] = useState<number | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -72,6 +75,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
         loadOffers(),
         loadWishlist(),
         loadNotes(),
+        loadDocuments(),
       ];
 
       const timeout = new Promise<null>((resolve) =>
@@ -92,6 +96,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
         safeSet(() => setOffersCount(0));
         safeSet(() => setWishlistCount(0));
         safeSet(() => setNotesCount(0));
+        safeSet(() => setDocumentsCount(0));
         return;
       }
 
@@ -103,6 +108,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
         offersRes,
         wishlistRes,
         notesRes,
+        documentsRes,
       ] = settled;
 
       safeSet(() =>
@@ -143,6 +149,12 @@ export default function Sidebar({ collapsed }: SidebarProps) {
 
       safeSet(() =>
         setNotesCount(notesRes.status === "fulfilled" ? len(notesRes.value) : 0),
+      );
+
+      safeSet(() =>
+        setDocumentsCount(
+          documentsRes.status === "fulfilled" ? len(documentsRes.value) : 0
+        ),
       );
     };
 
@@ -228,6 +240,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
             const isWithdrawnItem = href === "/withdrawn";
             const isWishlistItem = href === "/wishlist";
             const isNotesItem = href === "/notes";
+            const isDocumentsItem = href === "/documents";
 
             return (
               <li key={href}>
@@ -304,6 +317,12 @@ export default function Sidebar({ collapsed }: SidebarProps) {
                   {!collapsed && isNotesItem && notesCount !== null && (
                     <span className="ml-2 inline-flex items-center justify-center rounded-full bg-zinc-800 px-2.5 py-0.5 text-xs font-semibold text-zinc-100">
                       {notesCount ?? "…"}
+                    </span>
+                  )}
+
+                  {!collapsed && isDocumentsItem && documentsCount !== null && (
+                    <span className="ml-2 inline-flex items-center justify-center rounded-full bg-zinc-800 px-2.5 py-0.5 text-xs font-semibold text-zinc-100">
+                      {documentsCount ?? "…"}
                     </span>
                   )}
                 </Link>
