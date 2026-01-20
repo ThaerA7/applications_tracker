@@ -80,7 +80,7 @@ function getActivityIconSrc(type: ActivityType): string {
     case "moved_to_withdrawn":
       return "/icons/withdrawn.png";
     case "moved_to_interviews":
-      return "/icons/add.png";
+      return "/icons/interview.png";
     default:
       return "/icons/history.png";
   }
