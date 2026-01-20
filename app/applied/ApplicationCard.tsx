@@ -77,7 +77,7 @@ export default function ApplicationCard({
       {/* Inner padding container for main content */}
       <div className="relative z-10 flex-1 px-5 pt-3 pb-6">
         {/* Header with square logo + company/role + actions (same layout as InterviewCard) */}
-        <div className="relative flex items-start gap-3 pr-16 sm:pr-20">
+        <div className="relative flex items-start gap-3 pr-32 sm:pr-36">
           {/* Logo */}
           {app.logoUrl?.trim() ? (
             <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-neutral-200 bg-white ring-1 ring-white/60">
@@ -99,15 +99,15 @@ export default function ApplicationCard({
           )}
 
           {/* Company / role (exact style as InterviewCard: company, then role line) */}
-          <div className="min-w-0">
+          <div className="flex-1 min-w-0 overflow-hidden">
             <div className="flex items-center gap-2">
-              <h2 className="max-w-full truncate text-base font-semibold text-neutral-900">
+              <h2 className="truncate text-base font-semibold text-neutral-900">
                 {app.company}
               </h2>
             </div>
 
             {app.role && (
-              <p className="mt-0.5 flex items-center gap-1 text-sm text-neutral-600">
+              <p className="mt-0.5 flex items-center gap-1 min-w-0 text-sm text-neutral-600">
                 <Briefcase
                   className="h-3.5 w-3.5 flex-shrink-0 text-neutral-400"
                   aria-hidden="true"

@@ -11,6 +11,7 @@ const APPLICATION_BUCKETS = [
   "rejected",
   "wishlist",
   "withdrawn",
+  "documents"
 ] as const;
 
 const ACTIVITY_VARIANTS = [
