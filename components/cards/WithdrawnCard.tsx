@@ -153,7 +153,7 @@ export default function WithdrawnCard({
       {/* inner padding – same as other cards, top gap = 3 */}
       <div className="relative z-10 flex-1 px-5 pt-3 pb-6">
         {/* Header: logo + company/role + actions */}
-        <div className="relative flex items-start gap-3 pr-16 sm:pr-20">
+        <div className="relative flex items-start gap-3 pr-32 sm:pr-36">
           {item.logoUrl ? (
             <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-neutral-200 bg-white ring-1 ring-white/60">
               <Image
@@ -170,11 +170,11 @@ export default function WithdrawnCard({
             </div>
           )}
 
-          <div className="min-w-0">
+          <div className="flex-1 min-w-0 overflow-hidden">
             <h2 className="truncate text-base font-semibold text-neutral-900">
               {item.company}
             </h2>
-            <p className="flex items-center gap-1 truncate text-sm text-neutral-600">
+            <p className="flex items-center gap-1 min-w-0 truncate text-sm text-neutral-600">
               <Briefcase
                 className="h-3.5 w-3.5 text-neutral-400"
                 aria-hidden="true"

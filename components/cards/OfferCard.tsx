@@ -136,7 +136,7 @@ export default function OffersReceivedCards({
               )}
 
               {/* header */}
-              <div className="relative z-10 flex items-start gap-3 pr-20 sm:pr-24">
+              <div className="relative z-10 flex items-start gap-3 pr-40 sm:pr-44">
                 {item.logoUrl ? (
                   <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-neutral-200 bg-white ring-1 ring-white/60">
                     <Image
@@ -153,11 +153,11 @@ export default function OffersReceivedCards({
                   </div>
                 )}
 
-                <div className="min-w-0">
-                  <h2 className="max-w-full truncate text-sm font-semibold text-neutral-900">
+                <div className="flex-1 min-w-0 overflow-hidden">
+                  <h2 className="truncate text-sm font-semibold text-neutral-900">
                     {item.company}
                   </h2>
-                  <p className="mt-0.5 text-sm text-neutral-700">
+                  <p className="mt-0.5 truncate text-sm text-neutral-700">
                     {item.role}
                   </p>
                 </div>
