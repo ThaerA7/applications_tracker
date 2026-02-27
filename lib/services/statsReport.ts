@@ -63,16 +63,18 @@ export async function generateCompanyStatsReport(
     interviewPhase: data.reduce((sum, row) => sum + row.interviewPhase, 0),
   };
 
-  const markValue = (value: number) => (value > 0 ? "✓" : "-");
+  const waitingMark = (value: number) => (value > 0 ? "⏳" : "-");
+  const rejectedMark = (value: number) => (value > 0 ? "✗" : "-");
+  const interviewMark = (value: number) => (value > 0 ? "✓" : "-");
 
   // Generate table rows
   const tableRows = data.map((row, index) => {
     return `
       <tr class="company-row ${index % 2 === 0 ? 'even' : 'odd'}">
         <td class="company-name" contenteditable="true">${row.company}</td>
-        <td class="stat-waiting" contenteditable="true">${markValue(row.waiting)}</td>
-        <td class="stat-rejected" contenteditable="true">${markValue(row.rejected)}</td>
-        <td class="stat-interview" contenteditable="true">${markValue(row.interviewPhase)}</td>
+        <td class="stat-waiting" contenteditable="true">${waitingMark(row.waiting)}</td>
+        <td class="stat-rejected" contenteditable="true">${rejectedMark(row.rejected)}</td>
+        <td class="stat-interview" contenteditable="true">${interviewMark(row.interviewPhase)}</td>
         <td class="stat-total" contenteditable="true"></td>
       </tr>
     `;
