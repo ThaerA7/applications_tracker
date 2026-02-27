@@ -39,7 +39,7 @@ import ImportConfirmDialog from "@/components/dialogs/ImportConfirmDialog";
 import DeleteAllDataConfirmDialog from "@/components/dialogs/DeleteAllDataConfirmDialog";
 import DeleteAccountConfirmDialog from "@/components/dialogs/DeleteAccountConfirmDialog";
 import { clearAllData, clearAllLocalData } from "@/lib/services/purge";
-import { generateCompanyStatsExcel } from "@/lib/services/excelExport";
+import { generateCompanyStatsReport } from "@/lib/services/statsReport";
 
 type Preferences = {
   reminders: boolean;
@@ -360,7 +360,7 @@ export default function SettingsPage() {
     importInputRef.current?.click();
   }, []);
 
-  const handleExcelExport = useCallback(async () => {
+  const handleStatsReport = useCallback(async () => {
     try {
       const [appliedRes, interviewsRes, rejectedRes] = await Promise.all([
         loadApplied(),
@@ -368,13 +368,13 @@ export default function SettingsPage() {
         loadRejected(),
       ]);
 
-      await generateCompanyStatsExcel(
+      await generateCompanyStatsReport(
         appliedRes.items,
         rejectedRes.items,
         interviewsRes.items
       );
     } catch (err: any) {
-      alert("Excel export failed: " + (err?.message ?? String(err)));
+      alert("Report export failed: " + (err?.message ?? String(err)));
     }
   }, []);
 
@@ -1165,14 +1165,14 @@ export default function SettingsPage() {
 
               <div className="flex items-start justify-between gap-3 rounded-lg border border-dashed border-neutral-300 bg-white/60 p-3">
                 <div>
-                  <p className="text-sm font-semibold text-neutral-900">Company stats Excel</p>
-                  <p className="text-xs text-neutral-600">Download company statistics (waiting, rejected, interview phase) as an Excel file.</p>
+                  <p className="text-sm font-semibold text-neutral-900">Company Stats Report</p>
+                  <p className="text-xs text-neutral-600">Download a beautifully designed HTML report with company statistics.</p>
                 </div>
                 <div>
                   <button
                     type="button"
                     className="inline-flex h-8 w-24 items-center justify-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-1 text-sm font-medium text-neutral-800 shadow-sm hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-300"
-                    onClick={handleExcelExport}
+                    onClick={handleStatsReport}
                   >
                     <Download className="h-4 w-4" aria-hidden="true" />
                     Export
